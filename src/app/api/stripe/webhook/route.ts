@@ -8,6 +8,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const webhookSecret = env.stripe.webhookSecret();
+  if (!webhookSecret) {
+    return new NextResponse("Stripe webhook is not configured", { status: 503 });
+  }
+
   const stripe = getStripe();
   const sig = req.headers.get("stripe-signature");
   if (!sig) return new NextResponse("Missing stripe-signature", { status: 400 });
@@ -16,7 +21,7 @@ export async function POST(req: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, env.stripe.webhookSecret());
+    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
   } catch (err: any) {
     return new NextResponse(`Webhook Error: ${err?.message ?? "invalid signature"}`, { status: 400 });
   }
