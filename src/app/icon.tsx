@@ -1,41 +1,23 @@
-import { ImageResponse } from "next/server";
-
 export const size = {
   width: 64,
   height: 64
 };
 
-export const contentType = "image/png";
+export const contentType = "image/svg+xml";
 
 export default function Icon() {
-  return new ImageResponse(
-    (
-      <div
-        style={{
-          height: "100%",
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: 14,
-          backgroundColor: "#E8956D"
-        }}
-      >
-        <div
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 9999,
-            backgroundColor: "white"
-          }}
-        />
-      </div>
-    ),
-    {
-      width: size.width,
-      height: size.height
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}" viewBox="0 0 ${size.width} ${size.height}">
+  <rect width="${size.width}" height="${size.height}" rx="14" fill="#E8956D" />
+  <circle cx="${size.width / 2}" cy="${size.height / 2}" r="12" fill="#FFFFFF" />
+</svg>`;
+
+  return new Response(svg, {
+    headers: {
+      "content-type": contentType,
+      "cache-control": "public, max-age=31536000, immutable"
     }
-  );
+  });
 }
 
 
