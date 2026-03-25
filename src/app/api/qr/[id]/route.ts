@@ -21,8 +21,9 @@ export async function GET(
   });
 
   const download = new URL(req.url).searchParams.get("download") === "1";
+  const body = new Uint8Array(png);
 
-  return new NextResponse(png, {
+  return new NextResponse(body, {
     headers: {
       "content-type": "image/png",
       "cache-control": "no-store",
