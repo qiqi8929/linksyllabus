@@ -9,85 +9,86 @@ export async function signOutAction() {
   redirect("/");
 }
 
-export async function createSkuAction(formData: FormData) {
+export type TutorialStepInput = {
+  step_name: string;
+  description: string;
+  /** Stored in `steps.youtube_url`; may be YouTube or Vimeo. */
+  youtube_url: string;
+  start_time: number;
+  end_time: number;
+};
+
+/**
+ * Creates an inactive tutorial and all steps in one transaction (via sequential inserts).
+ * User completes Stripe checkout; webhook sets `skus.is_active = true`.
+ */
+export async function createInactiveSkuWithSteps(payload: {
+  tutorialName: string;
+  steps: TutorialStepInput[];
+}): Promise<{ skuId: string }> {
   const supabase = createSupabaseServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) {
+    throw new Error("Unauthorized");
+  }
 
-  const name = String(formData.get("name") || "").trim();
-  const description = String(formData.get("description") || "").trim();
-
+  const name = payload.tutorialName.trim();
   if (!name) {
-    throw new Error("请填写教程名称");
+    throw new Error("Tutorial name is required.");
+  }
+  if (!payload.steps.length) {
+    throw new Error("Add at least one step.");
+  }
+
+  for (let i = 0; i < payload.steps.length; i++) {
+    const s = payload.steps[i];
+    if (!s.step_name.trim() || !s.youtube_url.trim()) {
+      throw new Error(`Step ${i + 1}: name and video URL are required.`);
+    }
+    if (
+      !Number.isFinite(s.start_time) ||
+      !Number.isFinite(s.end_time) ||
+      s.end_time <= s.start_time
+    ) {
+      throw new Error(
+        `Step ${i + 1}: end time (seconds) must be greater than start time.`
+      );
+    }
   }
 
   await supabase.from("users").upsert({ id: user.id, email: user.email });
 
-  const { error } = await supabase.from("skus").insert({
-    user_id: user.id,
-    name,
-    description,
-    is_active: true
-  });
-
-  if (error) throw error;
-  redirect(`/dashboard`);
-}
-
-export async function createStepAction(formData: FormData) {
-  const supabase = createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const skuId = String(formData.get("sku_id") || "").trim();
-  const step_name = String(formData.get("step_name") || "").trim();
-  const description = String(formData.get("description") || "").trim();
-  const youtube_url = String(formData.get("youtube_url") || "").trim();
-  const start_time = Number(formData.get("start_time") || 0);
-  const end_time = Number(formData.get("end_time") || 0);
-
-  if (!skuId || !step_name || !youtube_url) {
-    throw new Error("请填写步骤名称与 YouTube 链接");
-  }
-  if (!Number.isFinite(start_time) || !Number.isFinite(end_time) || end_time <= start_time) {
-    throw new Error("结束时间（秒）必须大于开始时间（秒）");
-  }
-
-  const { data: owned } = await supabase
+  const { data: sku, error: skuErr } = await supabase
     .from("skus")
+    .insert({
+      user_id: user.id,
+      name,
+      description: "",
+      is_active: false
+    })
     .select("id")
-    .eq("id", skuId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+    .single();
 
-  if (!owned) {
-    throw new Error("无权在此教程下添加步骤");
+  if (skuErr || !sku) {
+    throw skuErr ?? new Error("Failed to create tutorial.");
   }
 
-  const { data: last } = await supabase
-    .from("steps")
-    .select("step_number")
-    .eq("sku_id", skuId)
-    .order("step_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const rows = payload.steps.map((s, idx) => ({
+    sku_id: sku.id,
+    step_number: idx + 1,
+    step_name: s.step_name.trim(),
+    description: s.description.trim(),
+    youtube_url: s.youtube_url.trim(),
+    start_time: Math.max(0, Math.floor(s.start_time)),
+    end_time: Math.floor(s.end_time)
+  }));
 
-  const step_number = (last?.step_number ?? 0) + 1;
+  const { error: stepErr } = await supabase.from("steps").insert(rows);
+  if (stepErr) {
+    throw stepErr;
+  }
 
-  const { error } = await supabase.from("steps").insert({
-    sku_id: skuId,
-    step_number,
-    step_name,
-    description,
-    youtube_url,
-    start_time: Math.max(0, Math.floor(start_time)),
-    end_time: Math.floor(end_time)
-  });
-
-  if (error) throw error;
-  redirect(`/dashboard`);
+  return { skuId: sku.id };
 }

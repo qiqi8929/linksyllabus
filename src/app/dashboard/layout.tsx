@@ -21,12 +21,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <div className="hidden text-xs text-zinc-500 md:block">{user.email}</div>
           </div>
           <div className="flex items-center gap-2">
-            <Link className="btn-ghost" href="/dashboard/new">
-              Add New Tutorial
+            <Link className="btn-ghost" href="/dashboard">
+              Dashboard
             </Link>
             <form action={signOutAction}>
               <button className="btn-danger" type="submit">
-                退出
+                Sign out
               </button>
             </form>
           </div>
@@ -36,4 +36,3 @@ export default async function DashboardLayout({ children }: { children: React.Re
     </div>
   );
 }
-

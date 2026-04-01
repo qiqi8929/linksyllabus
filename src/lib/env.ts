@@ -19,6 +19,9 @@ export const env = {
     secretKey: () => process.env.STRIPE_SECRET_KEY as string | undefined,
     webhookSecret: () => process.env.STRIPE_WEBHOOK_SECRET as string | undefined,
     publishableKey: () => process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY as string | undefined
-  }
+  },
+
+  /** Server-only. Step description generation via Gemini; omit in env to disable AI. */
+  geminiApiKey: () => process.env.GEMINI_API_KEY as string | undefined
 };
 

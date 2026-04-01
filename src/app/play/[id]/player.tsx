@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Player from "@vimeo/player";
 
 declare global {
   interface Window {
@@ -9,7 +10,7 @@ declare global {
   }
 }
 
-type Props = {
+type YtProps = {
   playbackId: string;
   videoId: string;
   startTime: number;
@@ -40,7 +41,7 @@ function loadYouTubeIframeApi(): Promise<void> {
   });
 }
 
-export function PlayerClient({ playbackId, videoId, startTime, endTime }: Props) {
+export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime }: YtProps) {
   const containerId = useMemo(() => `yt-player-${playbackId}`, [playbackId]);
   const playerRef = useRef<any>(null);
   const intervalRef = useRef<number | null>(null);
@@ -131,7 +132,6 @@ export function PlayerClient({ playbackId, videoId, startTime, endTime }: Props)
   }
 
   function onClose() {
-    // Prefer closing the tab if the browser allows it; otherwise go back.
     try {
       window.close();
     } catch {}
@@ -141,7 +141,6 @@ export function PlayerClient({ playbackId, videoId, startTime, endTime }: Props)
         window.history.back();
         return;
       }
-      // Fallback: reload the current page to remove the overlay.
       window.location.reload();
     }, 50);
   }
@@ -149,19 +148,19 @@ export function PlayerClient({ playbackId, videoId, startTime, endTime }: Props)
   return (
     <div className="card overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-zinc-200 p-4">
-        <div className="text-sm text-zinc-600">播放控制（只播本步片段）</div>
+        <div className="text-sm text-zinc-600">Playback (this step only)</div>
         <div className="flex gap-2">
           {!started ? (
             <button className="btn-primary" disabled={!ready} onClick={onPlay}>
-              {ready ? "播放" : "加载中..."}
+              {ready ? "Play" : "Loading…"}
             </button>
           ) : (
             <>
               <button className="btn-ghost" onClick={onPause}>
-                暂停
+                Pause
               </button>
               <button className="btn-primary" onClick={onReplay}>
-                重播
+                Replay
               </button>
             </>
           )}
@@ -173,9 +172,9 @@ export function PlayerClient({ playbackId, videoId, startTime, endTime }: Props)
 
         {endedOverlay ? (
           <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white p-6">
-            <div className="text-xl font-semibold">回到教材</div>
+            <div className="text-xl font-semibold">Back to your material</div>
             <button className="btn-primary w-full max-w-sm" onClick={onClose}>
-              关闭
+              Close
             </button>
           </div>
         ) : null}
@@ -183,3 +182,143 @@ export function PlayerClient({ playbackId, videoId, startTime, endTime }: Props)
     </div>
   );
 }
+
+type VmProps = {
+  playbackId: string;
+  vimeoId: string;
+  startTime: number;
+  endTime: number;
+};
+
+export function VimeoPlayerClient({ playbackId, vimeoId, startTime, endTime }: VmProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<Player | null>(null);
+
+  const [ready, setReady] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [endedOverlay, setEndedOverlay] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/step/${playbackId}/scan`, { method: "POST" }).catch(() => {});
+  }, [playbackId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const el = containerRef.current;
+    const idNum = parseInt(vimeoId, 10);
+    if (!el || Number.isNaN(idNum)) return;
+
+    const player = new Player(el, {
+      id: idNum,
+      responsive: true,
+      controls: false
+    });
+    playerRef.current = player;
+
+    player
+      .ready()
+      .then(() => {
+        if (cancelled) return;
+        return player.setCurrentTime(startTime);
+      })
+      .then(() => {
+        if (cancelled) return;
+        return player.pause();
+      })
+      .then(() => {
+        if (!cancelled) setReady(true);
+      })
+      .catch(() => {});
+
+    player.on("timeupdate", (data) => {
+      if (data.seconds >= endTime) {
+        player.pause().catch(() => {});
+        setEndedOverlay(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      player.destroy().catch(() => {});
+    };
+  }, [vimeoId, startTime, endTime]);
+
+  async function onPlay() {
+    const player = playerRef.current;
+    if (!player) return;
+    setEndedOverlay(false);
+    setStarted(true);
+    try {
+      await player.setCurrentTime(startTime);
+      await player.play();
+    } catch {}
+  }
+
+  function onPause() {
+    playerRef.current?.pause().catch(() => {});
+  }
+
+  async function onReplay() {
+    const player = playerRef.current;
+    if (!player) return;
+    setEndedOverlay(false);
+    try {
+      await player.setCurrentTime(startTime);
+      await player.play();
+    } catch {}
+  }
+
+  function onClose() {
+    try {
+      window.close();
+    } catch {}
+
+    setTimeout(() => {
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+      window.location.reload();
+    }, 50);
+  }
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-zinc-200 p-4">
+        <div className="text-sm text-zinc-600">Playback (this step only)</div>
+        <div className="flex gap-2">
+          {!started ? (
+            <button className="btn-primary" disabled={!ready} onClick={onPlay}>
+              {ready ? "Play" : "Loading…"}
+            </button>
+          ) : (
+            <>
+              <button className="btn-ghost" onClick={onPause}>
+                Pause
+              </button>
+              <button className="btn-primary" onClick={onReplay}>
+                Replay
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="relative aspect-video bg-zinc-950">
+        <div ref={containerRef} className="absolute inset-0" />
+
+        {endedOverlay ? (
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white p-6">
+            <div className="text-xl font-semibold">Back to your material</div>
+            <button className="btn-primary w-full max-w-sm" onClick={onClose}>
+              Close
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** @deprecated Use YouTubePlayerClient */
+export const PlayerClient = YouTubePlayerClient;

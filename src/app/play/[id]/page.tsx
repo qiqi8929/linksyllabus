@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { extractYouTubeVideoId } from "@/lib/youtube";
-import { PlayerClient } from "@/app/play/[id]/player";
+import {
+  detectVideoKind,
+  extractVimeoVideoId,
+  extractYouTubeVideoId
+} from "@/lib/video";
+import { VimeoPlayerClient, YouTubePlayerClient } from "@/app/play/[id]/player";
 
 export const dynamic = "force-dynamic";
 
@@ -31,11 +35,11 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
     return (
       <main className="container-page py-10">
         <div className="card p-6">
-          <div className="text-lg font-semibold">未找到</div>
-          <div className="mt-1 text-sm text-zinc-600">该步骤不存在或已删除。</div>
+          <div className="text-lg font-semibold">Not found</div>
+          <div className="mt-1 text-sm text-zinc-600">This step does not exist or was removed.</div>
           <div className="mt-4">
             <Link className="btn-ghost" href="/">
-              返回首页
+              Home
             </Link>
           </div>
         </div>
@@ -45,7 +49,11 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
 
   const sku = Array.isArray(step.skus) ? step.skus[0] : step.skus;
 
-  const videoId = extractYouTubeVideoId(step.youtube_url);
+  const kind = detectVideoKind(step.youtube_url);
+  const youtubeId = extractYouTubeVideoId(step.youtube_url);
+  const vimeoId = extractVimeoVideoId(step.youtube_url);
+  const showYoutube = kind === "youtube" && Boolean(youtubeId);
+  const showVimeo = kind === "vimeo" && Boolean(vimeoId);
 
   return (
     <main className="container-page py-6 md:py-10">
@@ -53,32 +61,45 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
         <div className="card p-6">
           {sku?.name ? (
             <div className="text-xs text-zinc-500">
-              教程 · <span className="text-zinc-700">{sku.name}</span>
+              Tutorial · <span className="text-zinc-700">{sku.name}</span>
             </div>
           ) : null}
-          <div className="mt-1 text-xs text-zinc-500">步骤</div>
+          <div className="mt-1 text-xs text-zinc-500">Step</div>
           <div className="mt-1 text-xl font-semibold tracking-tight">{step.step_name}</div>
           {step.description ? (
             <div className="mt-3 whitespace-pre-wrap text-sm text-zinc-600">{step.description}</div>
           ) : null}
           <div className="mt-4 text-xs text-zinc-500">
-            片段：{step.start_time}s → {step.end_time}s
+            Clip: {step.start_time}s → {step.end_time}s
           </div>
         </div>
 
-        {videoId ? (
-          <PlayerClient
+        {showYoutube && youtubeId ? (
+          <YouTubePlayerClient
             playbackId={step.id}
-            videoId={videoId}
+            videoId={youtubeId}
             startTime={step.start_time}
             endTime={step.end_time}
           />
-        ) : (
+        ) : null}
+
+        {showVimeo && vimeoId ? (
+          <VimeoPlayerClient
+            playbackId={step.id}
+            vimeoId={vimeoId}
+            startTime={step.start_time}
+            endTime={step.end_time}
+          />
+        ) : null}
+
+        {!showYoutube && !showVimeo ? (
           <div className="card p-6">
-            <div className="text-sm font-medium">YouTube 链接无效</div>
-            <div className="mt-1 text-sm text-zinc-600">请联系发布者检查该步骤的视频链接。</div>
+            <div className="text-sm font-medium">Unsupported or invalid video URL</div>
+            <div className="mt-1 text-sm text-zinc-600">
+              Use a standard YouTube or Vimeo link for this step. Contact the author if this persists.
+            </div>
           </div>
-        )}
+        ) : null}
       </div>
     </main>
   );

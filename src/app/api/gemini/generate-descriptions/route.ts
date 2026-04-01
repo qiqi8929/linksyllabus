@@ -1,0 +1,80 @@
+import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
+import { generateStepDescriptions } from "@/lib/gemini";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type Body = {
+  tutorialName?: string;
+  steps?: Array<{
+    stepName?: string;
+    videoUrl?: string;
+    startTime?: number;
+    endTime?: number;
+  }>;
+};
+
+export async function POST(req: Request) {
+  if (!env.geminiApiKey()) {
+    return NextResponse.json(
+      { error: "AI generation is not configured (missing GEMINI_API_KEY)." },
+      { status: 503 }
+    );
+  }
+
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = (await req.json()) as Body;
+  const tutorialName = String(body.tutorialName ?? "").trim();
+  const rawSteps = body.steps ?? [];
+
+  if (!tutorialName) {
+    return NextResponse.json({ error: "Tutorial name is required." }, { status: 400 });
+  }
+  if (rawSteps.length === 0) {
+    return NextResponse.json({ error: "Add at least one step." }, { status: 400 });
+  }
+
+  const steps = rawSteps.map((s) => ({
+    stepName: String(s.stepName ?? "").trim(),
+    videoUrl: String(s.videoUrl ?? "").trim(),
+    startTime: Number(s.startTime ?? 0),
+    endTime: Number(s.endTime ?? 0)
+  }));
+
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    if (!s.stepName || !s.videoUrl) {
+      return NextResponse.json(
+        { error: `Step ${i + 1}: name and video URL are required.` },
+        { status: 400 }
+      );
+    }
+    if (
+      !Number.isFinite(s.startTime) ||
+      !Number.isFinite(s.endTime) ||
+      s.endTime <= s.startTime
+    ) {
+      return NextResponse.json(
+        { error: `Step ${i + 1}: end time must be greater than start time (seconds).` },
+        { status: 400 }
+      );
+    }
+  }
+
+  try {
+    const descriptions = await generateStepDescriptions(tutorialName, steps);
+    return NextResponse.json({ descriptions });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Generation failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

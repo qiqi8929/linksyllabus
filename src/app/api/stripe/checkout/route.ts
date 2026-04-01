@@ -25,7 +25,6 @@ export async function POST(req: Request) {
   await admin.from("users").upsert({ id: user.id, email: user.email });
 
   const appUrl = env.appUrl();
-  const success_url = `${appUrl}/dashboard?checkout=success`;
   const cancel_url = `${appUrl}/dashboard?checkout=cancel`;
 
   const stripe = getStripe();
@@ -52,6 +51,7 @@ export async function POST(req: Request) {
   }
 
   if (payload.type === "subscription") {
+    const success_url = `${appUrl}/dashboard?checkout=success`;
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
@@ -75,13 +75,15 @@ export async function POST(req: Request) {
 
   if (!sku) return NextResponse.json({ error: "SKU not found" }, { status: 404 });
   if (sku.user_id !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  if (sku.is_active) return NextResponse.json({ url: success_url });
+
+  const successSkuUrl = `${appUrl}/dashboard/success?checkout=success&skuId=${encodeURIComponent(skuId)}`;
+  if (sku.is_active) return NextResponse.json({ url: successSkuUrl });
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     customer: customerId,
     line_items: [{ price: STRIPE_PRICES.skuActivationOneTimeUsd19, quantity: 1 }],
-    success_url,
+    success_url: successSkuUrl,
     cancel_url,
     metadata: {
       type: "sku",
