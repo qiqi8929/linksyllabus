@@ -1,5 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { env } from "@/lib/env";
+
+const GEMINI_MODEL = "gemini-2.0-flash-lite";
 
 export type StepForGemini = {
   stepName: string;
@@ -40,24 +41,30 @@ Respond with a JSON object ONLY, in this exact shape:
 {"descriptions":["...","...",...]}
 There must be exactly ${steps.length} strings in "descriptions", in the same order as the steps.`;
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
-    generationConfig: {
-      temperature: 0.6,
-      responseMimeType: "application/json"
-    }
+  const url = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.6,
+        responseMimeType: "application/json"
+      }
+    })
   });
 
-  let text: string;
-  try {
-    const result = await model.generateContent(prompt);
-    text = result.response.text();
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(`Gemini request failed: ${msg}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini request failed: ${res.status} ${errText}`);
   }
 
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) {
     throw new Error("Empty response from Gemini");
   }
