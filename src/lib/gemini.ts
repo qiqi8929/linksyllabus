@@ -37,7 +37,7 @@ For each numbered step below, write ONE concise English description (2–4 sente
 Steps:
 ${lines.join("\n\n")}
 
-Respond with a JSON object ONLY, in this exact shape:
+Respond only with valid JSON, no markdown, no backticks. Use this exact shape:
 {"descriptions":["...","...",...]}
 There must be exactly ${steps.length} strings in "descriptions", in the same order as the steps.`;
 
@@ -49,8 +49,7 @@ There must be exactly ${steps.length} strings in "descriptions", in the same ord
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.6,
-        responseMimeType: "application/json"
+        temperature: 0.6
       }
     })
   });
