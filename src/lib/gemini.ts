@@ -39,7 +39,7 @@ Respond with a JSON object ONLY, in this exact shape:
 {"descriptions":["...","...",...]}
 There must be exactly ${steps.length} strings in "descriptions", in the same order as the steps.`;
 
-  const model = "gemini-2.5-flash-preview-04-17";
+  const model = "gemini-1.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetch(url, {
