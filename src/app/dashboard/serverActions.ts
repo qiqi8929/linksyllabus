@@ -42,23 +42,44 @@ export async function createInactiveSkuWithSteps(payload: {
     throw new Error("Add at least one step.");
   }
 
-  for (let i = 0; i < payload.steps.length; i++) {
-    const s = payload.steps[i];
-    if (!s.step_name.trim() || !s.youtube_url.trim()) {
-      throw new Error(`Step ${i + 1}: name and video URL are required.`);
-    }
-    if (
-      !Number.isFinite(s.start_time) ||
-      !Number.isFinite(s.end_time) ||
-      s.end_time <= s.start_time
-    ) {
-      throw new Error(
-        `Step ${i + 1}: end time (seconds) must be greater than start time.`
-      );
-    }
+  if (!user.id) {
+    throw new Error("Missing user id.");
   }
 
-  await supabase.from("users").upsert({ id: user.id, email: user.email });
+  /** Server actions may strip `undefined`; missing keys become NULL on insert — coerce everything. */
+  const normalized = payload.steps.map((s, idx) => {
+    const step_name = String(s.step_name ?? "").trim();
+    const description = String(s.description ?? "").trim();
+    const youtube_url = String(s.youtube_url ?? "").trim();
+    const startRaw = Number(s.start_time);
+    const endRaw = Number(s.end_time);
+    const start_time = Math.max(0, Math.floor(Number.isFinite(startRaw) ? startRaw : 0));
+    const end_time = Math.floor(endRaw);
+
+    if (!step_name || !youtube_url) {
+      throw new Error(`Step ${idx + 1}: name and video URL are required.`);
+    }
+    if (
+      !Number.isFinite(endRaw) ||
+      !Number.isFinite(end_time) ||
+      end_time <= start_time
+    ) {
+      throw new Error(
+        `Step ${idx + 1}: end time (seconds) must be greater than start time.`
+      );
+    }
+
+    return {
+      step_number: idx + 1,
+      step_name,
+      description,
+      youtube_url,
+      start_time,
+      end_time
+    };
+  });
+
+  await supabase.from("users").upsert({ id: user.id, email: user.email ?? null });
 
   const { data: sku, error: skuErr } = await supabase
     .from("skus")
@@ -75,14 +96,9 @@ export async function createInactiveSkuWithSteps(payload: {
     throw skuErr ?? new Error("Failed to create tutorial.");
   }
 
-  const rows = payload.steps.map((s, idx) => ({
+  const rows = normalized.map((r) => ({
     sku_id: sku.id,
-    step_number: idx + 1,
-    step_name: s.step_name.trim(),
-    description: s.description.trim(),
-    youtube_url: s.youtube_url.trim(),
-    start_time: Math.max(0, Math.floor(s.start_time)),
-    end_time: Math.floor(s.end_time)
+    ...r
   }));
 
   const { error: stepErr } = await supabase.from("steps").insert(rows);
