@@ -13,6 +13,7 @@ type SkuNested = { name: string; is_active: boolean };
 
 type StepWithSku = {
   id: string;
+  step_number: number;
   step_name: string;
   description: string;
   youtube_url: string;
@@ -25,7 +26,9 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
   const admin = createSupabaseAdminClient();
   const { data: row } = await admin
     .from("steps")
-    .select("id,step_name,description,youtube_url,start_time,end_time, skus ( name, is_active )")
+    .select(
+      "id,step_number,step_name,description,youtube_url,start_time,end_time, skus ( name, is_active )"
+    )
     .eq("id", params.id)
     .maybeSingle();
 
@@ -64,7 +67,9 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
               Tutorial · <span className="text-zinc-700">{sku.name}</span>
             </div>
           ) : null}
-          <div className="mt-1 text-xs text-zinc-500">Step</div>
+          <div className="mt-1 text-xs text-zinc-500">
+            Step {step.step_number}
+          </div>
           <div className="mt-1 text-xl font-semibold tracking-tight">{step.step_name}</div>
           {step.description ? (
             <div className="mt-3 whitespace-pre-wrap text-sm text-zinc-600">{step.description}</div>

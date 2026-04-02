@@ -66,7 +66,11 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime }:
         height: "100%",
         videoId,
         playerVars: {
-          autoplay: 0,
+          // Equivalent to:
+          // https://www.youtube.com/embed/{videoId}?start={startTime}&end={endTime}&autoplay=1&rel=0&modestbranding=1
+          autoplay: 1,
+          start: startTime,
+          end: endTime,
           rel: 0,
           modestbranding: 1,
           controls: 0,
@@ -78,8 +82,39 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime }:
           onReady: () => {
             setReady(true);
             try {
-              playerRef.current?.seekTo(startTime, true);
-              playerRef.current?.pauseVideo();
+              // Ensure the segment starts exactly at `startTime`.
+              playerRef.current?.seekTo?.(startTime, true);
+            } catch {}
+          },
+          onStateChange: (event: any) => {
+            try {
+              const state = event?.data;
+              const PLAYING = window.YT?.PlayerState?.PLAYING;
+              const ENDED = window.YT?.PlayerState?.ENDED;
+              const PAUSED = window.YT?.PlayerState?.PAUSED;
+
+              if (state === PLAYING) {
+                setStarted(true);
+                setEndedOverlay(false);
+                beginWatchdog();
+                return;
+              }
+
+              if (state === ENDED) {
+                setStarted(false);
+                setEndedOverlay(true);
+                if (intervalRef.current) window.clearInterval(intervalRef.current);
+                intervalRef.current = null;
+                return;
+              }
+
+              if (state === PAUSED) {
+                // If we paused manually, hide end overlay.
+                if (intervalRef.current) window.clearInterval(intervalRef.current);
+                intervalRef.current = null;
+                setStarted(false);
+                return;
+              }
             } catch {}
           }
         }
@@ -102,11 +137,13 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime }:
     intervalRef.current = window.setInterval(() => {
       try {
         const t = Number(playerRef.current?.getCurrentTime?.() ?? 0);
+        // YT can be slightly late/early; treat `endTime` as inclusive.
         if (t >= endTime) {
           playerRef.current?.pauseVideo?.();
           window.clearInterval(intervalRef.current!);
           intervalRef.current = null;
           setEndedOverlay(true);
+          setStarted(false);
         }
       } catch {}
     }, 100);
@@ -117,7 +154,6 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime }:
     setStarted(true);
     playerRef.current?.seekTo?.(startTime, true);
     playerRef.current?.playVideo?.();
-    beginWatchdog();
   }
 
   function onPause() {
@@ -128,7 +164,6 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime }:
     setEndedOverlay(false);
     playerRef.current?.seekTo?.(startTime, true);
     playerRef.current?.playVideo?.();
-    beginWatchdog();
   }
 
   function onClose() {
@@ -160,7 +195,7 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime }:
                 Pause
               </button>
               <button className="btn-primary" onClick={onReplay}>
-                Replay
+                ▶ Replay
               </button>
             </>
           )}
@@ -173,6 +208,9 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime }:
         {endedOverlay ? (
           <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white p-6">
             <div className="text-xl font-semibold">Back to your material</div>
+            <button className="btn-primary w-full max-w-sm" onClick={onReplay}>
+              ▶ Replay
+            </button>
             <button className="btn-primary w-full max-w-sm" onClick={onClose}>
               Close
             </button>
