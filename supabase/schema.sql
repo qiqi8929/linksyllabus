@@ -8,12 +8,15 @@ create table if not exists public.users (
   created_at timestamptz not null default now()
 );
 
--- skus（教程容器：不再含 youtube / 起止秒）
+-- skus（教程容器；视频片段在 steps。部分线上库仍在 skus 上保留占位列 youtube_url / start_time / end_time，插入时必须填）
 create table if not exists public.skus (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references public.users(id) on delete cascade,
   name text not null,
   description text not null default '',
+  youtube_url text not null default '',
+  start_time int not null default 0,
+  end_time int not null default 0,
   scan_count int not null default 0,
   is_active boolean not null default true,
   created_at timestamptz not null default now()
