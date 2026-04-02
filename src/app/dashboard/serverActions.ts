@@ -87,6 +87,7 @@ export async function createInactiveSkuWithSteps(payload: {
       user_id: user.id,
       name,
       description: "",
+      youtube_url: "",
       is_active: false
     })
     .select("id")
