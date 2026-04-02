@@ -19,6 +19,7 @@ type StepWithSku = {
   youtube_url: string;
   start_time: number;
   end_time: number;
+  sku_id: string;
   skus: SkuNested | SkuNested[] | null;
 };
 
@@ -27,7 +28,7 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
   const { data: row } = await admin
     .from("steps")
     .select(
-      "id,step_number,step_name,description,youtube_url,start_time,end_time, skus ( name, is_active )"
+      "id,step_number,step_name,description,youtube_url,start_time,end_time,sku_id, skus ( name, is_active )"
     )
     .eq("id", params.id)
     .maybeSingle();
@@ -85,6 +86,8 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
             videoId={youtubeId}
             startTime={step.start_time}
             endTime={step.end_time}
+            skuId={step.sku_id}
+            stepNumber={step.step_number}
           />
         ) : null}
 
@@ -94,6 +97,8 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
             vimeoId={vimeoId}
             startTime={step.start_time}
             endTime={step.end_time}
+            skuId={step.sku_id}
+            stepNumber={step.step_number}
           />
         ) : null}
 
