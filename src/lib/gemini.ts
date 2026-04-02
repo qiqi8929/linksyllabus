@@ -10,6 +10,44 @@ export type StepForGemini = {
   endTime: number;
 };
 
+/** Normalize model output: trim, strip ``` fences, then parse JSON with a fallback extractor. */
+function parseDescriptionsPayload(raw: string): { descriptions: string[] } {
+  let s = raw.trim();
+  // ```json ... ``` or ``` ... ```
+  s = s.replace(/^```(?:json)?\s*\r?\n?/i, "");
+  s = s.replace(/\r?\n?```\s*$/i, "");
+  s = s.trim();
+
+  const tryParse = (chunk: string) => JSON.parse(chunk) as { descriptions?: unknown };
+
+  try {
+    const o = tryParse(s);
+    if (Array.isArray(o.descriptions)) {
+      return { descriptions: o.descriptions.map((d) => String(d ?? "").trim()) };
+    }
+  } catch {
+    // fall through
+  }
+
+  const start = s.indexOf("{");
+  const end = s.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    const slice = s.slice(start, end + 1);
+    try {
+      const o = tryParse(slice);
+      if (Array.isArray(o.descriptions)) {
+        return { descriptions: o.descriptions.map((d) => String(d ?? "").trim()) };
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  throw new Error(
+    `Gemini returned non-JSON text: ${raw.length > 280 ? `${raw.slice(0, 280)}…` : raw}`
+  );
+}
+
 /**
  * Returns one English description per step (same order as input).
  */
@@ -69,13 +107,7 @@ There must be exactly ${steps.length} strings in "descriptions", in the same ord
     throw new Error("Empty response from Gemini");
   }
 
-  let parsed: { descriptions?: string[] };
-  try {
-    parsed = JSON.parse(text) as { descriptions?: string[] };
-  } catch {
-    throw new Error("Gemini returned non-JSON text");
-  }
-
+  const parsed = parseDescriptionsPayload(text);
   const descriptions = parsed.descriptions;
   if (!Array.isArray(descriptions) || descriptions.length !== steps.length) {
     throw new Error(
