@@ -26,13 +26,20 @@ export default async function DashboardPage() {
     return null;
   }
 
-  const { data: rawSkus } = await supabase
-    .from("skus")
-    .select("id,name,is_active,steps(id,step_number,step_name,scan_count)")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+  let skus: SkuRow[] = [];
+  try {
+    const { data: rawSkus, error } = await supabase
+      .from("skus")
+      .select("id,name,is_active,steps(id,step_number,step_name,scan_count)")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
 
-  const skus = (rawSkus ?? []) as SkuRow[];
+    if (!error && rawSkus) {
+      skus = rawSkus as SkuRow[];
+    }
+  } catch {
+    skus = [];
+  }
 
   return (
     <div className="space-y-12">
