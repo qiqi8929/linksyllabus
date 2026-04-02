@@ -1,6 +1,7 @@
 import { env } from "@/lib/env";
 
-const GEMINI_MODEL = "gemini-2.0-flash-lite";
+/** Stable successor to deprecated `gemini-2.0-flash-lite` (not available to new users). */
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
 
 export type StepForGemini = {
   stepName: string;
