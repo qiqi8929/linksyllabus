@@ -385,7 +385,7 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime, s
             onClick={toggleVoice}
             aria-pressed={voiceListening}
           >
-            {voiceListening ? "⏹ Voice Control" : "🎤 Voice Control"}
+            🎤 Voice Control
           </button>
           {!started ? (
             <button className="btn-primary" disabled={!ready} onClick={onPlay}>
@@ -602,7 +602,7 @@ export function VimeoPlayerClient({
             onClick={toggleVoice}
             aria-pressed={voiceListening}
           >
-            {voiceListening ? "⏹ Voice Control" : "🎤 Voice Control"}
+            🎤 Voice Control
           </button>
           {!started ? (
             <button className="btn-primary" disabled={!ready} onClick={onPlay}>
