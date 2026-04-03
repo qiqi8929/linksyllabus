@@ -25,9 +25,6 @@ export const env = {
   },
 
   /** Server-only. Step description generation via Gemini; omit in env to disable AI. */
-  geminiApiKey: () => process.env.GEMINI_API_KEY as string | undefined,
-
-  /** Server-only. YouTube Data API v3 (video snippet / description). */
-  youtubeApiKey: () => process.env.YOUTUBE_API_KEY as string | undefined
+  geminiApiKey: () => process.env.GEMINI_API_KEY as string | undefined
 };
 

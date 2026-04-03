@@ -101,14 +101,19 @@ export function TutorialCreator() {
     return null;
   }, [tutorialName, steps]);
 
-  const extractTimestampsFromVideoDescription = async () => {
+  const extractTimestampsFromYouTubeVideo = async () => {
     const url = chapterVideoUrl.trim();
     if (!url) {
-      setError("Paste a YouTube URL above to extract timestamps from its description.");
+      setError("Paste a YouTube URL above to auto-extract timestamps.");
       return;
     }
     if (!extractYouTubeVideoId(url)) {
-      setError("Use a valid YouTube URL for description extraction.");
+      setError("Use a valid YouTube URL.");
+      return;
+    }
+    const stepNames = steps.map((s) => s.step_name.trim()).filter(Boolean);
+    if (stepNames.length === 0) {
+      setError("Enter at least one step name in the steps below.");
       return;
     }
     setError(null);
@@ -117,7 +122,7 @@ export function TutorialCreator() {
       const res = await fetch("/api/gemini/extract-timestamps-from-description", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ youtubeUrl: url })
+        body: JSON.stringify({ youtubeUrl: url, stepNames })
       });
       const data = (await res.json()) as {
         steps?: Array<{ stepName: string; start_time: number; end_time: number }>;
@@ -128,20 +133,32 @@ export function TutorialCreator() {
       }
       const list = data.steps ?? [];
       if (!list.length) {
-        throw new Error("No steps with timestamps were found in the video description.");
+        throw new Error("The model did not return timestamps for any step.");
       }
-      setSteps(
-        list.map((s) => ({
-          id: makeId(),
-          step_name: s.stepName,
-          video_url: url,
-          start_time: Math.floor(s.start_time),
-          end_time: Math.floor(s.end_time),
-          description: ""
-        }))
+      const byName = new Map(
+        list.map((s) => [s.stepName.trim(), s] as const)
       );
+      let matched = 0;
+      setSteps((prev) =>
+        prev.map((row) => {
+          const m = byName.get(row.step_name.trim());
+          if (!m) return row;
+          matched += 1;
+          return {
+            ...row,
+            video_url: url,
+            start_time: Math.floor(m.start_time),
+            end_time: Math.floor(m.end_time)
+          };
+        })
+      );
+      if (matched === 0) {
+        throw new Error(
+          "No step names matched the response. Use the exact same labels you asked the model to find."
+        );
+      }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Description extraction failed.");
+      setError(e instanceof Error ? e.message : "Timestamp extraction failed.");
     } finally {
       setDescExtractLoading(false);
     }
@@ -291,7 +308,7 @@ export function TutorialCreator() {
 
         <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50/80 p-4">
           <label className="text-sm font-medium" htmlFor="chapter-youtube-url">
-            YouTube URL (for chapter extraction)
+            YouTube URL (same video for the steps below)
           </label>
           <input
             id="chapter-youtube-url"
@@ -304,13 +321,18 @@ export function TutorialCreator() {
             <button
               type="button"
               className="btn-ghost text-sm"
-              disabled={descExtractLoading || !chapterVideoUrl.trim()}
-              onClick={() => void extractTimestampsFromVideoDescription()}
+              disabled={
+                descExtractLoading ||
+                !chapterVideoUrl.trim() ||
+                !steps.some((s) => s.step_name.trim())
+              }
+              onClick={() => void extractTimestampsFromYouTubeVideo()}
             >
-              {descExtractLoading ? "Extracting…" : "✨ Auto-extract timestamps from video description"}
+              {descExtractLoading ? "Analyzing video…" : "✨ Auto-extract timestamps"}
             </button>
             <span className="text-xs text-zinc-500">
-              Fetches the video description via YouTube Data API, then uses Gemini to fill steps.
+              Gemini 1.5 Pro watches the video and finds clip times for your step names (no YouTube Data
+              API).
             </span>
           </div>
         </div>

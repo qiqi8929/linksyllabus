@@ -4,8 +4,8 @@ import { extractYouTubeVideoId } from "@/lib/video";
 /** Stable successor to deprecated `gemini-2.0-flash-lite` (not available to new users). */
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
 
-/** Video understanding (YouTube URL) — use a model that supports multimodal video. */
-const GEMINI_MODEL_VIDEO = "gemini-2.5-flash";
+/** Native YouTube video analysis (Gemini watches the video URL). */
+const GEMINI_MODEL_YOUTUBE_VIDEO = "gemini-1.5-pro";
 
 export type StepForGemini = {
   stepName: string;
@@ -52,104 +52,113 @@ function parseDescriptionsPayload(raw: string): { descriptions: string[] } {
   );
 }
 
-function parseTimestampsPayload(raw: string): { start_time: number; end_time: number } {
+/**
+ * Uses Gemini 1.5 Pro native YouTube video understanding for a single step name.
+ */
+export async function extractVideoTimestamps(
+  youtubeUrl: string,
+  stepName: string
+): Promise<{ start_time: number; end_time: number }> {
+  const name = stepName.trim();
+  if (!name) {
+    throw new Error("Step name is required for timestamp detection.");
+  }
+
+  const rows = await extractTimestampsForStepsFromYouTubeVideo(youtubeUrl, [name]);
+  const row = rows.find((r) => r.stepName === name) ?? rows[0];
+  if (!row) {
+    throw new Error("Could not determine timestamps for this step.");
+  }
+  return { start_time: row.start_time, end_time: row.end_time };
+}
+
+export type StepTimestampFromVideo = {
+  stepName: string;
+  start_time: number;
+  end_time: number;
+};
+
+function parseVideoStepTimestampsArray(raw: string): StepTimestampFromVideo[] {
   let s = raw.trim();
   s = s.replace(/^```(?:json)?\s*\r?\n?/i, "");
   s = s.replace(/\r?\n?```\s*$/i, "");
   s = s.trim();
 
-  const tryParse = (chunk: string) =>
-    JSON.parse(chunk) as { start_time?: unknown; end_time?: unknown };
+  const coerceItem = (o: Record<string, unknown>): StepTimestampFromVideo | null => {
+    const stepName = String(o?.stepName ?? "").trim();
+    const startSec = o?.start_time_seconds ?? o?.start_time;
+    const endSec = o?.end_time_seconds ?? o?.end_time;
+    const start_time = Math.floor(Number(startSec));
+    const end_time = Math.floor(Number(endSec));
+    if (!stepName || !Number.isFinite(start_time) || !Number.isFinite(end_time)) return null;
+    if (end_time <= start_time) return null;
+    return { stepName, start_time, end_time };
+  };
 
-  const coerce = (o: { start_time?: unknown; end_time?: unknown }) => {
-    const start_time = Math.floor(Number(o.start_time));
-    const end_time = Math.floor(Number(o.end_time));
-    if (
-      !Number.isFinite(start_time) ||
-      !Number.isFinite(end_time) ||
-      end_time <= start_time
-    ) {
-      throw new Error("Invalid start_time/end_time in JSON");
+  const parseArray = (chunk: string): StepTimestampFromVideo[] => {
+    const arr = JSON.parse(chunk) as unknown;
+    if (!Array.isArray(arr)) throw new Error("Expected JSON array");
+    const out: StepTimestampFromVideo[] = [];
+    for (const item of arr) {
+      if (!item || typeof item !== "object") continue;
+      const row = coerceItem(item as Record<string, unknown>);
+      if (row) out.push(row);
     }
-    return { start_time, end_time };
+    return out.sort((a, b) => a.start_time - b.start_time);
   };
 
   try {
-    return coerce(tryParse(s));
+    return parseArray(s);
   } catch {
     // fall through
   }
 
-  const start = s.indexOf("{");
-  const end = s.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    const slice = s.slice(start, end + 1);
+  const lb = s.indexOf("[");
+  const rb = s.lastIndexOf("]");
+  if (lb >= 0 && rb > lb) {
     try {
-      return coerce(tryParse(slice));
+      return parseArray(s.slice(lb, rb + 1));
     } catch {
       // fall through
     }
   }
 
   throw new Error(
-    `Gemini returned non-JSON timestamps: ${raw.length > 280 ? `${raw.slice(0, 280)}…` : raw}`
+    `Gemini returned non-JSON array: ${raw.length > 280 ? `${raw.slice(0, 280)}…` : raw}`
   );
 }
 
-/**
- * Uses Gemini video understanding on a **YouTube** URL to estimate clip bounds for a step.
- * Returns start/end times in seconds.
- */
-export async function extractVideoTimestamps(
+async function generateContentYouTubeVideo(
   youtubeUrl: string,
-  stepName: string
-): Promise<{ start_time: number; end_time: number }> {
+  textPrompt: string,
+  temperature: number
+): Promise<string> {
   const apiKey = env.geminiApiKey();
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const urlTrim = youtubeUrl.trim();
-  if (!extractYouTubeVideoId(urlTrim)) {
-    throw new Error("Timestamp auto-detect supports YouTube URLs only.");
-  }
+  const url = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL_YOUTUBE_VIDEO}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-  const name = stepName.trim();
-  if (!name) {
-    throw new Error("Step name is required for timestamp detection.");
-  }
-
-  const prompt = `You are analyzing a YouTube video provided as context.
-
-For the step titled: "${name}"
-
-Find the start and end timestamps (in whole seconds from the beginning of the video) for the segment that best matches this step. The segment should be contiguous and reasonably tight (not the entire video unless the whole video is truly about only this step).
-
-Respond only with valid JSON, no markdown, no backticks. Use this exact shape:
-{"start_time": <integer seconds>, "end_time": <integer seconds>}
-Ensure end_time is strictly greater than start_time.`;
-
-  const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL_VIDEO}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  const res = await fetch(apiUrl, {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       contents: [
         {
           parts: [
-            { text: prompt },
             {
               fileData: {
-                mimeType: "video/mp4",
-                fileUri: urlTrim
+                mimeType: "video/youtube",
+                fileUri: youtubeUrl.trim()
               }
-            }
+            },
+            { text: textPrompt }
           ]
         }
       ],
       generationConfig: {
-        temperature: 0.2
+        temperature
       }
     })
   });
@@ -167,136 +176,40 @@ Ensure end_time is strictly greater than start_time.`;
   if (!text) {
     throw new Error("Empty response from Gemini");
   }
-
-  return parseTimestampsPayload(text);
-}
-
-export type StepTimestampFromDescription = {
-  stepName: string;
-  start_time: number;
-  end_time: number;
-};
-
-function parseStepsTimestampsPayload(raw: string): StepTimestampFromDescription[] {
-  let s = raw.trim();
-  s = s.replace(/^```(?:json)?\s*\r?\n?/i, "");
-  s = s.replace(/\r?\n?```\s*$/i, "");
-  s = s.trim();
-
-  const tryParse = (chunk: string) =>
-    JSON.parse(chunk) as { steps?: unknown };
-
-  const coerceArray = (steps: unknown): StepTimestampFromDescription[] => {
-    if (!Array.isArray(steps)) throw new Error("Expected steps array");
-    const out: StepTimestampFromDescription[] = [];
-    for (const item of steps) {
-      const o = item as Record<string, unknown>;
-      const stepName = String(o?.stepName ?? "").trim();
-      const start_time = Math.floor(Number(o?.start_time));
-      const end_time = Math.floor(Number(o?.end_time));
-      if (!stepName || !Number.isFinite(start_time) || !Number.isFinite(end_time)) {
-        continue;
-      }
-      if (end_time <= start_time) continue;
-      out.push({ stepName, start_time, end_time });
-    }
-    return out.sort((a, b) => a.start_time - b.start_time);
-  };
-
-  try {
-    const o = tryParse(s);
-    return coerceArray(o.steps);
-  } catch {
-    // fall through
-  }
-
-  const start = s.indexOf("{");
-  const end = s.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    const slice = s.slice(start, end + 1);
-    try {
-      const o = tryParse(slice);
-      return coerceArray(o.steps);
-    } catch {
-      // fall through
-    }
-  }
-
-  throw new Error(
-    `Gemini returned non-JSON steps: ${raw.length > 280 ? `${raw.slice(0, 280)}…` : raw}`
-  );
+  return text;
 }
 
 /**
- * Parses a YouTube video description (plain text) and returns one row per step with seconds.
- * Does not call YouTube — use {@link fetchYouTubeVideoSnippet} + pass `description` here.
+ * Watches the YouTube video via Gemini native video understanding and returns
+ * start/end seconds for each named step.
  */
-export async function extractTimestampsFromDescription(
-  descriptionText: string,
-  videoTitle?: string
-): Promise<StepTimestampFromDescription[]> {
-  const apiKey = env.geminiApiKey();
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured");
+export async function extractTimestampsForStepsFromYouTubeVideo(
+  youtubeUrl: string,
+  stepNames: string[]
+): Promise<StepTimestampFromVideo[]> {
+  const urlTrim = youtubeUrl.trim();
+  if (!extractYouTubeVideoId(urlTrim)) {
+    throw new Error("A valid YouTube URL is required.");
   }
 
-  const desc = descriptionText.trim();
-  if (!desc) {
-    return [];
+  const names = stepNames.map((n) => n.trim()).filter(Boolean);
+  if (names.length === 0) {
+    throw new Error("Add at least one step name before extracting timestamps.");
   }
 
-  const titleLine = videoTitle?.trim()
-    ? `Video title: "${videoTitle.trim()}"`
-    : "Video title: (unknown)";
+  const list = names.map((n) => `- ${n}`).join("\n");
 
-  const prompt = `You are parsing a YouTube video description. It may list chapters, timestamps (e.g. 0:00, 1:23, 1:02:30), and step/section names.
+  const prompt = `Watch this video and identify the timestamps for each of these steps:
 
-${titleLine}
+${list}
 
-Below is the full description text. Extract every distinct step or section that has (or can be paired with) a time range in the video. Convert all times to whole seconds from the start of the video (0 = beginning).
+Return JSON only, no markdown, no backticks, as a JSON array with one object per step, in the same order as listed above:
+[{"stepName":"<exact step name>","start_time_seconds":0,"end_time_seconds":60},...]
 
-Rules:
-- Use concise stepName strings (match the description labels when possible).
-- start_time and end_time must be integers in seconds; end_time > start_time.
-- If only a start time is given for a line, set end_time to the next step's start_time, or a reasonable segment length (e.g. 60–120s) if it is the last step.
-- If you cannot find any steps with timestamps, return an empty steps array.
+Use whole seconds from the start of the video. Each end_time_seconds must be greater than start_time_seconds.`;
 
-Description:
-"""
-${desc}
-"""
-
-Respond only with valid JSON, no markdown, no backticks. Use this exact shape:
-{"steps":[{"stepName":"...","start_time":0,"end_time":60}]}`;
-
-  const url = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.2
-      }
-    })
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini request failed: ${res.status} ${errText}`);
-  }
-
-  const data = (await res.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error("Empty response from Gemini");
-  }
-
-  return parseStepsTimestampsPayload(text);
+  const text = await generateContentYouTubeVideo(urlTrim, prompt, 0.2);
+  return parseVideoStepTimestampsArray(text);
 }
 
 /**
