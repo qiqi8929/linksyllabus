@@ -1,20 +1,27 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
-import { generateStepDescriptions } from "@/lib/gemini";
+import { extractVideoTimestamps, generateStepDescriptions } from "@/lib/gemini";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Body = {
-  tutorialName?: string;
-  steps?: Array<{
-    stepName?: string;
-    videoUrl?: string;
-    startTime?: number;
-    endTime?: number;
-  }>;
-};
+type Body =
+  | {
+      action?: "descriptions" | undefined;
+      tutorialName?: string;
+      steps?: Array<{
+        stepName?: string;
+        videoUrl?: string;
+        startTime?: number;
+        endTime?: number;
+      }>;
+    }
+  | {
+      action: "extractTimestamps";
+      youtubeUrl?: string;
+      stepName?: string;
+    };
 
 export async function POST(req: Request) {
   if (!env.geminiApiKey()) {
@@ -33,6 +40,25 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json()) as Body;
+
+  if (body.action === "extractTimestamps") {
+    const youtubeUrl = String(body.youtubeUrl ?? "").trim();
+    const stepName = String(body.stepName ?? "").trim();
+    if (!youtubeUrl) {
+      return NextResponse.json({ error: "YouTube URL is required." }, { status: 400 });
+    }
+    if (!stepName) {
+      return NextResponse.json({ error: "Step name is required." }, { status: 400 });
+    }
+    try {
+      const result = await extractVideoTimestamps(youtubeUrl, stepName);
+      return NextResponse.json(result);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Timestamp detection failed";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
+
   const tutorialName = String(body.tutorialName ?? "").trim();
   const rawSteps = body.steps ?? [];
 

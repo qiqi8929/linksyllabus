@@ -5,6 +5,7 @@ import {
   createInactiveSkuWithSteps,
   type TutorialStepInput
 } from "@/app/dashboard/serverActions";
+import { extractYouTubeVideoId } from "@/lib/video";
 
 type StepRow = {
   id: string;
@@ -53,6 +54,7 @@ export function TutorialCreator() {
   const [steps, setSteps] = useState<StepRow[]>(() => [emptyStep()]);
   const [aiLoading, setAiLoading] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
+  const [timestampLoadingId, setTimestampLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const updateStep = useCallback((id: string, patch: Partial<StepRow>) => {
@@ -96,6 +98,58 @@ export function TutorialCreator() {
     }
     return null;
   }, [tutorialName, steps]);
+
+  const autoDetectTimestamps = async (rowId: string) => {
+    const row = steps.find((s) => s.id === rowId);
+    if (!row) return;
+    const stepName = row.step_name.trim();
+    const url = row.video_url.trim();
+    if (!stepName || !url) {
+      setError("Enter a step name and video URL before auto-detecting timestamps.");
+      return;
+    }
+    if (!extractYouTubeVideoId(url)) {
+      setError("Auto-detect timestamps works with YouTube URLs only.");
+      return;
+    }
+    setError(null);
+    setTimestampLoadingId(rowId);
+    try {
+      const res = await fetch("/api/gemini/generate-descriptions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "extractTimestamps",
+          youtubeUrl: url,
+          stepName
+        })
+      });
+      const data = (await res.json()) as {
+        start_time?: number;
+        end_time?: number;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || "Timestamp detection failed.");
+      }
+      if (
+        typeof data.start_time !== "number" ||
+        typeof data.end_time !== "number" ||
+        !Number.isFinite(data.start_time) ||
+        !Number.isFinite(data.end_time)
+      ) {
+        throw new Error("Unexpected response from timestamp detection.");
+      }
+      updateStep(rowId, {
+        start_time: Math.floor(data.start_time),
+        end_time: Math.floor(data.end_time)
+      });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Timestamp detection failed.");
+    } finally {
+      setTimestampLoadingId(null);
+    }
+  };
 
   const onGenerateAi = async () => {
     setError(null);
@@ -230,6 +284,25 @@ export function TutorialCreator() {
                       onChange={(e) => updateStep(row.id, { video_url: e.target.value })}
                       placeholder="https://..."
                     />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 md:col-span-2">
+                    <button
+                      type="button"
+                      className="btn-ghost text-sm"
+                      disabled={
+                        timestampLoadingId === row.id ||
+                        !row.step_name.trim() ||
+                        !row.video_url.trim()
+                      }
+                      onClick={() => void autoDetectTimestamps(row.id)}
+                    >
+                      {timestampLoadingId === row.id
+                        ? "Detecting…"
+                        : "Auto-detect timestamps"}
+                    </button>
+                    <span className="text-xs text-zinc-500">
+                      Uses AI on the YouTube video (YouTube only).
+                    </span>
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-zinc-600">Start (seconds)</label>
