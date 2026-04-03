@@ -55,6 +55,8 @@ export function TutorialCreator() {
   const [aiLoading, setAiLoading] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [timestampLoadingId, setTimestampLoadingId] = useState<string | null>(null);
+  const [chapterVideoUrl, setChapterVideoUrl] = useState("");
+  const [descExtractLoading, setDescExtractLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const updateStep = useCallback((id: string, patch: Partial<StepRow>) => {
@@ -98,6 +100,52 @@ export function TutorialCreator() {
     }
     return null;
   }, [tutorialName, steps]);
+
+  const extractTimestampsFromVideoDescription = async () => {
+    const url = chapterVideoUrl.trim();
+    if (!url) {
+      setError("Paste a YouTube URL above to extract timestamps from its description.");
+      return;
+    }
+    if (!extractYouTubeVideoId(url)) {
+      setError("Use a valid YouTube URL for description extraction.");
+      return;
+    }
+    setError(null);
+    setDescExtractLoading(true);
+    try {
+      const res = await fetch("/api/gemini/extract-timestamps-from-description", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ youtubeUrl: url })
+      });
+      const data = (await res.json()) as {
+        steps?: Array<{ stepName: string; start_time: number; end_time: number }>;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || "Could not extract timestamps.");
+      }
+      const list = data.steps ?? [];
+      if (!list.length) {
+        throw new Error("No steps with timestamps were found in the video description.");
+      }
+      setSteps(
+        list.map((s) => ({
+          id: makeId(),
+          step_name: s.stepName,
+          video_url: url,
+          start_time: Math.floor(s.start_time),
+          end_time: Math.floor(s.end_time),
+          description: ""
+        }))
+      );
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Description extraction failed.");
+    } finally {
+      setDescExtractLoading(false);
+    }
+  };
 
   const autoDetectTimestamps = async (rowId: string) => {
     const row = steps.find((s) => s.id === rowId);
@@ -239,6 +287,32 @@ export function TutorialCreator() {
             placeholder="e.g. DS-160 walkthrough"
             className="w-full"
           />
+        </div>
+
+        <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50/80 p-4">
+          <label className="text-sm font-medium" htmlFor="chapter-youtube-url">
+            YouTube URL (for chapter extraction)
+          </label>
+          <input
+            id="chapter-youtube-url"
+            value={chapterVideoUrl}
+            onChange={(e) => setChapterVideoUrl(e.target.value)}
+            placeholder="https://www.youtube.com/watch?v=…"
+            className="w-full"
+          />
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              type="button"
+              className="btn-ghost text-sm"
+              disabled={descExtractLoading || !chapterVideoUrl.trim()}
+              onClick={() => void extractTimestampsFromVideoDescription()}
+            >
+              {descExtractLoading ? "Extracting…" : "✨ Auto-extract timestamps from video description"}
+            </button>
+            <span className="text-xs text-zinc-500">
+              Fetches the video description via YouTube Data API, then uses Gemini to fill steps.
+            </span>
+          </div>
         </div>
 
         <div className="space-y-3">
