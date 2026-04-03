@@ -21,60 +21,171 @@ type YtProps = {
   stepNumber: number;
 };
 
-type VoiceToastType = { kind: "replay" | "pause" | "play" | "next"; text: string };
+type VoiceCmd = "replay" | "pause" | "play" | "next" | "previous";
 
-function parseVoiceCommand(t: string): "replay" | "pause" | "play" | "next" | null {
+const WAKE_RE = /hey\s+link/i;
+
+function stripWakePhrase(t: string) {
+  return t.replace(WAKE_RE, " ").replace(/\s+/g, " ").trim();
+}
+
+function parseVoiceCommand(t: string): VoiceCmd | null {
   const s = t.toLowerCase();
-  if (/(replay|again)/.test(s)) return "replay";
-  if (/(pause|stop)/.test(s)) return "pause";
-  if (/(play|resume)/.test(s)) return "play";
-  if (/(next)/.test(s)) return "next";
+  if (/\b(replay|again)\b/.test(s)) return "replay";
+  if (/\b(pause|stop)\b/.test(s)) return "pause";
+  if (/\b(play|resume|continue)\b/.test(s)) return "play";
+  if (/\bnext\b/.test(s)) return "next";
+  if (/\b(back|previous)\b/.test(s)) return "previous";
   return null;
 }
 
-function useVoiceCommands(opts: {
+function playWakeBeep() {
+  try {
+    const Ctx = window.AudioContext ?? (window as any).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.12, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+    osc.start(now);
+    osc.stop(now + 0.13);
+  } catch {
+    // ignore
+  }
+}
+
+function useLinkVoiceControl(opts: {
   onReplay: () => void;
   onPause: () => void;
   onPlay: () => void;
   onNext: () => void | Promise<void>;
+  onPrevious: () => void | Promise<void>;
 }) {
-  const [voiceListening, setVoiceListening] = useState(false);
-  const [voiceToast, setVoiceToast] = useState<VoiceToastType | null>(null);
+  const optsRef = useRef(opts);
+  optsRef.current = opts;
 
+  const [voiceArmed, setVoiceArmed] = useState(false);
+  const [voiceAwake, setVoiceAwake] = useState(false);
+  const [voiceToast, setVoiceToast] = useState<string | null>(null);
+
+  const armedRef = useRef(false);
+  const awakeRef = useRef(false);
   const recognitionRef = useRef<any>(null);
-  const voiceEnabledRef = useRef(false);
-  const lastCommandAtRef = useRef(0);
+  const commandWindowTimerRef = useRef<number | null>(null);
   const toastTimerRef = useRef<number | null>(null);
+  const restartTimerRef = useRef<number | null>(null);
+  const lastFireRef = useRef(0);
 
-  const showToast = useCallback((t: VoiceToastType) => {
-    setVoiceToast(t);
+  const showToast = useCallback((text: string) => {
+    setVoiceToast(text);
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = window.setTimeout(() => setVoiceToast(null), 2400);
+    toastTimerRef.current = window.setTimeout(() => setVoiceToast(null), 2200);
   }, []);
 
-  const stopListening = useCallback(() => {
-    voiceEnabledRef.current = false;
-    setVoiceListening(false);
+  const clearCommandWindow = useCallback(() => {
+    if (commandWindowTimerRef.current) {
+      window.clearTimeout(commandWindowTimerRef.current);
+      commandWindowTimerRef.current = null;
+    }
+    awakeRef.current = false;
+    setVoiceAwake(false);
+  }, []);
+
+  const startCommandWindow = useCallback(() => {
+    playWakeBeep();
+    awakeRef.current = true;
+    setVoiceAwake(true);
+    if (commandWindowTimerRef.current) window.clearTimeout(commandWindowTimerRef.current);
+    commandWindowTimerRef.current = window.setTimeout(() => {
+      commandWindowTimerRef.current = null;
+      awakeRef.current = false;
+      setVoiceAwake(false);
+    }, 5000);
+  }, []);
+
+  const runCommand = useCallback(
+    (cmd: VoiceCmd) => {
+      const now = Date.now();
+      if (now - lastFireRef.current < 500) return;
+      lastFireRef.current = now;
+
+      clearCommandWindow();
+
+      const o = optsRef.current;
+      if (cmd === "replay") {
+        showToast("✓ Replay");
+        o.onReplay();
+        return;
+      }
+      if (cmd === "pause") {
+        showToast("✓ Pause");
+        o.onPause();
+        return;
+      }
+      if (cmd === "play") {
+        showToast("✓ Play");
+        o.onPlay();
+        return;
+      }
+      if (cmd === "next") {
+        showToast("✓ Next");
+        Promise.resolve(o.onNext()).catch(() => {
+          showToast("✗ Next step unavailable");
+        });
+        return;
+      }
+      if (cmd === "previous") {
+        showToast("✓ Previous");
+        Promise.resolve(o.onPrevious()).catch(() => {
+          showToast("✗ Previous step unavailable");
+        });
+      }
+    },
+    [clearCommandWindow, showToast]
+  );
+
+  const stopRecognition = useCallback(() => {
+    armedRef.current = false;
+    setVoiceArmed(false);
+    clearCommandWindow();
+    if (restartTimerRef.current) {
+      window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
     try {
       recognitionRef.current?.stop?.();
-    } catch {}
+    } catch {
+      // ignore
+    }
+  }, [clearCommandWindow]);
+
+  const tryStartRecognition = useCallback(() => {
+    if (!armedRef.current) return;
+    try {
+      recognitionRef.current?.start?.();
+    } catch {
+      // often "already started" — ignore
+    }
   }, []);
 
-  const startListening = useCallback(() => {
-    if (voiceEnabledRef.current) return;
-
+  const attachRecognition = useCallback(() => {
     const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
     if (!SR) {
-      showToast({ kind: "next", text: "🎤 Voice control not supported in this browser." });
+      showToast("Voice not supported in this browser.");
+      armedRef.current = false;
+      setVoiceArmed(false);
       return;
     }
 
-    voiceEnabledRef.current = true;
-    setVoiceListening(true);
-
     const recognition = new SR();
     recognitionRef.current = recognition;
-
     recognition.lang = "en-US";
     recognition.continuous = true;
     recognition.interimResults = false;
@@ -82,78 +193,179 @@ function useVoiceCommands(opts: {
 
     recognition.onresult = (event: any) => {
       try {
-        // Collect all new final results.
         const parts: string[] = [];
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const r = event.results[i];
-          if (r?.isFinal) parts.push(r?.[0]?.transcript ?? "");
+          if (r?.isFinal) parts.push(String(r?.[0]?.transcript ?? ""));
         }
-        const transcript = parts.join(" ").trim();
-        if (!transcript) return;
+        const raw = parts.join(" ").trim();
+        if (!raw) return;
 
-        const cmd = parseVoiceCommand(transcript);
-        if (!cmd) return;
+        if (!armedRef.current) return;
 
-        const now = Date.now();
-        if (now - lastCommandAtRef.current < 800) return;
-        lastCommandAtRef.current = now;
+        const hasWake = WAKE_RE.test(raw);
 
-        if (cmd === "replay") {
-          showToast({ kind: "replay", text: "🎤 Replaying..." });
-          opts.onReplay();
+        if (awakeRef.current) {
+          const cmd = parseVoiceCommand(raw);
+          if (cmd) {
+            runCommand(cmd);
+            return;
+          }
+          if (hasWake) {
+            startCommandWindow();
+          }
           return;
         }
-        if (cmd === "pause") {
-          showToast({ kind: "pause", text: "🎤 Pausing..." });
-          opts.onPause();
-          return;
+
+        if (hasWake) {
+          startCommandWindow();
+          const rest = stripWakePhrase(raw);
+          if (rest) {
+            const cmd = parseVoiceCommand(rest);
+            if (cmd) runCommand(cmd);
+          }
         }
-        if (cmd === "play") {
-          showToast({ kind: "play", text: "🎤 Playing..." });
-          opts.onPlay();
-          return;
-        }
-        if (cmd === "next") {
-          showToast({ kind: "next", text: "🎤 Next step..." });
-          Promise.resolve(opts.onNext()).catch(() => {
-            showToast({ kind: "next", text: "🎤 Could not load next step." });
-          });
-          return;
-        }
-      } catch {}
+      } catch {
+        // ignore
+      }
     };
 
     recognition.onerror = (event: any) => {
-      // Keep it visible but don't spam.
-      const msg = event?.error ? String(event.error) : "Speech recognition error";
-      console.error("[voice] recognition error", msg);
-      showToast({ kind: "next", text: "🎤 Voice error. Try again." });
+      const code = event?.error ? String(event.error) : "unknown";
+      if (code === "aborted") return;
+      if (code === "not-allowed") {
+        console.warn("[voice] microphone not allowed");
+        showToast("Microphone access denied.");
+        stopRecognition();
+        return;
+      }
+      if (code === "no-speech") return;
+
+      console.warn("[voice] recognition error", code);
+      if (!armedRef.current) return;
+      if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = window.setTimeout(() => {
+        restartTimerRef.current = null;
+        tryStartRecognition();
+      }, 350);
     };
 
     recognition.onend = () => {
-      if (!voiceEnabledRef.current) return;
-      // SpeechRecognition may stop automatically; restart to keep listening.
-      try {
-        recognition.start();
-      } catch {}
+      if (!armedRef.current) return;
+      if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = window.setTimeout(() => {
+        restartTimerRef.current = null;
+        tryStartRecognition();
+      }, 120);
     };
 
-    try {
-      recognition.start();
-    } catch {}
-  }, [opts, showToast]);
+    tryStartRecognition();
+  }, [runCommand, showToast, startCommandWindow, stopRecognition, tryStartRecognition]);
+
+  const startVoiceArm = useCallback(() => {
+    if (armedRef.current) return;
+    armedRef.current = true;
+    setVoiceArmed(true);
+    attachRecognition();
+  }, [attachRecognition]);
+
+  const toggleVoiceArm = useCallback(() => {
+    if (armedRef.current) stopRecognition();
+    else startVoiceArm();
+  }, [startVoiceArm, stopRecognition]);
 
   useEffect(() => {
     return () => {
-      try {
-        voiceEnabledRef.current = false;
-        recognitionRef.current?.stop?.();
-      } catch {}
+      armedRef.current = false;
+      if (commandWindowTimerRef.current) window.clearTimeout(commandWindowTimerRef.current);
       if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+      if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
+      try {
+        recognitionRef.current?.stop?.();
+      } catch {
+        // ignore
+      }
     };
   }, []);
 
-  return { voiceListening, voiceToast, startListening, stopListening, setVoiceToast: showToast };
+  return {
+    voiceArmed,
+    voiceAwake,
+    voiceToast,
+    toggleVoiceArm,
+    showToast,
+    stopVoice: stopRecognition
+  };
+}
+
+function VoiceMicCluster({
+  voiceArmed,
+  voiceAwake,
+  onToggle
+}: {
+  voiceArmed: boolean;
+  voiceAwake: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <>
+      <span
+        className="flex items-center gap-1"
+        title={
+          !voiceArmed ? "Voice off" : voiceAwake ? "Listening for commands" : 'Say "Hey Link"'
+        }
+      >
+        <span
+          className={`text-lg leading-none ${
+            !voiceArmed
+              ? "grayscale opacity-50"
+              : voiceAwake
+                ? "animate-pulse text-emerald-600"
+                : "text-zinc-500"
+          }`}
+        >
+          🎤
+        </span>
+        <span
+          className={`h-2 w-2 rounded-full ${
+            !voiceArmed ? "bg-zinc-300" : voiceAwake ? "animate-pulse bg-emerald-500" : "bg-zinc-400"
+          }`}
+        />
+      </span>
+      <button type="button" className="btn-ghost text-sm" onClick={onToggle} aria-pressed={voiceArmed}>
+        🎤 Voice Control
+      </button>
+    </>
+  );
+}
+
+function VoiceFeedbackBanners({
+  voiceArmed,
+  voiceAwake,
+  voiceToast
+}: {
+  voiceArmed: boolean;
+  voiceAwake: boolean;
+  voiceToast: string | null;
+}) {
+  return (
+    <>
+      {voiceAwake ? (
+        <div className="border-b border-emerald-100 bg-emerald-50 px-4 py-2 text-sm text-emerald-900">
+          Listening… Say a command (replay, pause, play, next, back).
+        </div>
+      ) : voiceArmed ? (
+        <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-2 text-xs text-zinc-600">
+          Say <span className="font-semibold">Hey Link</span> to wake voice commands.
+        </div>
+      ) : null}
+      {voiceToast ? (
+        <div className="border-b border-zinc-100 bg-white px-4 py-2 text-sm font-medium text-zinc-900">
+          {voiceToast}
+        </div>
+      ) : null}
+    </>
+  );
 }
 
 function loadYouTubeIframeApi(): Promise<void> {
@@ -191,7 +403,7 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime, s
   const [endedOverlay, setEndedOverlay] = useState(false);
 
   const goToNextStep = useCallback(async () => {
-    if (!skuId) return;
+    if (!skuId) throw new Error("missing sku");
     const nextStepNumber = stepNumber + 1;
     const supabase = createSupabaseBrowserClient();
 
@@ -202,9 +414,25 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime, s
       .eq("step_number", nextStepNumber)
       .maybeSingle();
 
-    if (error || !data?.id) {
-      return;
-    }
+    if (error || !data?.id) throw new Error("next not found");
+
+    router.push(`/play/${data.id}`);
+  }, [router, skuId, stepNumber]);
+
+  const goToPreviousStep = useCallback(async () => {
+    if (!skuId) throw new Error("missing sku");
+    if (stepNumber <= 1) throw new Error("no previous");
+    const prevNum = stepNumber - 1;
+    const supabase = createSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("steps")
+      .select("id")
+      .eq("sku_id", skuId)
+      .eq("step_number", prevNum)
+      .maybeSingle();
+
+    if (error || !data?.id) throw new Error("previous not found");
 
     router.push(`/play/${data.id}`);
   }, [router, skuId, stepNumber]);
@@ -345,48 +573,27 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime, s
     }, 50);
   }
 
-  const { voiceListening, voiceToast, startListening, stopListening, setVoiceToast } =
-    useVoiceCommands({
-      onReplay: () => onReplay(),
-      onPause: () => onPause(),
-      onPlay: () => {
-        // Voice "play"/"resume": if we already ended, replay the segment.
-        if (endedOverlay) onReplay();
-        else onResume();
-      },
-      onNext: async () => {
-        try {
-          await goToNextStep();
-        } catch {
-          setVoiceToast({ kind: "next", text: "🎤 Could not load next step." });
-        }
-      }
-    });
-
-  const toggleVoice = useCallback(() => {
-    if (voiceListening) stopListening();
-    else startListening();
-  }, [voiceListening, startListening, stopListening]);
+  const { voiceArmed, voiceAwake, voiceToast, toggleVoiceArm } = useLinkVoiceControl({
+    onReplay: () => onReplay(),
+    onPause: () => onPause(),
+    onPlay: () => {
+      if (endedOverlay) onReplay();
+      else onResume();
+    },
+    onNext: () => goToNextStep(),
+    onPrevious: () => goToPreviousStep()
+  });
 
   return (
     <div className="card overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-zinc-200 p-4">
         <div className="text-sm text-zinc-600">Playback (this step only)</div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <span
-            className={`h-2.5 w-2.5 rounded-full ${
-              voiceListening ? "bg-emerald-500" : "bg-zinc-400"
-            }`}
-            aria-label={voiceListening ? "Voice listening on" : "Voice listening off"}
+          <VoiceMicCluster
+            voiceArmed={voiceArmed}
+            voiceAwake={voiceAwake}
+            onToggle={toggleVoiceArm}
           />
-          <button
-            type="button"
-            className="btn-ghost text-sm"
-            onClick={toggleVoice}
-            aria-pressed={voiceListening}
-          >
-            🎤 Voice Control
-          </button>
           {!started ? (
             <button className="btn-primary" disabled={!ready} onClick={onPlay}>
               {ready ? "Play" : "Loading…"}
@@ -404,9 +611,7 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime, s
         </div>
       </div>
 
-      {voiceToast ? (
-        <div className="px-4 py-3 text-sm text-zinc-800">{voiceToast.text}</div>
-      ) : null}
+      <VoiceFeedbackBanners voiceArmed={voiceArmed} voiceAwake={voiceAwake} voiceToast={voiceToast} />
 
       <div className="relative aspect-video bg-zinc-950">
         <div id={containerId} className="absolute inset-0" />
@@ -453,7 +658,7 @@ export function VimeoPlayerClient({
   const [endedOverlay, setEndedOverlay] = useState(false);
 
   const goToNextStep = useCallback(async () => {
-    if (!skuId) return;
+    if (!skuId) throw new Error("missing sku");
     const nextStepNumber = stepNumber + 1;
     const supabase = createSupabaseBrowserClient();
 
@@ -464,7 +669,24 @@ export function VimeoPlayerClient({
       .eq("step_number", nextStepNumber)
       .maybeSingle();
 
-    if (error || !data?.id) return;
+    if (error || !data?.id) throw new Error("next not found");
+    router.push(`/play/${data.id}`);
+  }, [router, skuId, stepNumber]);
+
+  const goToPreviousStep = useCallback(async () => {
+    if (!skuId) throw new Error("missing sku");
+    if (stepNumber <= 1) throw new Error("no previous");
+    const prevNum = stepNumber - 1;
+    const supabase = createSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("steps")
+      .select("id")
+      .eq("sku_id", skuId)
+      .eq("step_number", prevNum)
+      .maybeSingle();
+
+    if (error || !data?.id) throw new Error("previous not found");
     router.push(`/play/${data.id}`);
   }, [router, skuId, stepNumber]);
 
@@ -562,48 +784,27 @@ export function VimeoPlayerClient({
     }, 50);
   }
 
-  const { voiceListening, voiceToast, startListening, stopListening, setVoiceToast } =
-    useVoiceCommands({
-      onReplay: () => onReplay(),
-      onPause: () => onPause(),
-      onPlay: () => {
-        // Voice "play"/"resume"
-        if (endedOverlay) onReplay();
-        else onResume();
-      },
-      onNext: async () => {
-        try {
-          await goToNextStep();
-        } catch {
-          setVoiceToast({ kind: "next", text: "🎤 Could not load next step." });
-        }
-      }
-    });
-
-  const toggleVoice = useCallback(() => {
-    if (voiceListening) stopListening();
-    else startListening();
-  }, [voiceListening, startListening, stopListening]);
+  const { voiceArmed, voiceAwake, voiceToast, toggleVoiceArm } = useLinkVoiceControl({
+    onReplay: () => onReplay(),
+    onPause: () => onPause(),
+    onPlay: () => {
+      if (endedOverlay) onReplay();
+      else onResume();
+    },
+    onNext: () => goToNextStep(),
+    onPrevious: () => goToPreviousStep()
+  });
 
   return (
     <div className="card overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-zinc-200 p-4">
         <div className="text-sm text-zinc-600">Playback (this step only)</div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <span
-            className={`h-2.5 w-2.5 rounded-full ${
-              voiceListening ? "bg-emerald-500" : "bg-zinc-400"
-            }`}
-            aria-label={voiceListening ? "Voice listening on" : "Voice listening off"}
+          <VoiceMicCluster
+            voiceArmed={voiceArmed}
+            voiceAwake={voiceAwake}
+            onToggle={toggleVoiceArm}
           />
-          <button
-            type="button"
-            className="btn-ghost text-sm"
-            onClick={toggleVoice}
-            aria-pressed={voiceListening}
-          >
-            🎤 Voice Control
-          </button>
           {!started ? (
             <button className="btn-primary" disabled={!ready} onClick={onPlay}>
               {ready ? "Play" : "Loading…"}
@@ -621,9 +822,7 @@ export function VimeoPlayerClient({
         </div>
       </div>
 
-      {voiceToast ? (
-        <div className="px-4 py-3 text-sm text-zinc-800">{voiceToast.text}</div>
-      ) : null}
+      <VoiceFeedbackBanners voiceArmed={voiceArmed} voiceAwake={voiceAwake} voiceToast={voiceToast} />
 
       <div className="relative aspect-video bg-zinc-950">
         <div ref={containerRef} className="absolute inset-0" />
