@@ -53,9 +53,15 @@ export async function POST(req: Request) {
 
   try {
     const steps = await extractTimestampsForStepsFromYouTubeVideo(youtubeUrl, stepNames);
-    return NextResponse.json({ steps });
+    const estimated = steps.some((s) => s.estimated === true);
+    console.log(
+      "[extract-timestamps-from-description]",
+      JSON.stringify({ stepCount: steps.length, estimated })
+    );
+    return NextResponse.json({ steps, estimated });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Extraction failed";
+    console.error("[extract-timestamps-from-description] FULL ERROR:", e);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -78,7 +78,9 @@ export async function POST(req: Request) {
       if (mode === "timestamps") {
         console.log(
           "[generate-descriptions] mode=timestamps parsed result:",
-          JSON.stringify(result, null, 2)
+          JSON.stringify(result, null, 2),
+          "estimated=",
+          result.estimated === true
         );
       }
       return NextResponse.json(result);
