@@ -82,11 +82,16 @@ export async function POST(req: Request) {
         );
       }
       return NextResponse.json(result);
-    } catch (e: unknown) {
+    } catch (err: unknown) {
       if (mode === "timestamps") {
-        console.error("[generate-descriptions] mode=timestamps error:", e);
+        console.error(
+          "[generate-descriptions] FULL ERROR:",
+          JSON.stringify(err, null, 2),
+          (err as Error)?.message,
+          (err as Error)?.stack
+        );
       }
-      const message = e instanceof Error ? e.message : "Timestamp detection failed";
+      const message = err instanceof Error ? err.message : "Timestamp detection failed";
       return NextResponse.json({ error: message }, { status: 500 });
     }
   }
