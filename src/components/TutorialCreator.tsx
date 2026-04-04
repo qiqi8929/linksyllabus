@@ -336,8 +336,7 @@ export function TutorialCreator() {
               {descExtractLoading ? "Analyzing video…" : "✨ Auto-extract timestamps"}
             </button>
             <span className="text-xs text-zinc-500">
-              Gemini 1.5 Pro watches the video and finds clip times for your step names (no YouTube Data
-              API).
+              Uses YouTube captions plus Gemini to match step names to clip times (no YouTube Data API).
             </span>
           </div>
         </div>
@@ -402,7 +401,7 @@ export function TutorialCreator() {
                         : "Auto-detect timestamps"}
                     </button>
                     <span className="text-xs text-zinc-500">
-                      Uses AI on the YouTube video (YouTube only).
+                      Uses captions + Gemini on the YouTube URL (YouTube only).
                     </span>
                   </div>
                   <div className="space-y-1">

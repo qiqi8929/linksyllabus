@@ -1,11 +1,9 @@
 import { env } from "@/lib/env";
+import { getTranscript, type TranscriptCue } from "@/lib/transcript";
 import { extractYouTubeVideoId } from "@/lib/video";
 
 /** Stable successor to deprecated `gemini-2.0-flash-lite` (not available to new users). */
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
-
-/** Native YouTube video analysis (Gemini watches the video URL). */
-const GEMINI_MODEL_YOUTUBE_VIDEO = "gemini-1.5-pro";
 
 export type StepForGemini = {
   stepName: string;
@@ -53,18 +51,19 @@ function parseDescriptionsPayload(raw: string): { descriptions: string[] } {
 }
 
 /**
- * Uses Gemini 1.5 Pro native YouTube video understanding for a single step name.
+ * Uses YouTube transcript + Gemini to estimate clip bounds for a single step.
  */
 export async function extractVideoTimestamps(
   youtubeUrl: string,
-  stepName: string
+  stepName: string,
+  options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
 ): Promise<{ start_time: number; end_time: number }> {
   const name = stepName.trim();
   if (!name) {
     throw new Error("Step name is required for timestamp detection.");
   }
 
-  const rows = await extractTimestampsForStepsFromYouTubeVideo(youtubeUrl, [name]);
+  const rows = await extractTimestampsForStepsFromYouTubeVideo(youtubeUrl, [name], options);
   const row = rows.find((r) => r.stepName === name) ?? rows[0];
   if (!row) {
     throw new Error("Could not determine timestamps for this step.");
@@ -77,6 +76,15 @@ export type StepTimestampFromVideo = {
   start_time: number;
   end_time: number;
 };
+
+/** Fired after a successful generateContent for timestamp matching (full REST body + model text). */
+export type GeminiTimestampsDebugPayload = {
+  responseJson: unknown;
+  modelText: string;
+};
+
+/** @deprecated Use GeminiTimestampsDebugPayload */
+export type GeminiYouTubeVideoDebugPayload = GeminiTimestampsDebugPayload;
 
 function parseVideoStepTimestampsArray(raw: string): StepTimestampFromVideo[] {
   let s = raw.trim();
@@ -128,35 +136,23 @@ function parseVideoStepTimestampsArray(raw: string): StepTimestampFromVideo[] {
   );
 }
 
-async function generateContentYouTubeVideo(
-  youtubeUrl: string,
-  textPrompt: string,
-  temperature: number
+async function generateContentPlainText(
+  prompt: string,
+  temperature: number,
+  onGemini?: (payload: GeminiTimestampsDebugPayload) => void
 ): Promise<string> {
   const apiKey = env.geminiApiKey();
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL_YOUTUBE_VIDEO}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            {
-              fileData: {
-                mimeType: "video/youtube",
-                fileUri: youtubeUrl.trim()
-              }
-            },
-            { text: textPrompt }
-          ]
-        }
-      ],
+      contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         temperature
       }
@@ -176,40 +172,66 @@ async function generateContentYouTubeVideo(
   if (!text) {
     throw new Error("Empty response from Gemini");
   }
+  onGemini?.({ responseJson: data, modelText: text });
   return text;
 }
 
 /**
- * Watches the YouTube video via Gemini native video understanding and returns
- * start/end seconds for each named step.
+ * Sends timed transcript + step names to Gemini; returns semantic start/end seconds per step.
  */
-export async function extractTimestampsForStepsFromYouTubeVideo(
-  youtubeUrl: string,
-  stepNames: string[]
+export async function matchStepsToTranscript(
+  transcript: TranscriptCue[],
+  stepNames: string[],
+  options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
 ): Promise<StepTimestampFromVideo[]> {
-  const urlTrim = youtubeUrl.trim();
-  if (!extractYouTubeVideoId(urlTrim)) {
-    throw new Error("A valid YouTube URL is required.");
-  }
-
   const names = stepNames.map((n) => n.trim()).filter(Boolean);
   if (names.length === 0) {
     throw new Error("Add at least one step name before extracting timestamps.");
   }
+  if (transcript.length === 0) {
+    throw new Error("Transcript is empty.");
+  }
+
+  const formatted = transcript
+    .map((s) => {
+      const end = s.start + s.duration;
+      return `[${s.start.toFixed(2)}s → ${end.toFixed(2)}s] ${s.text}`;
+    })
+    .join("\n");
 
   const list = names.map((n) => `- ${n}`).join("\n");
 
-  const prompt = `Watch this video and identify the timestamps for each of these steps:
+  const prompt = `Given this YouTube transcript with timestamps, find the start and end time (in seconds) for each of these steps:
 
 ${list}
 
-Return JSON only, no markdown, no backticks, as a JSON array with one object per step, in the same order as listed above:
+Transcript:
+${formatted}
+
+Return only JSON, no markdown or backticks. Use this exact shape:
 [{"stepName":"<exact step name>","start_time_seconds":0,"end_time_seconds":60},...]
+One object per step in the same order as listed above. Use whole seconds from the start of the video. Each end_time_seconds must be greater than start_time_seconds.`;
 
-Use whole seconds from the start of the video. Each end_time_seconds must be greater than start_time_seconds.`;
-
-  const text = await generateContentYouTubeVideo(urlTrim, prompt, 0.2);
+  const text = await generateContentPlainText(prompt, 0.2, options?.onGemini);
   return parseVideoStepTimestampsArray(text);
+}
+
+/**
+ * Fetches the video transcript, then uses Gemini to match each step name to a time range.
+ */
+export async function extractTimestampsForStepsFromYouTubeVideo(
+  youtubeUrl: string,
+  stepNames: string[],
+  options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
+): Promise<StepTimestampFromVideo[]> {
+  const urlTrim = youtubeUrl.trim();
+  const videoId = extractYouTubeVideoId(urlTrim);
+  if (!videoId) {
+    throw new Error("A valid YouTube URL is required.");
+  }
+
+  const transcript = await getTranscript(videoId);
+  return matchStepsToTranscript(transcript, stepNames, options);
 }
 
 /**

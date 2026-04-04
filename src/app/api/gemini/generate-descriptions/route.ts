@@ -19,6 +19,8 @@ type Body =
     }
   | {
       action: "extractTimestamps";
+      /** Transcript + Gemini semantic matching (default). */
+      mode?: "timestamps";
       youtubeUrl?: string;
       stepName?: string;
     };
@@ -42,6 +44,13 @@ export async function POST(req: Request) {
   const body = (await req.json()) as Body;
 
   if (body.action === "extractTimestamps") {
+    const mode = body.mode ?? "timestamps";
+    if (mode !== "timestamps") {
+      return NextResponse.json(
+        { error: 'Only mode "timestamps" is supported for extractTimestamps.' },
+        { status: 400 }
+      );
+    }
     const youtubeUrl = String(body.youtubeUrl ?? "").trim();
     const stepName = String(body.stepName ?? "").trim();
     if (!youtubeUrl) {
@@ -51,9 +60,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Step name is required." }, { status: 400 });
     }
     try {
-      const result = await extractVideoTimestamps(youtubeUrl, stepName);
+      // Transcript is fetched inside extractVideoTimestamps → matchStepsToTranscript
+      const result = await extractVideoTimestamps(youtubeUrl, stepName, {
+        onGemini: (payload) => {
+          if (mode === "timestamps") {
+            console.log(
+              "[generate-descriptions] mode=timestamps Gemini REST response JSON:",
+              JSON.stringify(payload.responseJson, null, 2)
+            );
+            console.log(
+              "[generate-descriptions] mode=timestamps Gemini model text (exact):",
+              payload.modelText
+            );
+          }
+        }
+      });
+      if (mode === "timestamps") {
+        console.log(
+          "[generate-descriptions] mode=timestamps parsed result:",
+          JSON.stringify(result, null, 2)
+        );
+      }
       return NextResponse.json(result);
     } catch (e: unknown) {
+      if (mode === "timestamps") {
+        console.error("[generate-descriptions] mode=timestamps error:", e);
+      }
       const message = e instanceof Error ? e.message : "Timestamp detection failed";
       return NextResponse.json({ error: message }, { status: 500 });
     }
