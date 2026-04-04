@@ -1,5 +1,9 @@
 import { env } from "@/lib/env";
-import { getTranscript, type TranscriptCue } from "@/lib/transcript";
+import {
+  fetchYouTubeOEmbedTitle,
+  getTranscriptWithFallbacks,
+  type TranscriptCue
+} from "@/lib/transcript";
 import { extractYouTubeVideoId } from "@/lib/video";
 
 /** Stable successor to deprecated `gemini-2.0-flash-lite` (not available to new users). */
@@ -57,24 +61,44 @@ export async function extractVideoTimestamps(
   youtubeUrl: string,
   stepName: string,
   options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
-): Promise<{ start_time: number; end_time: number }> {
+): Promise<{ start_time: number; end_time: number; estimated?: boolean }> {
   const name = stepName.trim();
   if (!name) {
     throw new Error("Step name is required for timestamp detection.");
   }
-
-  const rows = await extractTimestampsForStepsFromYouTubeVideo(youtubeUrl, [name], options);
-  const row = rows.find((r) => r.stepName === name) ?? rows[0];
-  if (!row) {
-    throw new Error("Could not determine timestamps for this step.");
+  if (!extractYouTubeVideoId(youtubeUrl.trim())) {
+    throw new Error("A valid YouTube URL is required.");
   }
-  return { start_time: row.start_time, end_time: row.end_time };
+
+  try {
+    const rows = await extractTimestampsForStepsFromYouTubeVideo(youtubeUrl, [name], options);
+    const row = rows.find((r) => r.stepName === name) ?? rows[0];
+    if (!row) {
+      throw new Error("Could not determine timestamps for this step.");
+    }
+    return {
+      start_time: row.start_time,
+      end_time: row.end_time,
+      estimated: row.estimated
+    };
+  } catch (e: unknown) {
+    console.error("[gemini] extractVideoTimestamps → forced estimate", e);
+    const est = await estimateTimestampsFromTitleAndSteps(youtubeUrl, [name], options);
+    const row = est.find((r) => r.stepName === name) ?? est[0];
+    return {
+      start_time: row.start_time,
+      end_time: row.end_time,
+      estimated: true
+    };
+  }
 }
 
 export type StepTimestampFromVideo = {
   stepName: string;
   start_time: number;
   end_time: number;
+  /** True when transcript was unavailable and times were guessed (oEmbed + Gemini or linear split). */
+  estimated?: boolean;
 };
 
 /** Fired after a successful generateContent for timestamp matching (full REST body + model text). */
@@ -216,8 +240,78 @@ One object per step in the same order as listed above. Use whole seconds from th
   return parseVideoStepTimestampsArray(text);
 }
 
+function linearEstimatedTimestamps(
+  names: string[],
+  totalSeconds: number
+): StepTimestampFromVideo[] {
+  const n = names.length;
+  if (n === 0) return [];
+  const chunk = Math.max(20, Math.floor(totalSeconds / n));
+  return names.map((stepName, i) => {
+    const start_time = i * chunk;
+    const end_time = i === n - 1 ? totalSeconds : (i + 1) * chunk - 1;
+    return {
+      stepName,
+      start_time,
+      end_time: Math.max(end_time, start_time + 15),
+      estimated: true
+    };
+  });
+}
+
 /**
- * Fetches the video transcript, then uses Gemini to match each step name to a time range.
+ * When no transcript is available: oEmbed title + Gemini guesses, then linear split (never throws).
+ */
+export async function estimateTimestampsFromTitleAndSteps(
+  youtubeUrl: string,
+  stepNames: string[],
+  options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
+): Promise<StepTimestampFromVideo[]> {
+  const names = stepNames.map((n) => n.trim()).filter(Boolean);
+  if (names.length === 0) {
+    return [{ stepName: "step", start_time: 0, end_time: 60, estimated: true }];
+  }
+
+  let title: string | null = null;
+  try {
+    title = await fetchYouTubeOEmbedTitle(youtubeUrl);
+  } catch (e: unknown) {
+    console.error("[gemini] oEmbed title fetch failed", e);
+  }
+  const displayTitle = title ?? "YouTube tutorial video";
+
+  try {
+    const list = names.map((n, i) => `${i + 1}. ${n}`).join("\n");
+    const prompt = `Video title: "${displayTitle}"
+
+Steps (in order):
+${list}
+
+There is no usable transcript. Assume a typical YouTube tutorial. Output plausible start and end times in seconds for each step: they must be in order, non-overlapping, and span the full video. If total duration is unknown, assume about 12 minutes (720 seconds).
+
+Return JSON only, no markdown:
+[{"stepName":"<exact name>","start_time_seconds":0,"end_time_seconds":120},...]
+Whole seconds. end_time_seconds must be greater than start_time_seconds.`;
+
+    const text = await generateContentPlainText(prompt, 0.35, options?.onGemini);
+    const rows = parseVideoStepTimestampsArray(text);
+    if (rows.length === names.length) {
+      return rows.map((r) => ({ ...r, estimated: true }));
+    }
+    console.error(
+      "[gemini] estimateTimestampsFromTitleAndSteps: Gemini row count mismatch",
+      rows.length,
+      names.length
+    );
+  } catch (e: unknown) {
+    console.error("[gemini] estimateTimestampsFromTitleAndSteps Gemini failed", e);
+  }
+
+  return linearEstimatedTimestamps(names, 720);
+}
+
+/**
+ * Transcript strategies first; then oEmbed + Gemini; then linear estimates (always returns rows).
  */
 export async function extractTimestampsForStepsFromYouTubeVideo(
   youtubeUrl: string,
@@ -230,8 +324,36 @@ export async function extractTimestampsForStepsFromYouTubeVideo(
     throw new Error("A valid YouTube URL is required.");
   }
 
-  const transcript = await getTranscript(videoId);
-  return matchStepsToTranscript(transcript, stepNames, options);
+  const expected = stepNames.map((s) => s.trim()).filter(Boolean).length;
+
+  try {
+    const fetched = await getTranscriptWithFallbacks(videoId);
+    if (fetched?.cues?.length) {
+      try {
+        const matched = await matchStepsToTranscript(fetched.cues, stepNames, options);
+        if (matched.length === expected && expected > 0) {
+          return matched;
+        }
+        console.error(
+          "[gemini] matchStepsToTranscript length mismatch, using estimate fallback",
+          matched.length,
+          expected
+        );
+      } catch (e: unknown) {
+        console.error("[gemini] matchStepsToTranscript failed, using estimate fallback", e);
+      }
+    } else {
+      console.log(
+        "[gemini] no transcript from any source; using title/Gemini estimate",
+        JSON.stringify({ videoId })
+      );
+    }
+
+    return await estimateTimestampsFromTitleAndSteps(urlTrim, stepNames, options);
+  } catch (e: unknown) {
+    console.error("[gemini] extractTimestampsForStepsFromYouTubeVideo fatal → estimate", e);
+    return estimateTimestampsFromTitleAndSteps(urlTrim, stepNames, options);
+  }
 }
 
 /**
