@@ -266,13 +266,18 @@ export function TutorialCreator() {
     setPayLoading(true);
     try {
       const payload = buildStepPayload();
-      const { skuId } = await createInactiveSkuWithSteps({
+      const result = await createInactiveSkuWithSteps({
         tutorialName: tutorialName.trim(),
         steps: payload
       });
+      const skuId = result?.skuId;
+      if (!skuId) {
+        throw new Error("Could not create tutorial (missing id). Please try again.");
+      }
       await startCheckout(skuId);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not start checkout.");
+    } finally {
       setPayLoading(false);
     }
   };

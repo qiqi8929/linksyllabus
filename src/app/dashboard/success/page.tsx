@@ -10,7 +10,7 @@ export default async function DashboardSuccessPage({
 }: {
   searchParams: Search | Promise<Search>;
 }) {
-  const sp = await Promise.resolve(searchParams);
+  const sp = (await Promise.resolve(searchParams)) ?? {};
   const skuId = sp.skuId;
   if (!skuId) {
     redirect("/dashboard");
