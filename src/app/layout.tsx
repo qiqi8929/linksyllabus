@@ -2,8 +2,12 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "LinkSyllabus",
-  description: "Turn a YouTube segment into a scannable tutorial."
+  title: {
+    default: "LinkSyllabus",
+    template: "%s · LinkSyllabus"
+  },
+  description:
+    "Turn a long tutorial video into guided steps with QR codes, print sheets, and voice control."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

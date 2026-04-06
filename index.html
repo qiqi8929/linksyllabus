@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkSyllabus — Turn Your Tutorial Into a Step-by-Step Experience</title>
+  <meta name="description" content="Cut your long tutorial video into guided steps. Print a QR-code instruction sheet. Buyers scan any step, jump straight to that clip — voice controlled, ad-free, at their own pace." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --brand: #C05621;
+      --brand-dark: #9C4A1A;
+      --brand-light: #FEF3ED;
+      --brand-mid: #F5C9AE;
+      --ink: #111110;
+      --ink-2: #444440;
+      --ink-3: #888880;
+      --surface: #FAFAF8;
+      --border: #E8E3DC;
+      --white: #FFFFFF;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--white);
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { text-decoration: none; color: inherit; }
+    em { font-style: normal; }
+    img { display: block; max-width: 100%; }
+
+    /* ─── NAV ─── */
+    .nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 2.5rem;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      font-family: var(--font-display);
+      font-size: 20px; font-weight: 800;
+      letter-spacing: -0.5px; color: var(--ink);
+    }
+    .logo em { color: var(--brand); }
+    .nav-links { display: flex; align-items: center; gap: 2rem; }
+    .nav-links a { font-size: 14px; font-weight: 500; color: var(--ink-2); transition: color .2s; }
+    .nav-links a:hover { color: var(--brand); }
+    .btn-nav {
+      background: var(--brand); color: #fff;
+      border: none; border-radius: var(--radius-sm);
+      padding: 9px 20px; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: background .2s, transform .1s;
+      font-family: var(--font-body);
+    }
+    .btn-nav:hover { background: var(--brand-dark); }
+    .btn-nav:active { transform: scale(0.97); }
+
+    /* ─── BUTTONS ─── */
+    .btn-primary {
+      display: inline-block;
+      background: var(--brand); color: #fff;
+      border: none; border-radius: var(--radius-md);
+      padding: 14px 28px; font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: background .2s, transform .1s;
+      font-family: var(--font-body); white-space: nowrap;
+    }
+    .btn-primary:hover { background: var(--brand-dark); }
+    .btn-primary:active { transform: scale(0.97); }
+    .btn-outline {
+      display: inline-block;
+      background: transparent; color: var(--ink-2);
+      border: 1.5px solid var(--border); border-radius: var(--radius-md);
+      padding: 14px 28px; font-size: 15px; font-weight: 500;
+      cursor: pointer; transition: border-color .2s, color .2s, transform .1s;
+      font-family: var(--font-body);
+    }
+    .btn-outline:hover { border-color: var(--ink-3); color: var(--ink); }
+    .btn-outline:active { transform: scale(0.97); }
+
+    /* ─── LAYOUT ─── */
+    .container { max-width: 1000px; margin: 0 auto; padding: 0 2.5rem; }
+    .section { padding: 5rem 0; }
+    .section-sm { padding: 3.5rem 0; }
+    .divider { height: 1px; background: var(--border); margin: 0 2.5rem; }
+
+    .eyebrow {
+      display: inline-block;
+      font-size: 11px; font-weight: 700; color: var(--brand);
+      letter-spacing: 1.2px; text-transform: uppercase;
+      margin-bottom: .6rem;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 34px; font-weight: 800;
+      letter-spacing: -1px; line-height: 1.2;
+      margin-bottom: .75rem;
+    }
+    .section-title em { color: var(--brand); }
+    .section-sub {
+      font-size: 16px; color: var(--ink-2);
+      line-height: 1.75; max-width: 560px;
+      margin-bottom: 2.5rem;
+    }
+
+    /* ─── HERO ─── */
+    .hero {
+      padding: 5rem 2.5rem 4rem;
+      text-align: center;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--brand-light); color: var(--brand);
+      font-size: 12px; font-weight: 700;
+      padding: 6px 16px; border-radius: 99px;
+      margin-bottom: 1.5rem; letter-spacing: .3px;
+    }
+    .hero-badge-dot { width: 6px; height: 6px; background: var(--brand); border-radius: 50%; }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 6vw, 54px);
+      font-weight: 900;
+      letter-spacing: -2px;
+      line-height: 1.1;
+      margin-bottom: 1.25rem;
+      color: var(--ink);
+    }
+    .hero h1 em { color: var(--brand); }
+    .hero p {
+      font-size: 18px; color: var(--ink-2);
+      line-height: 1.75; max-width: 600px;
+      margin: 0 auto 2rem;
+    }
+    .hero-btns {
+      display: flex; gap: 12px;
+      justify-content: center; flex-wrap: wrap;
+      margin-bottom: .75rem;
+    }
+    .hero-note { font-size: 13px; color: var(--ink-3); margin-bottom: 3.5rem; }
+
+    /* ─── PLAYER MOCK ─── */
+    .player-wrap {
+      max-width: 680px; margin: 0 auto;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden; background: var(--white);
+      box-shadow: 0 4px 40px rgba(0,0,0,0.08);
+    }
+    .vid-area {
+      background: #1c1c1e;
+      aspect-ratio: 16/9;
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .vid-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      justify-content: space-between;
+      padding: 16px 18px;
+    }
+    .vid-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .vid-chapter {
+      background: rgba(0,0,0,.65);
+      color: #fff; font-size: 12px; font-weight: 600;
+      padding: 6px 12px; border-radius: 8px;
+      backdrop-filter: blur(4px);
+    }
+    .vid-step {
+      background: var(--brand); color: #fff;
+      font-size: 11px; font-weight: 700;
+      padding: 6px 12px; border-radius: 8px;
+    }
+    .vid-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+    .play-circle {
+      width: 52px; height: 52px;
+      background: rgba(255,255,255,.18);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid rgba(255,255,255,.4);
+    }
+    .tri { width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-left: 18px solid #fff; margin-left: 4px; }
+    .voice-tag {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(0,0,0,.55); color: #fff;
+      font-size: 11px; font-weight: 600;
+      padding: 6px 12px; border-radius: 99px;
+    }
+    .voice-dot { width: 7px; height: 7px; background: #4ade80; border-radius: 50%; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .prog-wrap { background: #1c1c1e; padding: 0 18px; }
+    .prog-bar { height: 3px; background: #333; border-radius: 2px; position: relative; margin: 14px 0; }
+    .prog-fill { height: 100%; width: 38%; background: var(--brand); border-radius: 2px; }
+    .prog-dot {
+      width: 14px; height: 14px;
+      background: var(--brand); border: 2px solid #fff;
+      border-radius: 50%; position: absolute;
+      top: 50%; left: 38%; transform: translate(-50%,-50%);
+    }
+    .ctrl-bar {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 0 18px 14px; background: #1c1c1e;
+    }
+    .ctrl-l { display: flex; align-items: center; gap: 16px; }
+    .ctrl-t { color: #888; font-size: 13px; font-weight: 600; }
+    .ctrl-t.hi { color: #fff; }
+    .spd {
+      background: var(--brand); color: #fff;
+      font-size: 11px; font-weight: 800;
+      padding: 3px 9px; border-radius: 5px;
+    }
+    .ctrl-r { color: #555; font-size: 12px; }
+    .steps-panel { border-top: 1px solid #f0ede8; padding: 18px; }
+    .steps-label {
+      font-size: 11px; font-weight: 700; color: #aaa;
+      letter-spacing: .8px; text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .step-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+    .step-item:last-child { margin-bottom: 0; }
+    .snum {
+      width: 22px; height: 22px;
+      background: #f0ede8; color: #999;
+      border-radius: 50%; font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .step-item.active .snum { background: var(--brand); color: #fff; }
+    .stext { font-size: 13px; color: #888; line-height: 1.5; }
+    .step-item.active .stext { color: var(--ink); font-weight: 600; }
+
+    /* ─── DUAL DELIVERY ─── */
+    .dual-intro {
+      text-align: center;
+      padding: 5rem 2.5rem 3rem;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .flow-diagram {
+      display: grid;
+      grid-template-columns: 1fr 36px 1fr 36px 1fr;
+      align-items: center;
+      gap: 0;
+      max-width: 700px;
+      margin: 0 auto 3rem;
+    }
+    .flow-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .flow-box.center {
+      background: var(--brand-light);
+      border-color: var(--brand-mid);
+    }
+    .flow-box-icon { font-size: 24px; margin-bottom: .5rem; }
+    .flow-box-title { font-size: 13px; font-weight: 700; margin-bottom: .2rem; }
+    .flow-box-desc { font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+    .flow-arrow { text-align: center; color: var(--brand); font-size: 22px; font-weight: 700; }
+
+    .split-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      max-width: 1000px;
+      margin: 0 auto 2rem;
+      padding: 0 2.5rem;
+    }
+    @media (max-width: 680px) { .split-grid { grid-template-columns: 1fr; } }
+
+    .delivery-card { border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; }
+    .delivery-head {
+      padding: 1.1rem 1.4rem;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .delivery-head.online { background: #1c1c1e; }
+    .delivery-head.print { background: #f5f0e8; }
+    .dh-icon {
+      width: 36px; height: 36px;
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .dh-icon.online { background: rgba(255,255,255,.12); }
+    .dh-icon.print { background: #fff; }
+    .dh-title { font-size: 14px; font-weight: 700; }
+    .dh-sub { font-size: 12px; opacity: .65; }
+    .online .dh-title, .online .dh-sub { color: #fff; }
+    .print .dh-title { color: var(--ink); }
+    .print .dh-sub { color: var(--ink-3); }
+
+    .delivery-body {
+      padding: 1.25rem;
+      background: var(--white);
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    /* online mini mock */
+    .vid-mini {
+      background: #1c1c1e; border-radius: 10px;
+      aspect-ratio: 16/7; position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .vid-mini-label {
+      position: absolute; top: 9px; left: 11px;
+      background: var(--brand); color: #fff;
+      font-size: 10px; font-weight: 700;
+      padding: 4px 9px; border-radius: 6px;
+    }
+    .vid-mini-voice {
+      position: absolute; bottom: 9px; right: 11px;
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(0,0,0,.6); color: #fff;
+      font-size: 10px; padding: 4px 9px; border-radius: 99px;
+    }
+    .play-sm {
+      width: 32px; height: 32px;
+      background: rgba(255,255,255,.2);
+      border-radius: 50%; display: flex;
+      align-items: center; justify-content: center;
+    }
+    .tri-sm { width: 0; height: 0; border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-left: 12px solid #fff; margin-left: 2px; }
+    .ctrl-mini {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      background: var(--surface); border-radius: 8px;
+    }
+    .ctrl-mini span { font-size: 11px; color: var(--ink-2); font-weight: 600; }
+    .spd-mini {
+      background: var(--brand); color: #fff;
+      font-size: 10px; font-weight: 800;
+      padding: 2px 7px; border-radius: 4px;
+    }
+    .feat-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .fpill {
+      background: var(--brand-light); color: #993C1D;
+      font-size: 11px; font-weight: 600;
+      padding: 4px 10px; border-radius: 99px;
+    }
+
+    /* print mini mock */
+    .paper {
+      background: #fff; border: 1px solid #e0dbd3;
+      border-radius: 10px; padding: 1rem;
+    }
+    .paper-header {
+      font-size: 11px; font-weight: 700;
+      text-align: center; border-bottom: 1px solid #e0dbd3;
+      padding-bottom: .6rem; margin-bottom: .75rem;
+      color: var(--ink); letter-spacing: .2px;
+    }
+    .paper-step {
+      display: grid; grid-template-columns: 22px 1fr 42px;
+      gap: 8px; align-items: start;
+      margin-bottom: .6rem; padding-bottom: .6rem;
+      border-bottom: 1px dashed #ede9e3;
+    }
+    .paper-step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .ps-num {
+      width: 22px; height: 22px;
+      background: var(--ink); color: #fff;
+      border-radius: 50%; font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .ps-num.active { background: var(--brand); }
+    .ps-title { font-size: 11px; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+    .ps-desc { font-size: 10px; color: var(--ink-3); line-height: 1.45; }
+    .qr-tiny {
+      width: 38px; height: 38px; background: var(--ink);
+      border-radius: 4px; display: grid;
+      grid-template-columns: repeat(5,1fr);
+      gap: 1.5px; padding: 3px; flex-shrink: 0;
+    }
+    .qc { background: #fff; border-radius: 1px; }
+    .qc.b { background: var(--ink); }
+    .qr-hint {
+      font-size: 9px; color: var(--brand);
+      text-align: center; margin-top: 2px;
+      font-weight: 700; line-height: 1.2;
+    }
+    .pfpill {
+      background: #f5f0e8; color: #7a4f1d;
+      font-size: 11px; font-weight: 600;
+      padding: 4px 10px; border-radius: 99px;
+    }
+
+    /* same-source banner */
+    .same-source-wrap { padding: 0 2.5rem; max-width: 1000px; margin: 0 auto 2rem; }
+    .same-source {
+      background: #EFF6FF; border: 1px solid #BFDBFE;
+      border-radius: var(--radius-lg);
+      padding: 1.1rem 1.4rem;
+      display: flex; align-items: flex-start; gap: 14px;
+    }
+    .ss-icon {
+      width: 38px; height: 38px; flex-shrink: 0;
+      background: #DBEAFE; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .ss-icon svg { width: 18px; height: 18px; stroke: #1D4ED8; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .ss-text strong { font-size: 14px; font-weight: 700; display: block; margin-bottom: 3px; color: #1E3A8A; }
+    .ss-text span { font-size: 13px; color: #3B6CB7; line-height: 1.6; }
+
+    /* ─── FEATURES ─── */
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+    .feat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 1.4rem;
+      transition: border-color .2s, transform .2s;
+    }
+    .feat-card:hover { border-color: var(--brand-mid); transform: translateY(-2px); }
+    .feat-card.highlight { background: var(--brand-light); border-color: var(--brand-mid); }
+    .feat-icon {
+      width: 38px; height: 38px;
+      background: #fff; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: .9rem; border: 1px solid var(--border);
+    }
+    .feat-card.highlight .feat-icon { background: var(--white); border-color: var(--brand-mid); }
+    .feat-icon svg { width: 18px; height: 18px; stroke: var(--brand); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .feat-card h3 { font-size: 15px; font-weight: 700; margin-bottom: .35rem; }
+    .feat-card p { font-size: 13px; color: var(--ink-2); line-height: 1.65; }
+    .new-tag {
+      display: inline-block;
+      background: var(--brand); color: #fff;
+      font-size: 10px; font-weight: 700;
+      padding: 2px 7px; border-radius: 99px;
+      margin-left: 6px; vertical-align: middle;
+    }
+
+    /* ─── WHO ─── */
+    .who-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .who-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem; background: var(--white);
+      transition: border-color .2s;
+    }
+    .who-card:hover { border-color: var(--brand-mid); }
+    .who-tag {
+      display: inline-block;
+      background: var(--brand-light); color: var(--brand);
+      font-size: 11px; font-weight: 700;
+      padding: 4px 11px; border-radius: 99px;
+      margin-bottom: .85rem;
+    }
+    .who-card h3 { font-size: 17px; font-weight: 700; margin-bottom: .5rem; }
+    .who-card > p { font-size: 14px; color: var(--ink-2); line-height: 1.65; }
+    .who-quote {
+      margin-top: 1rem; padding: .85rem 1rem;
+      background: var(--surface); border-radius: 10px;
+      font-size: 13px; color: var(--ink-2);
+      font-style: italic; border-left: 3px solid var(--brand);
+      line-height: 1.6;
+    }
+
+    /* ─── HOW ─── */
+    .how-wrap {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden; background: var(--white);
+    }
+    .how-row { display: grid; grid-template-columns: repeat(4, 1fr); }
+    @media (max-width: 700px) { .how-row { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 480px) { .how-row { grid-template-columns: 1fr; } }
+    .how-step { padding: 1.5rem; border-right: 1px solid var(--border); }
+    .how-step:last-child { border-right: none; }
+    @media (max-width: 700px) {
+      .how-step:nth-child(2) { border-right: none; }
+      .how-step:nth-child(1), .how-step:nth-child(2) { border-bottom: 1px solid var(--border); }
+    }
+    .how-n { font-size: 11px; font-weight: 800; color: var(--brand); letter-spacing: .5px; margin-bottom: .5rem; }
+    .how-step h3 { font-size: 15px; font-weight: 700; margin-bottom: .4rem; }
+    .how-step p { font-size: 13px; color: var(--ink-2); line-height: 1.65; }
+
+    /* ─── CTA ─── */
+    .cta-section {
+      margin: 0 2.5rem 5rem;
+      background: var(--brand-light);
+      border-radius: var(--radius-xl);
+      padding: 3.5rem 2rem;
+      text-align: center;
+    }
+    .cta-section h2 {
+      font-family: var(--font-display);
+      font-size: 34px; font-weight: 900;
+      letter-spacing: -1px; margin-bottom: .75rem;
+    }
+    .cta-section p {
+      font-size: 16px; color: #993C1D;
+      margin: 0 auto 1.75rem;
+      line-height: 1.7; max-width: 480px;
+    }
+    .cta-note { font-size: 13px; color: var(--brand); margin-top: .75rem; font-weight: 600; }
+
+    /* ─── FOOTER ─── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.75rem 2.5rem;
+      display: flex; align-items: center;
+      justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+    }
+    .foot-links { display: flex; gap: 2rem; }
+    .foot-links a { font-size: 13px; color: var(--ink-3); }
+    .foot-links a:hover { color: var(--brand); }
+    .foot-copy { font-size: 13px; color: var(--ink-3); }
+
+    /* ─── ANIMATIONS ─── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .hero > * { animation: fadeUp .6s ease both; }
+    .hero-badge { animation-delay: .05s; }
+    .hero h1 { animation-delay: .12s; }
+    .hero p { animation-delay: .2s; }
+    .hero-btns { animation-delay: .28s; }
+    .hero-note { animation-delay: .34s; }
+    .player-wrap { animation-delay: .4s; }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 640px) {
+      .nav { padding: 1rem 1.25rem; }
+      .nav-links { gap: 1rem; }
+      .hero { padding: 3rem 1.25rem 2.5rem; }
+      .container { padding: 0 1.25rem; }
+      .divider { margin: 0 1.25rem; }
+      .cta-section { margin: 0 1.25rem 3.5rem; padding: 2.5rem 1.25rem; }
+      .split-grid { padding: 0 1.25rem; }
+      .same-source-wrap { padding: 0 1.25rem; }
+      footer { padding: 1.25rem; }
+      .section-title { font-size: 26px; }
+      .flow-diagram { grid-template-columns: 1fr; gap: 8px; }
+      .flow-arrow { transform: rotate(90deg); font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="logo">Link<em>Syllabus</em></div>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#who">Who it's for</a>
+      <a href="#features">Features</a>
+      <button class="btn-nav">Try free →</button>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-badge">
+      <div class="hero-badge-dot"></div>
+      For DIY sellers · PDF creators · Teachers
+    </div>
+    <h1>Your tutorial, broken into steps<br><em>anyone can follow</em></h1>
+    <p>Cut your long video into guided clips. Share a link online — or print a QR-code instruction sheet to pack with every order. Your buyers stop getting lost at step 3.</p>
+    <div class="hero-btns">
+      <button class="btn-primary">Turn my video into steps →</button>
+      <button class="btn-outline">See a live example</button>
+    </div>
+    <div class="hero-note">Free to start · No app needed for viewers · Works on any device</div>
+
+    <!-- Player mockup -->
+    <div class="player-wrap">
+      <div class="vid-area">
+        <div class="vid-overlay">
+          <div class="vid-top">
+            <div class="vid-chapter">Step 2 — Mount onto dowel</div>
+            <div class="vid-step">2 of 9</div>
+          </div>
+          <div class="vid-bottom">
+            <div class="play-circle"><div class="tri"></div></div>
+            <div class="voice-tag"><div class="voice-dot"></div>Listening… "next step"</div>
+          </div>
+        </div>
+      </div>
+      <div class="prog-wrap">
+        <div class="prog-bar">
+          <div class="prog-fill"></div>
+          <div class="prog-dot"></div>
+        </div>
+      </div>
+      <div class="ctrl-bar">
+        <div class="ctrl-l">
+          <span class="ctrl-t hi">⏮</span>
+          <span class="ctrl-t hi">▶</span>
+          <span class="ctrl-t hi">⏭</span>
+          <span class="spd">0.75×</span>
+          <span class="ctrl-t">Loop this step</span>
+        </div>
+        <div class="ctrl-r">0:47 / 2:15</div>
+      </div>
+      <div class="steps-panel">
+        <div class="steps-label">All steps</div>
+        <div class="step-item">
+          <div class="snum">1</div>
+          <div class="stext">Cut your cords — 16 × 4m, fold in half</div>
+        </div>
+        <div class="step-item active">
+          <div class="snum">2</div>
+          <div class="stext">Mount onto dowel — lark's head knot, 1.5cm spacing</div>
+        </div>
+        <div class="step-item">
+          <div class="snum">3</div>
+          <div class="stext">First row of square knots — groups of 4</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- DUAL DELIVERY -->
+  <div class="dual-intro">
+    <div class="eyebrow">One build. Two ways to reach your customer.</div>
+    <h2 class="section-title">Make it once —<br>deliver it <em>online</em> and <em>in print</em></h2>
+    <p class="section-sub" style="margin:0 auto 2.5rem">You set up your steps once. LinkSyllabus generates a shareable webpage AND a printable instruction sheet — automatically, from the same content.</p>
+  </div>
+
+  <!-- Flow diagram -->
+  <div style="max-width:700px;margin:0 auto 3rem;padding:0 2.5rem">
+    <div class="flow-diagram">
+      <div class="flow-box">
+        <div class="flow-box-icon">🎬</div>
+        <div class="flow-box-title">Your video</div>
+        <div class="flow-box-desc">Upload or paste a YouTube link</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box center">
+        <div class="flow-box-icon">⚙️</div>
+        <div class="flow-box-title">LinkSyllabus</div>
+        <div class="flow-box-desc">Cut into steps, add notes, generate QR codes</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">
+        <div class="flow-box-icon">✨</div>
+        <div class="flow-box-title">Two outputs</div>
+        <div class="flow-box-desc">Webpage + printable PDF, both ready instantly</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Split delivery cards -->
+  <div class="split-grid">
+
+    <!-- ONLINE -->
+    <div class="delivery-card">
+      <div class="delivery-head online">
+        <div class="dh-icon online">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        <div>
+          <div class="dh-title">Online — webpage</div>
+          <div class="dh-sub">Share a link or QR code anywhere</div>
+        </div>
+      </div>
+      <div class="delivery-body">
+        <div class="vid-mini">
+          <div class="vid-mini-label">Step 2 of 9</div>
+          <div class="play-sm"><div class="tri-sm"></div></div>
+          <div class="vid-mini-voice"><div class="voice-dot"></div>"next step"</div>
+        </div>
+        <div class="ctrl-mini">
+          <span>⏮ ▶ ⏭</span>
+          <span class="spd-mini">0.75×</span>
+          <span>Loop step</span>
+        </div>
+        <div class="feat-pills">
+          <div class="fpill">Voice control</div>
+          <div class="fpill">Speed adjust</div>
+          <div class="fpill">Zero ads</div>
+          <div class="fpill">No app needed</div>
+          <div class="fpill">Any device</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRINT -->
+    <div class="delivery-card">
+      <div class="delivery-head print">
+        <div class="dh-icon print">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#C05621" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        </div>
+        <div>
+          <div class="dh-title">In print — instruction sheet</div>
+          <div class="dh-sub">Pack inside every order or kit</div>
+        </div>
+      </div>
+      <div class="delivery-body">
+        <div class="paper">
+          <div class="paper-header">Macramé Wall Hanging — Step guide</div>
+          <div class="paper-step">
+            <div class="ps-num">1</div>
+            <div>
+              <div class="ps-title">Cut your cords</div>
+              <div class="ps-desc">16 cords × 4m, fold in half</div>
+            </div>
+            <div>
+              <div class="qr-tiny">
+                <div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc b"></div>
+                <div class="qc b"></div><div class="qc"></div><div class="qc b"></div><div class="qc"></div><div class="qc b"></div>
+                <div class="qc b"></div><div class="qc b"></div><div class="qc"></div><div class="qc b"></div><div class="qc b"></div>
+                <div class="qc b"></div><div class="qc"></div><div class="qc b"></div><div class="qc"></div><div class="qc b"></div>
+                <div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc b"></div>
+              </div>
+              <div class="qr-hint">Step 1<br>video</div>
+            </div>
+          </div>
+          <div class="paper-step">
+            <div class="ps-num active">2</div>
+            <div>
+              <div class="ps-title">Mount onto dowel</div>
+              <div class="ps-desc">Lark's head knot, 1.5cm apart</div>
+            </div>
+            <div>
+              <div class="qr-tiny">
+                <div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc b"></div>
+                <div class="qc b"></div><div class="qc"></div><div class="qc"></div><div class="qc"></div><div class="qc b"></div>
+                <div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc b"></div>
+                <div class="qc b"></div><div class="qc"></div><div class="qc b"></div><div class="qc"></div><div class="qc b"></div>
+                <div class="qc b"></div><div class="qc b"></div><div class="qc"></div><div class="qc b"></div><div class="qc b"></div>
+              </div>
+              <div class="qr-hint">Step 2<br>video</div>
+            </div>
+          </div>
+          <div class="paper-step">
+            <div class="ps-num">3</div>
+            <div>
+              <div class="ps-title">First row of square knots</div>
+              <div class="ps-desc">Groups of 4 cords each</div>
+            </div>
+            <div>
+              <div class="qr-tiny">
+                <div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc b"></div>
+                <div class="qc b"></div><div class="qc b"></div><div class="qc"></div><div class="qc b"></div><div class="qc b"></div>
+                <div class="qc b"></div><div class="qc"></div><div class="qc b"></div><div class="qc"></div><div class="qc b"></div>
+                <div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc"></div><div class="qc b"></div>
+                <div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc b"></div><div class="qc b"></div>
+              </div>
+              <div class="qr-hint">Step 3<br>video</div>
+            </div>
+          </div>
+        </div>
+        <div class="feat-pills">
+          <div class="pfpill">One-click PDF export</div>
+          <div class="pfpill">A4 / Letter size</div>
+          <div class="pfpill">QR per step</div>
+          <div class="pfpill">Pack with orders</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Same source banner -->
+  <div class="same-source-wrap">
+    <div class="same-source">
+      <div class="ss-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="ss-text">
+        <strong>Both come from the same setup — you only build it once</strong>
+        <span>Update your video or notes anytime. The webpage updates instantly. Re-export the PDF and reprint — the QR codes never change, so old printed sheets still work.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider" style="margin-top:3.5rem"></div>
+
+  <!-- FEATURES -->
+  <div class="section" id="features">
+    <div class="container">
+      <div class="eyebrow">Everything included</div>
+      <h2 class="section-title">One tool, the whole experience</h2>
+      <p class="section-sub">From filming to printing to your customer's hands — everything connects.</p>
+      <div class="feat-grid">
+        <div class="feat-card highlight">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </div>
+          <h3>Per-step QR codes <span class="new-tag">KEY</span></h3>
+          <p>Every step gets a unique QR. Scan step 4 → opens step 4's clip. Print once, works forever — even if you update the video.</p>
+        </div>
+        <div class="feat-card highlight">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          </div>
+          <h3>Print-ready PDF <span class="new-tag">KEY</span></h3>
+          <p>Export a formatted A4/Letter instruction sheet in one click. Ready to print and pack with every order.</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </div>
+          <h3>Auto-cut into steps</h3>
+          <p>We split your video by chapter or timestamp. Each step is its own clip — no scrubbing through 45 minutes.</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </div>
+          <h3>Voice control</h3>
+          <p>"Next step" · "Repeat" · "Slow down" — hands stay on the project, not the screen.</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          </div>
+          <h3>Speed per step</h3>
+          <p>Beginners slow to 0.5×, experienced makers speed to 2×. Each viewer controls their own pace.</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="4"/><path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+          </div>
+          <h3>Zero ads, always</h3>
+          <p>No mid-project interruptions. Your buyer is focused — your player keeps them that way.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- WHO -->
+  <div class="section" id="who">
+    <div class="container">
+      <div class="eyebrow">Who it's for</div>
+      <h2 class="section-title">Made for people who teach through making</h2>
+      <p class="section-sub">If you've ever answered the same question 40 times in your comments — this is for you.</p>
+      <div class="who-grid">
+        <div class="who-card">
+          <div class="who-tag">Etsy · DIY sellers</div>
+          <h3>Craft kit sellers</h3>
+          <p>Pack the QR instruction sheet inside every kit. Buyers scan step by step as they work — no YouTube, no ads, no messaging you at midnight.</p>
+          <div class="who-quote">"I used to get 5 DMs a week asking about step 3. Now, zero."</div>
+        </div>
+        <div class="who-card">
+          <div class="who-tag">PDF · digital products</div>
+          <h3>Pattern & PDF designers</h3>
+          <p>Each section of your PDF links to a video step via QR. Buyers follow the written pattern and the video together — perfectly in sync.</p>
+          <div class="who-quote">"Customers actually finish the project now. 5-star reviews went up."</div>
+        </div>
+        <div class="who-card">
+          <div class="who-tag">Courses · workshops</div>
+          <h3>Teachers & workshop hosts</h3>
+          <p>Hand out a printed step sheet at the start of class. Students scan whichever step they need — no one falls behind, no one holds up the class.</p>
+          <div class="who-quote">"My workshop runs itself now. Students help each other using the sheet."</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- HOW IT WORKS -->
+  <div class="section" id="how">
+    <div class="container">
+      <div class="eyebrow">How it works</div>
+      <h2 class="section-title">Upload once. Print once. Done.</h2>
+      <p class="section-sub">No editing skills. No design tools. Just your video and 10 minutes.</p>
+      <div class="how-wrap">
+        <div class="how-row">
+          <div class="how-step">
+            <div class="how-n">01</div>
+            <h3>Upload your video</h3>
+            <p>YouTube link or direct upload. Chapters detected automatically, or set timestamps manually.</p>
+          </div>
+          <div class="how-step">
+            <div class="how-n">02</div>
+            <h3>Add notes per step</h3>
+            <p>Write materials needed, measurements, tips. Shown below the video clip for that step.</p>
+          </div>
+          <div class="how-step">
+            <div class="how-n">03</div>
+            <h3>Export print-ready PDF</h3>
+            <p>One click. Formatted A4/Letter instruction sheet with a unique QR code for every step.</p>
+          </div>
+          <div class="how-step">
+            <div class="how-n">04</div>
+            <h3>Pack it. Ship it.</h3>
+            <p>Buyers open the webpage or scan from the sheet. Your support inbox goes quiet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-section">
+    <h2>Stop losing customers at step 3</h2>
+    <p>Give every buyer a guided experience — online and in print, from one setup. Free to start, no credit card needed.</p>
+    <button class="btn-primary" style="font-size:16px;padding:15px 32px">Turn my video into steps →</button>
+    <div class="cta-note">Takes less than 10 minutes to set up your first video</div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="logo">Link<em>Syllabus</em></div>
+    <div class="foot-links">
+      <a href="#how">How it works</a>
+      <a href="#who">Who it's for</a>
+      <a href="#features">Features</a>
+      <a href="mailto:hello@linksyllabus.com">Contact</a>
+    </div>
+    <div class="foot-copy">© 2026 LinkSyllabus</div>
+  </footer>
+
+</body>
+</html>

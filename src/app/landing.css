@@ -1,0 +1,572 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap");
+
+    #lp-root {
+      --brand: #C05621;
+      --brand-dark: #9C4A1A;
+      --brand-light: #FEF3ED;
+      --brand-mid: #F5C9AE;
+      --ink: #111110;
+      --ink-2: #444440;
+      --ink-3: #888880;
+      --surface: #FAFAF8;
+      --border: #E8E3DC;
+      --white: #FFFFFF;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+    }
+
+    #lp-root *,
+    #lp-root *::before,
+    #lp-root *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    
+
+    #lp-root {
+      font-family: var(--font-body);
+      background: var(--white);
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #lp-root a { text-decoration: none; color: inherit; }
+    #lp-root em { font-style: normal; }
+    #lp-root img { display: block; max-width: 100%; }
+
+    /* ─── NAV ─── */
+    #lp-root .nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 2.5rem;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    #lp-root .logo {
+      font-family: var(--font-display);
+      font-size: 20px; font-weight: 800;
+      letter-spacing: -0.5px; color: var(--ink);
+    }
+    #lp-root .logo em { color: var(--brand); }
+    #lp-root .nav-links { display: flex; align-items: center; gap: 2rem; }
+    #lp-root .nav-links a { font-size: 14px; font-weight: 500; color: var(--ink-2); transition: color .2s; }
+    #lp-root .nav-links a:hover { color: var(--brand); }
+    #lp-root .btn-nav {
+      background: var(--brand); color: #fff;
+      border: none; border-radius: var(--radius-sm);
+      padding: 9px 20px; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: background .2s, transform .1s;
+      font-family: var(--font-body);
+    }
+    #lp-root .btn-nav:hover { background: var(--brand-dark); }
+    #lp-root .btn-nav:active { transform: scale(0.97); }
+    #lp-root a.btn-nav {
+      display: inline-block;
+      text-align: center;
+    }
+
+    /* ─── BUTTONS ─── */
+    #lp-root .btn-primary {
+      display: inline-block;
+      background: var(--brand); color: #fff;
+      border: none; border-radius: var(--radius-md);
+      padding: 14px 28px; font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: background .2s, transform .1s;
+      font-family: var(--font-body); white-space: nowrap;
+    }
+    #lp-root .btn-primary:hover { background: var(--brand-dark); }
+    #lp-root .btn-primary:active { transform: scale(0.97); }
+    #lp-root .btn-outline {
+      display: inline-block;
+      background: transparent; color: var(--ink-2);
+      border: 1.5px solid var(--border); border-radius: var(--radius-md);
+      padding: 14px 28px; font-size: 15px; font-weight: 500;
+      cursor: pointer; transition: border-color .2s, color .2s, transform .1s;
+      font-family: var(--font-body);
+    }
+    #lp-root .btn-outline:hover { border-color: var(--ink-3); color: var(--ink); }
+    #lp-root .btn-outline:active { transform: scale(0.97); }
+
+    /* ─── LAYOUT ─── */
+    #lp-root .container { max-width: 1000px; margin: 0 auto; padding: 0 2.5rem; }
+    #lp-root .section { padding: 5rem 0; }
+    #lp-root .section-sm { padding: 3.5rem 0; }
+    #lp-root .divider { height: 1px; background: var(--border); margin: 0 2.5rem; }
+
+    #lp-root .eyebrow {
+      display: inline-block;
+      font-size: 11px; font-weight: 700; color: var(--brand);
+      letter-spacing: 1.2px; text-transform: uppercase;
+      margin-bottom: .6rem;
+    }
+    #lp-root .section-title {
+      font-family: var(--font-display);
+      font-size: 34px; font-weight: 800;
+      letter-spacing: -1px; line-height: 1.2;
+      margin-bottom: .75rem;
+    }
+    #lp-root .section-title em { color: var(--brand); }
+    #lp-root .section-sub {
+      font-size: 16px; color: var(--ink-2);
+      line-height: 1.75; max-width: 560px;
+      margin-bottom: 2.5rem;
+    }
+
+    /* ─── HERO ─── */
+    #lp-root .hero {
+      padding: 5rem 2.5rem 4rem;
+      text-align: center;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    #lp-root .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--brand-light); color: var(--brand);
+      font-size: 12px; font-weight: 700;
+      padding: 6px 16px; border-radius: 99px;
+      margin-bottom: 1.5rem; letter-spacing: .3px;
+    }
+    #lp-root .hero-badge-dot { width: 6px; height: 6px; background: var(--brand); border-radius: 50%; }
+    #lp-root .hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 6vw, 54px);
+      font-weight: 900;
+      letter-spacing: -2px;
+      line-height: 1.1;
+      margin-bottom: 1.25rem;
+      color: var(--ink);
+    }
+    #lp-root .hero h1 em { color: var(--brand); }
+    #lp-root .hero p {
+      font-size: 18px; color: var(--ink-2);
+      line-height: 1.75; max-width: 600px;
+      margin: 0 auto 2rem;
+    }
+    #lp-root .hero-btns {
+      display: flex; gap: 12px;
+      justify-content: center; flex-wrap: wrap;
+      margin-bottom: .75rem;
+    }
+    #lp-root .hero-note { font-size: 13px; color: var(--ink-3); margin-bottom: 3.5rem; }
+
+    /* ─── PLAYER MOCK ─── */
+    #lp-root .player-wrap {
+      max-width: 680px; margin: 0 auto;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden; background: var(--white);
+      box-shadow: 0 4px 40px rgba(0,0,0,0.08);
+    }
+    #lp-root .vid-area {
+      background: #1c1c1e;
+      aspect-ratio: 16/9;
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #lp-root .vid-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      justify-content: space-between;
+      padding: 16px 18px;
+    }
+    #lp-root .vid-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    #lp-root .vid-chapter {
+      background: rgba(0,0,0,.65);
+      color: #fff; font-size: 12px; font-weight: 600;
+      padding: 6px 12px; border-radius: 8px;
+      backdrop-filter: blur(4px);
+    }
+    #lp-root .vid-step {
+      background: var(--brand); color: #fff;
+      font-size: 11px; font-weight: 700;
+      padding: 6px 12px; border-radius: 8px;
+    }
+    #lp-root .vid-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+    #lp-root .play-circle {
+      width: 52px; height: 52px;
+      background: rgba(255,255,255,.18);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid rgba(255,255,255,.4);
+    }
+    #lp-root .tri { width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-left: 18px solid #fff; margin-left: 4px; }
+    #lp-root .voice-tag {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(0,0,0,.55); color: #fff;
+      font-size: 11px; font-weight: 600;
+      padding: 6px 12px; border-radius: 99px;
+    }
+    #lp-root .voice-dot { width: 7px; height: 7px; background: #4ade80; border-radius: 50%; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    #lp-root .prog-wrap { background: #1c1c1e; padding: 0 18px; }
+    #lp-root .prog-bar { height: 3px; background: #333; border-radius: 2px; position: relative; margin: 14px 0; }
+    #lp-root .prog-fill { height: 100%; width: 38%; background: var(--brand); border-radius: 2px; }
+    #lp-root .prog-dot {
+      width: 14px; height: 14px;
+      background: var(--brand); border: 2px solid #fff;
+      border-radius: 50%; position: absolute;
+      top: 50%; left: 38%; transform: translate(-50%,-50%);
+    }
+    #lp-root .ctrl-bar {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 0 18px 14px; background: #1c1c1e;
+    }
+    #lp-root .ctrl-l { display: flex; align-items: center; gap: 16px; }
+    #lp-root .ctrl-t { color: #888; font-size: 13px; font-weight: 600; }
+    #lp-root .ctrl-t.hi { color: #fff; }
+    #lp-root .spd {
+      background: var(--brand); color: #fff;
+      font-size: 11px; font-weight: 800;
+      padding: 3px 9px; border-radius: 5px;
+    }
+    #lp-root .ctrl-r { color: #555; font-size: 12px; }
+    #lp-root .steps-panel { border-top: 1px solid #f0ede8; padding: 18px; }
+    #lp-root .steps-label {
+      font-size: 11px; font-weight: 700; color: #aaa;
+      letter-spacing: .8px; text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    #lp-root .step-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+    #lp-root .step-item:last-child { margin-bottom: 0; }
+    #lp-root .snum {
+      width: 22px; height: 22px;
+      background: #f0ede8; color: #999;
+      border-radius: 50%; font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    #lp-root .step-item.active .snum { background: var(--brand); color: #fff; }
+    #lp-root .stext { font-size: 13px; color: #888; line-height: 1.5; }
+    #lp-root .step-item.active .stext { color: var(--ink); font-weight: 600; }
+
+    /* ─── DUAL DELIVERY ─── */
+    #lp-root .dual-intro {
+      text-align: center;
+      padding: 5rem 2.5rem 3rem;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    #lp-root .flow-diagram {
+      display: grid;
+      grid-template-columns: 1fr 36px 1fr 36px 1fr;
+      align-items: center;
+      gap: 0;
+      max-width: 700px;
+      margin: 0 auto 3rem;
+    }
+    #lp-root .flow-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      text-align: center;
+    }
+    #lp-root .flow-box.center {
+      background: var(--brand-light);
+      border-color: var(--brand-mid);
+    }
+    #lp-root .flow-box-icon { font-size: 24px; margin-bottom: .5rem; }
+    #lp-root .flow-box-title { font-size: 13px; font-weight: 700; margin-bottom: .2rem; }
+    #lp-root .flow-box-desc { font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+    #lp-root .flow-arrow { text-align: center; color: var(--brand); font-size: 22px; font-weight: 700; }
+
+    #lp-root .split-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      max-width: 1000px;
+      margin: 0 auto 2rem;
+      padding: 0 2.5rem;
+    }
+    @media (max-width: 680px) { .split-grid { grid-template-columns: 1fr; } }
+
+    #lp-root .delivery-card { border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; }
+    #lp-root .delivery-head {
+      padding: 1.1rem 1.4rem;
+      display: flex; align-items: center; gap: 12px;
+    }
+    #lp-root .delivery-head.online { background: #1c1c1e; }
+    #lp-root .delivery-head.print { background: #f5f0e8; }
+    #lp-root .dh-icon {
+      width: 36px; height: 36px;
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    #lp-root .dh-icon.online { background: rgba(255,255,255,.12); }
+    #lp-root .dh-icon.print { background: #fff; }
+    #lp-root .dh-title { font-size: 14px; font-weight: 700; }
+    #lp-root .dh-sub { font-size: 12px; opacity: .65; }
+    #lp-root .online .dh-title, .online .dh-sub { color: #fff; }
+    #lp-root .print .dh-title { color: var(--ink); }
+    #lp-root .print .dh-sub { color: var(--ink-3); }
+
+    #lp-root .delivery-#lp-root {
+      padding: 1.25rem;
+      background: var(--white);
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    /* online mini mock */
+    #lp-root .vid-mini {
+      background: #1c1c1e; border-radius: 10px;
+      aspect-ratio: 16/7; position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #lp-root .vid-mini-label {
+      position: absolute; top: 9px; left: 11px;
+      background: var(--brand); color: #fff;
+      font-size: 10px; font-weight: 700;
+      padding: 4px 9px; border-radius: 6px;
+    }
+    #lp-root .vid-mini-voice {
+      position: absolute; bottom: 9px; right: 11px;
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(0,0,0,.6); color: #fff;
+      font-size: 10px; padding: 4px 9px; border-radius: 99px;
+    }
+    #lp-root .play-sm {
+      width: 32px; height: 32px;
+      background: rgba(255,255,255,.2);
+      border-radius: 50%; display: flex;
+      align-items: center; justify-content: center;
+    }
+    #lp-root .tri-sm { width: 0; height: 0; border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-left: 12px solid #fff; margin-left: 2px; }
+    #lp-root .ctrl-mini {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      background: var(--surface); border-radius: 8px;
+    }
+    #lp-root .ctrl-mini span { font-size: 11px; color: var(--ink-2); font-weight: 600; }
+    #lp-root .spd-mini {
+      background: var(--brand); color: #fff;
+      font-size: 10px; font-weight: 800;
+      padding: 2px 7px; border-radius: 4px;
+    }
+    #lp-root .feat-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+    #lp-root .fpill {
+      background: var(--brand-light); color: #993C1D;
+      font-size: 11px; font-weight: 600;
+      padding: 4px 10px; border-radius: 99px;
+    }
+
+    /* print mini mock */
+    #lp-root .paper {
+      background: #fff; border: 1px solid #e0dbd3;
+      border-radius: 10px; padding: 1rem;
+    }
+    #lp-root .paper-header {
+      font-size: 11px; font-weight: 700;
+      text-align: center; border-bottom: 1px solid #e0dbd3;
+      padding-bottom: .6rem; margin-bottom: .75rem;
+      color: var(--ink); letter-spacing: .2px;
+    }
+    #lp-root .paper-step {
+      display: grid; grid-template-columns: 22px 1fr 42px;
+      gap: 8px; align-items: start;
+      margin-bottom: .6rem; padding-bottom: .6rem;
+      border-bottom: 1px dashed #ede9e3;
+    }
+    #lp-root .paper-step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    #lp-root .ps-num {
+      width: 22px; height: 22px;
+      background: var(--ink); color: #fff;
+      border-radius: 50%; font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #lp-root .ps-num.active { background: var(--brand); }
+    #lp-root .ps-title { font-size: 11px; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+    #lp-root .ps-desc { font-size: 10px; color: var(--ink-3); line-height: 1.45; }
+    #lp-root .qr-tiny {
+      width: 38px; height: 38px; background: var(--ink);
+      border-radius: 4px; display: grid;
+      grid-template-columns: repeat(5,1fr);
+      gap: 1.5px; padding: 3px; flex-shrink: 0;
+    }
+    #lp-root .qc { background: #fff; border-radius: 1px; }
+    #lp-root .qc.b { background: var(--ink); }
+    #lp-root .qr-hint {
+      font-size: 9px; color: var(--brand);
+      text-align: center; margin-top: 2px;
+      font-weight: 700; line-height: 1.2;
+    }
+    #lp-root .pfpill {
+      background: #f5f0e8; color: #7a4f1d;
+      font-size: 11px; font-weight: 600;
+      padding: 4px 10px; border-radius: 99px;
+    }
+
+    /* same-source banner */
+    #lp-root .same-source-wrap { padding: 0 2.5rem; max-width: 1000px; margin: 0 auto 2rem; }
+    #lp-root .same-source {
+      background: #EFF6FF; border: 1px solid #BFDBFE;
+      border-radius: var(--radius-lg);
+      padding: 1.1rem 1.4rem;
+      display: flex; align-items: flex-start; gap: 14px;
+    }
+    #lp-root .ss-icon {
+      width: 38px; height: 38px; flex-shrink: 0;
+      background: #DBEAFE; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #lp-root .ss-icon svg { width: 18px; height: 18px; stroke: #1D4ED8; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    #lp-root .ss-text strong { font-size: 14px; font-weight: 700; display: block; margin-bottom: 3px; color: #1E3A8A; }
+    #lp-root .ss-text span { font-size: 13px; color: #3B6CB7; line-height: 1.6; }
+
+    /* ─── FEATURES ─── */
+    #lp-root .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+    #lp-root .feat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 1.4rem;
+      transition: border-color .2s, transform .2s;
+    }
+    #lp-root .feat-card:hover { border-color: var(--brand-mid); transform: translateY(-2px); }
+    #lp-root .feat-card.highlight { background: var(--brand-light); border-color: var(--brand-mid); }
+    #lp-root .feat-icon {
+      width: 38px; height: 38px;
+      background: #fff; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: .9rem; border: 1px solid var(--border);
+    }
+    #lp-root .feat-card.highlight .feat-icon { background: var(--white); border-color: var(--brand-mid); }
+    #lp-root .feat-icon svg { width: 18px; height: 18px; stroke: var(--brand); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    #lp-root .feat-card h3 { font-size: 15px; font-weight: 700; margin-bottom: .35rem; }
+    #lp-root .feat-card p { font-size: 13px; color: var(--ink-2); line-height: 1.65; }
+    #lp-root .new-tag {
+      display: inline-block;
+      background: var(--brand); color: #fff;
+      font-size: 10px; font-weight: 700;
+      padding: 2px 7px; border-radius: 99px;
+      margin-left: 6px; vertical-align: middle;
+    }
+
+    /* ─── WHO ─── */
+    #lp-root .who-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    #lp-root .who-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem; background: var(--white);
+      transition: border-color .2s;
+    }
+    #lp-root .who-card:hover { border-color: var(--brand-mid); }
+    #lp-root .who-tag {
+      display: inline-block;
+      background: var(--brand-light); color: var(--brand);
+      font-size: 11px; font-weight: 700;
+      padding: 4px 11px; border-radius: 99px;
+      margin-bottom: .85rem;
+    }
+    #lp-root .who-card h3 { font-size: 17px; font-weight: 700; margin-bottom: .5rem; }
+    #lp-root .who-card > p { font-size: 14px; color: var(--ink-2); line-height: 1.65; }
+    #lp-root .who-quote {
+      margin-top: 1rem; padding: .85rem 1rem;
+      background: var(--surface); border-radius: 10px;
+      font-size: 13px; color: var(--ink-2);
+      font-style: italic; border-left: 3px solid var(--brand);
+      line-height: 1.6;
+    }
+
+    /* ─── HOW ─── */
+    #lp-root .how-wrap {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden; background: var(--white);
+    }
+    #lp-root .how-row { display: grid; grid-template-columns: repeat(4, 1fr); }
+    @media (max-width: 700px) { .how-row { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 480px) { .how-row { grid-template-columns: 1fr; } }
+    #lp-root .how-step { padding: 1.5rem; border-right: 1px solid var(--border); }
+    #lp-root .how-step:last-child { border-right: none; }
+    @media (max-width: 700px) {
+      #lp-root .how-step:nth-child(2) { border-right: none; }
+      #lp-root .how-step:nth-child(1), .how-step:nth-child(2) { border-bottom: 1px solid var(--border); }
+    }
+    #lp-root .how-n { font-size: 11px; font-weight: 800; color: var(--brand); letter-spacing: .5px; margin-bottom: .5rem; }
+    #lp-root .how-step h3 { font-size: 15px; font-weight: 700; margin-bottom: .4rem; }
+    #lp-root .how-step p { font-size: 13px; color: var(--ink-2); line-height: 1.65; }
+
+    /* ─── CTA ─── */
+    #lp-root .cta-section {
+      margin: 0 2.5rem 5rem;
+      background: var(--brand-light);
+      border-radius: var(--radius-xl);
+      padding: 3.5rem 2rem;
+      text-align: center;
+    }
+    #lp-root .cta-section h2 {
+      font-family: var(--font-display);
+      font-size: 34px; font-weight: 900;
+      letter-spacing: -1px; margin-bottom: .75rem;
+    }
+    #lp-root .cta-section p {
+      font-size: 16px; color: #993C1D;
+      margin: 0 auto 1.75rem;
+      line-height: 1.7; max-width: 480px;
+    }
+    #lp-root .cta-note { font-size: 13px; color: var(--brand); margin-top: .75rem; font-weight: 600; }
+
+    /* ─── FOOTER ─── */
+    #lp-root footer {
+      border-top: 1px solid var(--border);
+      padding: 1.75rem 2.5rem;
+      display: flex; align-items: center;
+      justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+    }
+    #lp-root .foot-links { display: flex; gap: 2rem; }
+    #lp-root .foot-links a { font-size: 13px; color: var(--ink-3); }
+    #lp-root .foot-links a:hover { color: var(--brand); }
+    #lp-root .foot-copy { font-size: 13px; color: var(--ink-3); }
+
+    /* ─── ANIMATIONS ─── */
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    #lp-root .hero > * { animation: fadeUp .6s ease both; }
+    #lp-root .hero-badge { animation-delay: .05s; }
+    #lp-root .hero h1 { animation-delay: .12s; }
+    #lp-root .hero p { animation-delay: .2s; }
+    #lp-root .hero-btns { animation-delay: .28s; }
+    #lp-root .hero-note { animation-delay: .34s; }
+    #lp-root .player-wrap { animation-delay: .4s; }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 640px) {
+      #lp-root .nav { padding: 1rem 1.25rem; }
+      #lp-root .nav-links { gap: 1rem; }
+      #lp-root .hero { padding: 3rem 1.25rem 2.5rem; }
+      #lp-root .container { padding: 0 1.25rem; }
+      #lp-root .divider { margin: 0 1.25rem; }
+      #lp-root .cta-section { margin: 0 1.25rem 3.5rem; padding: 2.5rem 1.25rem; }
+      #lp-root .split-grid { padding: 0 1.25rem; }
+      #lp-root .same-source-wrap { padding: 0 1.25rem; }
+      #lp-root footer { padding: 1.25rem; }
+      #lp-root .section-title { font-size: 26px; }
+      #lp-root .flow-diagram { grid-template-columns: 1fr; gap: 8px; }
+      #lp-root .flow-arrow { transform: rotate(90deg); font-size: 16px; }
+    }
+  
