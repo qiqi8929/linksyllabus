@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import QRCode from "qrcode";
-import { env } from "@/lib/env";
+import { publicSiteOriginFromRequest } from "@/lib/publicOrigin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,7 +9,8 @@ export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
-  const url = `${env.appUrl()}/play/${params.id}`;
+  const base = publicSiteOriginFromRequest(req);
+  const url = `${base}/play/${params.id}`;
   const png = await QRCode.toBuffer(url, {
     type: "png",
     width: 512,

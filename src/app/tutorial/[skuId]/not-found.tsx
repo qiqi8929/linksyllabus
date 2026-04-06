@@ -7,6 +7,11 @@ export default function TutorialNotFound() {
       <p className="mt-2 text-sm text-zinc-600">
         This tutorial may be unpublished or the link is invalid.
       </p>
+      <p className="mt-3 text-sm text-zinc-500">
+        If you scanned a QR code: the tutorial must be activated after payment
+        before public links work. The creator can open the link while logged in
+        to preview before activation.
+      </p>
       <Link className="btn-primary mt-6 inline-block" href="/">
         Home
       </Link>

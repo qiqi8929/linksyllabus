@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import QRCode from "qrcode";
-import { env } from "@/lib/env";
+import { publicSiteOriginFromRequest } from "@/lib/publicOrigin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export async function GET(
   const skuId = params.skuId;
   const urlObj = new URL(req.url);
   const step = urlObj.searchParams.get("step");
-  const base = env.appUrl().replace(/\/$/, "");
+  const base = publicSiteOriginFromRequest(req);
   const tutorialPath = `/tutorial/${encodeURIComponent(skuId)}`;
   const target =
     step === null || step === ""
