@@ -62,6 +62,25 @@ export default async function DashboardSuccessPage({
         ) : null}
       </div>
 
+      {sku.is_active ? (
+        <div>
+          <Link
+            className="btn-primary inline-flex items-center gap-2"
+            href={`/tutorial/${encodeURIComponent(sku.id)}`}
+          >
+            🖥️ View full tutorial page
+          </Link>
+          <p className="mt-2 text-xs text-zinc-500">
+            Desktop-friendly walkthrough with all steps on one page. QR codes below are ideal for
+            phones.
+          </p>
+        </div>
+      ) : (
+        <p className="text-sm text-zinc-600">
+          Full tutorial page will be available after payment confirms.
+        </p>
+      )}
+
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {(steps ?? []).map((st) => (
           <div key={st.id} className="card overflow-hidden p-4">
