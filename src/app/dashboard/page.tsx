@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { DashboardTutorialActions } from "@/components/DashboardTutorialActions";
 import { TutorialCreator } from "@/components/TutorialCreator";
 
 type StepRow = {
@@ -49,7 +50,9 @@ export default async function DashboardPage() {
         <div>
           <h2 className="text-lg font-semibold">Your tutorials</h2>
           <p className="mt-1 text-sm text-zinc-600">
-            Published tutorials are active; unpaid drafts stay inactive until checkout completes.
+            Use <span className="font-medium">Edit</span> to change names and descriptions.{" "}
+            <span className="font-medium">Unpublish</span> hides a live tutorial from public
+            links; finish payment to activate drafts.
           </p>
         </div>
 
@@ -64,28 +67,26 @@ export default async function DashboardPage() {
             const steps = [...(sku.steps ?? [])].sort((a, b) => a.step_number - b.step_number);
             return (
               <div key={sku.id} className="card overflow-hidden">
-                <div className="flex flex-col gap-2 border-b border-zinc-100 p-5 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-col gap-3 border-b border-zinc-100 p-5 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
                     <div className="text-base font-semibold">{sku.name}</div>
                     <div className="mt-1 flex flex-wrap gap-2 text-sm text-zinc-500">
-                      <span>{steps.length} step{steps.length === 1 ? "" : "s"}</span>
+                      <span>
+                        {steps.length} step{steps.length === 1 ? "" : "s"}
+                      </span>
                       <span
                         className={
-                          sku.is_active ? "text-emerald-700" : "text-amber-700"
+                          sku.is_active ? "text-emerald-700" : "text-amber-800"
                         }
                       >
-                        {sku.is_active ? "Active" : "Inactive (payment pending)"}
+                        {sku.is_active ? "Published" : "Not published"}
                       </span>
                     </div>
                   </div>
-                  {sku.is_active ? (
-                    <Link
-                      className="btn-primary shrink-0 text-sm"
-                      href={`/dashboard/success?skuId=${encodeURIComponent(sku.id)}`}
-                    >
-                      View QR codes
-                    </Link>
-                  ) : null}
+                  <DashboardTutorialActions
+                    skuId={sku.id}
+                    isActive={sku.is_active}
+                  />
                 </div>
 
                 {steps.length === 0 ? (

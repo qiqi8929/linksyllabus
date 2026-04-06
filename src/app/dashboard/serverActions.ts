@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -121,4 +122,133 @@ export async function createInactiveSkuWithSteps(payload: {
   }
 
   return { skuId: sku.id };
+}
+
+export async function deleteSkuAction(skuId: string) {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user?.id) throw new Error("Unauthorized");
+
+  const { error } = await supabase
+    .from("skus")
+    .delete()
+    .eq("id", skuId)
+    .eq("user_id", user.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard");
+}
+
+export async function unpublishSkuAction(skuId: string) {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user?.id) throw new Error("Unauthorized");
+
+  const { error } = await supabase
+    .from("skus")
+    .update({ is_active: false })
+    .eq("id", skuId)
+    .eq("user_id", user.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/tutorial/${skuId}`);
+  revalidatePath(`/tutorial/${skuId}/print`);
+}
+
+export type TutorialStepUpdateInput = {
+  id: string;
+  step_name: string;
+  description: string;
+  youtube_url: string;
+  start_time: number;
+  end_time: number;
+};
+
+export async function updateTutorialAction(
+  skuId: string,
+  payload: {
+    name: string;
+    description: string;
+    steps: TutorialStepUpdateInput[];
+  }
+) {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user?.id) throw new Error("Unauthorized");
+
+  const { data: sku, error: skuErr } = await supabase
+    .from("skus")
+    .select("id,user_id")
+    .eq("id", skuId)
+    .maybeSingle();
+
+  if (skuErr || !sku || sku.user_id !== user.id) {
+    throw new Error("Tutorial not found.");
+  }
+
+  const name = payload.name.trim();
+  if (!name) throw new Error("Tutorial name is required.");
+
+  const { error: upSku } = await supabase
+    .from("skus")
+    .update({ name, description: String(payload.description ?? "").trim() })
+    .eq("id", skuId)
+    .eq("user_id", user.id);
+
+  if (upSku) throw new Error(upSku.message);
+
+  const { data: stepRows } = await supabase
+    .from("steps")
+    .select("id")
+    .eq("sku_id", skuId);
+
+  const allowed = new Set((stepRows ?? []).map((r) => r.id));
+
+  for (let i = 0; i < payload.steps.length; i++) {
+    const s = payload.steps[i];
+    if (!allowed.has(s.id)) {
+      throw new Error(`Invalid step reference (step ${i + 1}).`);
+    }
+    const step_name = String(s.step_name ?? "").trim();
+    const youtube_url = String(s.youtube_url ?? "").trim();
+    if (!step_name || !youtube_url) {
+      throw new Error(`Step ${i + 1}: name and video URL are required.`);
+    }
+    const startRaw = Number(s.start_time);
+    const endRaw = Number(s.end_time);
+    const start_time = Math.max(0, Math.floor(Number.isFinite(startRaw) ? startRaw : 0));
+    const end_time = Math.floor(endRaw);
+    if (!Number.isFinite(end_time) || end_time <= start_time) {
+      throw new Error(
+        `Step ${i + 1}: end time (seconds) must be greater than start time.`
+      );
+    }
+
+    const { error: se } = await supabase
+      .from("steps")
+      .update({
+        step_name,
+        description: String(s.description ?? "").trim(),
+        youtube_url,
+        start_time,
+        end_time
+      })
+      .eq("id", s.id)
+      .eq("sku_id", skuId);
+
+    if (se) throw new Error(se.message);
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/tutorial/${skuId}`);
+  revalidatePath(`/tutorial/${skuId}/print`);
 }

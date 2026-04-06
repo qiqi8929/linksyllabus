@@ -80,6 +80,10 @@ on public.skus for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+create policy "skus are deletable by owner"
+on public.skus for delete
+using (auth.uid() = user_id);
+
 -- steps：所属教程的拥有者可读写；激活教程的步骤可被匿名读取（便于扫码）
 create policy "steps_select_owner_or_active_sku"
 on public.steps for select
