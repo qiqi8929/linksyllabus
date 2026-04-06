@@ -25,6 +25,8 @@ export type TutorialStepInput = {
 export async function createInactiveSkuWithSteps(payload: {
   tutorialName: string;
   steps: TutorialStepInput[];
+  /** When a step has no per-step URL, use this (chapter YouTube URL from the form). */
+  defaultYoutubeUrl?: string;
 }): Promise<{ skuId: string }> {
   const supabase = createSupabaseServerClient();
   const {
@@ -46,11 +48,14 @@ export async function createInactiveSkuWithSteps(payload: {
     throw new Error("Missing user id.");
   }
 
+  const defaultYoutubeUrl = String(payload.defaultYoutubeUrl ?? "").trim();
+
   /** Server actions may strip `undefined`; missing keys become NULL on insert — coerce everything. */
   const normalized = payload.steps.map((s, idx) => {
     const step_name = String(s.step_name ?? "").trim();
     const description = String(s.description ?? "").trim();
-    const youtube_url = String(s.youtube_url ?? "").trim();
+    const youtube_url =
+      String(s.youtube_url ?? "").trim() || defaultYoutubeUrl;
     const startRaw = Number(s.start_time);
     const endRaw = Number(s.end_time);
     const start_time = Math.max(0, Math.floor(Number.isFinite(startRaw) ? startRaw : 0));
