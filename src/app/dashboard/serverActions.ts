@@ -131,13 +131,20 @@ export async function deleteSkuAction(skuId: string) {
   } = await supabase.auth.getUser();
   if (!user?.id) throw new Error("Unauthorized");
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("skus")
     .delete()
     .eq("id", skuId)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .select("id");
 
   if (error) throw new Error(error.message);
+
+  if (!data?.length) {
+    throw new Error(
+      "Delete failed: no rows removed. In Supabase → SQL Editor, run the policy from supabase/migration_skus_delete_policy.sql (skus deletable by owner), then try again."
+    );
+  }
 
   revalidatePath("/dashboard");
 }
@@ -149,13 +156,18 @@ export async function unpublishSkuAction(skuId: string) {
   } = await supabase.auth.getUser();
   if (!user?.id) throw new Error("Unauthorized");
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("skus")
     .update({ is_active: false })
     .eq("id", skuId)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .select("id");
 
   if (error) throw new Error(error.message);
+
+  if (!data?.length) {
+    throw new Error("Unpublish failed: no rows updated.");
+  }
 
   revalidatePath("/dashboard");
   revalidatePath(`/tutorial/${skuId}`);

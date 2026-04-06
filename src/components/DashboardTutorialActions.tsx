@@ -26,10 +26,9 @@ export function DashboardTutorialActions({ skuId, isActive }: Props) {
     setPending(true);
     try {
       await deleteSkuAction(skuId);
-      router.refresh();
+      window.location.assign("/dashboard");
     } catch (e) {
       alert(e instanceof Error ? e.message : "Delete failed.");
-    } finally {
       setPending(false);
     }
   }
