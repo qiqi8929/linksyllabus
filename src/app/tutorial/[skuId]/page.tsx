@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { TutorialStepsClient, type TutorialStepPayload } from "./TutorialStepsClient";
+import { TutorialViewClient, type TutorialStepPayload } from "./TutorialViewClient";
 
 export const dynamic = "force-dynamic";
 
@@ -98,7 +98,7 @@ export default async function TutorialPage({
           No steps published yet.
         </div>
       ) : (
-        <TutorialStepsClient skuId={sku.id} steps={steps} />
+        <TutorialViewClient skuId={sku.id} steps={steps} />
       )}
 
       <div className="mt-10 text-center">

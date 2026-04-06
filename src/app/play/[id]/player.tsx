@@ -61,7 +61,7 @@ function playWakeBeep() {
   }
 }
 
-function useLinkVoiceControl(opts: {
+export function useLinkVoiceControl(opts: {
   onReplay: () => void;
   onPause: () => void;
   onPlay: () => void;
@@ -298,7 +298,7 @@ function useLinkVoiceControl(opts: {
   };
 }
 
-function VoiceMicCluster({
+export function VoiceMicCluster({
   voiceArmed,
   voiceAwake,
   onToggle
@@ -339,7 +339,7 @@ function VoiceMicCluster({
   );
 }
 
-function VoiceFeedbackBanners({
+export function VoiceFeedbackBanners({
   voiceArmed,
   voiceAwake,
   voiceToast
@@ -368,7 +368,7 @@ function VoiceFeedbackBanners({
   );
 }
 
-function loadYouTubeIframeApi(): Promise<void> {
+export function loadYouTubeIframeApi(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (window.YT?.Player) return Promise.resolve();
 

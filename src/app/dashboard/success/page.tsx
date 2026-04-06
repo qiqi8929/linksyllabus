@@ -64,10 +64,10 @@ export default async function DashboardSuccessPage({
 
       <div>
         <Link
-          className="btn-primary inline-flex items-center gap-2"
+          className="inline-flex w-full max-w-lg items-center justify-center gap-2 rounded-xl bg-orange-500 px-8 py-5 text-lg font-semibold text-white shadow-md transition hover:bg-orange-600 sm:text-xl"
           href={`/tutorial/${encodeURIComponent(sku.id)}`}
         >
-          🖥️ View full tutorial
+          🖥️ View Tutorial Page →
         </Link>
         <p className="mt-2 text-xs text-zinc-500">
           All steps on one page (best on desktop). QR codes below are great on phones. If a link
