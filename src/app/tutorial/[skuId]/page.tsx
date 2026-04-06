@@ -14,19 +14,40 @@ async function resolveParams(
   return Promise.resolve(params);
 }
 
+/**
+ * RLS: inactive SKUs are visible only to the owner; active SKUs to anyone.
+ * This mirrors that logic so owners can preview before Stripe activates `is_active`.
+ */
+async function fetchSkuVisibleToViewer(skuId: string) {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  const { data: sku, error } = await supabase
+    .from("skus")
+    .select("id,name,description,is_active,user_id")
+    .eq("id", skuId)
+    .maybeSingle();
+
+  if (error || !sku) {
+    return { supabase, sku: null, user: user ?? null };
+  }
+
+  if (!sku.is_active && user?.id !== sku.user_id) {
+    return { supabase, sku: null, user: user ?? null };
+  }
+
+  return { supabase, sku, user: user ?? null };
+}
+
 export async function generateMetadata({
   params
 }: {
   params: PageParams | Promise<PageParams>;
 }): Promise<Metadata> {
   const { skuId } = await resolveParams(params);
-  const supabase = createSupabaseServerClient();
-  const { data: sku } = await supabase
-    .from("skus")
-    .select("name")
-    .eq("id", skuId)
-    .eq("is_active", true)
-    .maybeSingle();
+  const { sku } = await fetchSkuVisibleToViewer(skuId);
 
   const title = sku?.name?.trim()
     ? `${sku.name} · Tutorial`
@@ -42,16 +63,9 @@ export default async function TutorialPage({
 }) {
   const { skuId } = await resolveParams(params);
 
-  const supabase = createSupabaseServerClient();
+  const { supabase, sku } = await fetchSkuVisibleToViewer(skuId);
 
-  const { data: sku, error: skuErr } = await supabase
-    .from("skus")
-    .select("id,name,description,is_active")
-    .eq("id", skuId)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (skuErr || !sku) {
+  if (!sku) {
     notFound();
   }
 
@@ -79,6 +93,12 @@ export default async function TutorialPage({
 
   return (
     <main className="container-page py-8 md:py-12">
+      {!sku.is_active ? (
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <span className="font-medium">Preview</span> — This tutorial is not published yet.
+          After payment completes, anyone with the link can open it.
+        </div>
+      ) : null}
       <div className="mb-8 space-y-2 border-b border-zinc-100 pb-8">
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
           Tutorial
