@@ -38,16 +38,30 @@ const SPEEDS = [0.5, 1, 1.5, 2] as const;
 type Props = {
   skuId: string;
   steps: TutorialStepPayload[];
+  /** From `?step=N` (step_number). Selects that step; first load may autoplay the clip. */
+  initialStepNumber?: number;
 };
 
-export function TutorialViewClient({ skuId, steps }: Props) {
+export function TutorialViewClient({
+  skuId,
+  steps,
+  initialStepNumber
+}: Props) {
   const containerId = useMemo(() => `tutorial-yt-${skuId}`, [skuId]);
   const playerRef = useRef<any>(null);
   const intervalRef = useRef<number | null>(null);
   const videoWrapRef = useRef<HTMLDivElement | null>(null);
   const timesRef = useRef({ start: 0, end: 0 });
+  const autoplayFromUrlOnceRef = useRef(
+    initialStepNumber != null &&
+      steps.some((s) => s.step_number === initialStepNumber)
+  );
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    if (initialStepNumber == null) return 0;
+    const i = steps.findIndex((s) => s.step_number === initialStepNumber);
+    return i >= 0 ? i : 0;
+  });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(80);
@@ -162,6 +176,10 @@ export function TutorialViewClient({ skuId, steps }: Props) {
             e.target.seekTo(startTime, true);
             e.target.setVolume(volume);
             e.target.setPlaybackRate(playbackRate);
+            if (autoplayFromUrlOnceRef.current) {
+              autoplayFromUrlOnceRef.current = false;
+              e.target.playVideo();
+            }
           },
           onStateChange: (e: { data: number }) => {
             const YT = window.YT;

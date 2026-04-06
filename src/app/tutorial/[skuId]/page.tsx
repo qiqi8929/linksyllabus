@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TutorialViewClient, type TutorialStepPayload } from "./TutorialViewClient";
+import { fetchSkuVisibleToViewer } from "./tutorialAccess";
 
 export const dynamic = "force-dynamic";
 
 type PageParams = { skuId: string };
+
+type SearchParamsInput =
+  | Record<string, string | string[] | undefined>
+  | Promise<Record<string, string | string[] | undefined>>;
 
 async function resolveParams(
   params: PageParams | Promise<PageParams>
@@ -14,31 +18,12 @@ async function resolveParams(
   return Promise.resolve(params);
 }
 
-/**
- * RLS: inactive SKUs are visible only to the owner; active SKUs to anyone.
- * This mirrors that logic so owners can preview before Stripe activates `is_active`.
- */
-async function fetchSkuVisibleToViewer(skuId: string) {
-  const supabase = createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  const { data: sku, error } = await supabase
-    .from("skus")
-    .select("id,name,description,is_active,user_id")
-    .eq("id", skuId)
-    .maybeSingle();
-
-  if (error || !sku) {
-    return { supabase, sku: null, user: user ?? null };
-  }
-
-  if (!sku.is_active && user?.id !== sku.user_id) {
-    return { supabase, sku: null, user: user ?? null };
-  }
-
-  return { supabase, sku, user: user ?? null };
+function parseStepParam(sp: Record<string, string | string[] | undefined>) {
+  const raw = sp.step;
+  const stepStr = Array.isArray(raw) ? raw[0] : raw;
+  const n = stepStr != null ? parseInt(String(stepStr), 10) : NaN;
+  if (!Number.isFinite(n) || n < 1) return undefined;
+  return n;
 }
 
 export async function generateMetadata({
@@ -57,11 +42,15 @@ export async function generateMetadata({
 }
 
 export default async function TutorialPage({
-  params
+  params,
+  searchParams
 }: {
   params: PageParams | Promise<PageParams>;
+  searchParams?: SearchParamsInput;
 }) {
   const { skuId } = await resolveParams(params);
+  const sp = await Promise.resolve(searchParams ?? {});
+  const initialStepNumber = parseStepParam(sp);
 
   const { supabase, sku } = await fetchSkuVisibleToViewer(skuId);
 
@@ -118,10 +107,20 @@ export default async function TutorialPage({
           No steps published yet.
         </div>
       ) : (
-        <TutorialViewClient skuId={sku.id} steps={steps} />
+        <TutorialViewClient
+          skuId={sku.id}
+          steps={steps}
+          initialStepNumber={initialStepNumber}
+        />
       )}
 
-      <div className="mt-10 text-center">
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-center">
+        <Link
+          className="text-sm font-medium text-orange-700 hover:text-orange-900"
+          href={`/tutorial/${encodeURIComponent(sku.id)}/print`}
+        >
+          Print manual (QR codes)
+        </Link>
         <Link className="text-sm text-zinc-500 hover:text-zinc-800" href="/">
           Home
         </Link>
