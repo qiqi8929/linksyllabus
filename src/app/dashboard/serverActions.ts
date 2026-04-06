@@ -107,7 +107,12 @@ export async function createInactiveSkuWithSteps(payload: {
 
   const rows = normalized.map((r) => ({
     sku_id: sku.id,
-    ...r
+    step_number: r.step_number,
+    step_name: r.step_name,
+    description: r.description,
+    youtube_url: r.youtube_url,
+    start_time: r.start_time,
+    end_time: r.end_time
   }));
 
   const { error: stepErr } = await supabase.from("steps").insert(rows);

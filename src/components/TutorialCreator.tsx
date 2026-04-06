@@ -197,7 +197,14 @@ export function TutorialCreator() {
         throw new Error("Unexpected AI response shape.");
       }
       setSteps((prev) =>
-        prev.map((row, i) => ({ ...row, description: descriptions[i] ?? "" }))
+        prev.map((row, i) => {
+          const generated = descriptions[i] ?? "";
+          const hadUserText = row.description.trim().length > 0;
+          return {
+            ...row,
+            description: hadUserText ? row.description : generated
+          };
+        })
       );
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "AI generation failed.");
@@ -321,11 +328,27 @@ export function TutorialCreator() {
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-1 md:col-span-2">
-                    <label className="text-xs text-zinc-600">Step name</label>
+                    <label className="text-xs text-zinc-600" htmlFor={`step-name-${row.id}`}>
+                      Step name
+                    </label>
                     <input
+                      id={`step-name-${row.id}`}
                       value={row.step_name}
                       onChange={(e) => updateStep(row.id, { step_name: e.target.value })}
                       placeholder="Short label for this segment"
+                    />
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-xs text-zinc-600" htmlFor={`step-desc-${row.id}`}>
+                      Description
+                    </label>
+                    <textarea
+                      id={`step-desc-${row.id}`}
+                      rows={4}
+                      value={row.description}
+                      onChange={(e) => updateStep(row.id, { description: e.target.value })}
+                      placeholder="Optional — type your own, or leave empty and use “Generate with AI” below."
+                      className="w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
                     />
                   </div>
                   <div className="space-y-1">
@@ -358,7 +381,7 @@ export function TutorialCreator() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 pt-2">
+        <div className="flex flex-wrap items-center gap-2 pt-2">
           <button
             type="button"
             className="btn-ghost"
@@ -367,6 +390,9 @@ export function TutorialCreator() {
           >
             {aiLoading ? "Generating…" : "Generate with AI"}
           </button>
+          <span className="text-xs text-zinc-500">
+            Fills only steps with an empty description; you can edit any text afterward.
+          </span>
           <button
             type="button"
             className="btn-primary"
