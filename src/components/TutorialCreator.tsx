@@ -10,7 +10,6 @@ import { extractYouTubeVideoId } from "@/lib/video";
 type StepRow = {
   id: string;
   step_name: string;
-  video_url: string;
   start_time: number;
   end_time: number;
   description: string;
@@ -27,7 +26,6 @@ function emptyStep(): StepRow {
   return {
     id: makeId(),
     step_name: "",
-    video_url: "",
     start_time: 0,
     end_time: 60,
     description: ""
@@ -75,7 +73,7 @@ export function TutorialCreator() {
     return steps.map((s) => ({
       step_name: s.step_name.trim(),
       description: s.description.trim(),
-      youtube_url: s.video_url.trim() || chapter,
+      youtube_url: chapter,
       start_time: s.start_time,
       end_time: s.end_time
     }));
@@ -86,11 +84,13 @@ export function TutorialCreator() {
     if (!name) return "Please enter a tutorial name.";
     if (!steps.length) return "Add at least one step.";
     const chapter = chapterVideoUrl.trim();
+    if (!chapter) {
+      return "Paste the YouTube URL for this tutorial above.";
+    }
     for (let i = 0; i < steps.length; i++) {
       const s = steps[i];
-      const effectiveUrl = s.video_url.trim() || chapter;
-      if (!s.step_name.trim() || !effectiveUrl) {
-        return `Step ${i + 1}: enter a step name and a video URL (or set the chapter YouTube URL above).`;
+      if (!s.step_name.trim()) {
+        return `Step ${i + 1}: enter a step name.`;
       }
       if (
         !Number.isFinite(s.start_time) ||
@@ -119,12 +119,6 @@ export function TutorialCreator() {
       return;
     }
     setError(null);
-    setSteps((prev) =>
-      prev.map((row) => ({
-        ...row,
-        video_url: row.video_url.trim() ? row.video_url : url
-      }))
-    );
     setDescExtractLoading(true);
     try {
       const res = await fetch("/api/gemini/extract-timestamps-from-description", {
@@ -154,7 +148,6 @@ export function TutorialCreator() {
           matched += 1;
           return {
             ...row,
-            video_url: url,
             start_time: Math.floor(m.start_time),
             end_time: Math.floor(m.end_time)
           };
@@ -179,6 +172,7 @@ export function TutorialCreator() {
       setError(v);
       return;
     }
+    const chapter = chapterVideoUrl.trim();
     setAiLoading(true);
     try {
       const res = await fetch("/api/gemini/generate-descriptions", {
@@ -188,7 +182,7 @@ export function TutorialCreator() {
           tutorialName: tutorialName.trim(),
           steps: steps.map((s) => ({
             stepName: s.step_name.trim(),
-            videoUrl: s.video_url.trim(),
+            videoUrl: chapter,
             startTime: s.start_time,
             endTime: s.end_time
           }))
@@ -270,7 +264,7 @@ export function TutorialCreator() {
 
         <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50/80 p-4">
           <label className="text-sm font-medium" htmlFor="chapter-youtube-url">
-            YouTube URL (same video for the steps below)
+            YouTube URL (same video for all steps)
           </label>
           <input
             id="chapter-youtube-url"
@@ -332,14 +326,6 @@ export function TutorialCreator() {
                       value={row.step_name}
                       onChange={(e) => updateStep(row.id, { step_name: e.target.value })}
                       placeholder="Short label for this segment"
-                    />
-                  </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="text-xs text-zinc-600">YouTube or Vimeo URL</label>
-                    <input
-                      value={row.video_url}
-                      onChange={(e) => updateStep(row.id, { video_url: e.target.value })}
-                      placeholder="https://..."
                     />
                   </div>
                   <div className="space-y-1">
