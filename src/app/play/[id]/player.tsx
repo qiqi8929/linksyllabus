@@ -107,13 +107,13 @@ export function useLinkVoiceControl(opts: {
       commandWindowTimerRef.current = null;
       awakeRef.current = false;
       setVoiceAwake(false);
-    }, 5000);
+    }, 8000);
   }, []);
 
   const runCommand = useCallback(
     (cmd: VoiceCmd) => {
       const now = Date.now();
-      if (now - lastFireRef.current < 500) return;
+      if (now - lastFireRef.current < 280) return;
       lastFireRef.current = now;
 
       clearCommandWindow();
@@ -188,25 +188,30 @@ export function useLinkVoiceControl(opts: {
     recognitionRef.current = recognition;
     recognition.lang = "en-US";
     recognition.continuous = true;
-    recognition.interimResults = false;
+    /** Interim + final = faster command detection after “Hey Link”. */
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
+
+    const fullTranscript = (event: any) => {
+      let t = "";
+      for (let i = 0; i < event.results.length; i++) {
+        t += String(event.results[i]?.[0]?.transcript ?? "");
+      }
+      return t.trim();
+    };
 
     recognition.onresult = (event: any) => {
       try {
-        const parts: string[] = [];
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const r = event.results[i];
-          if (r?.isFinal) parts.push(String(r?.[0]?.transcript ?? ""));
-        }
-        const raw = parts.join(" ").trim();
+        const raw = fullTranscript(event);
         if (!raw) return;
 
         if (!armedRef.current) return;
 
+        const lower = raw.toLowerCase();
         const hasWake = WAKE_RE.test(raw);
 
         if (awakeRef.current) {
-          const cmd = parseVoiceCommand(raw);
+          const cmd = parseVoiceCommand(lower);
           if (cmd) {
             runCommand(cmd);
             return;
@@ -221,7 +226,7 @@ export function useLinkVoiceControl(opts: {
           startCommandWindow();
           const rest = stripWakePhrase(raw);
           if (rest) {
-            const cmd = parseVoiceCommand(rest);
+            const cmd = parseVoiceCommand(rest.toLowerCase());
             if (cmd) runCommand(cmd);
           }
         }
@@ -247,7 +252,7 @@ export function useLinkVoiceControl(opts: {
       restartTimerRef.current = window.setTimeout(() => {
         restartTimerRef.current = null;
         tryStartRecognition();
-      }, 350);
+      }, 200);
     };
 
     recognition.onend = () => {
@@ -256,7 +261,7 @@ export function useLinkVoiceControl(opts: {
       restartTimerRef.current = window.setTimeout(() => {
         restartTimerRef.current = null;
         tryStartRecognition();
-      }, 120);
+      }, 50);
     };
 
     tryStartRecognition();

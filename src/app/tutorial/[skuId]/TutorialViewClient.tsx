@@ -259,51 +259,55 @@ export function TutorialViewClient({
   }, []);
 
   const controlsBar = (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 py-2 text-sm">
-      <button
-        type="button"
-        className="btn-ghost min-w-[2.5rem] px-2 py-1.5"
-        onClick={goPrev}
-        disabled={currentIndex <= 0}
-        aria-label="Previous step"
-      >
-        ⏮
-      </button>
-      <button
-        type="button"
-        className="btn-ghost min-w-[2.5rem] px-2 py-1.5"
-        onClick={togglePlay}
-        aria-label={playing ? "Pause" : "Play"}
-      >
-        {playing ? "⏸" : "▶"}
-      </button>
-      <button
-        type="button"
-        className="btn-ghost min-w-[2.5rem] px-2 py-1.5"
-        onClick={goNext}
-        disabled={currentIndex >= steps.length - 1}
-        aria-label="Next step"
-      >
-        ⏭
-      </button>
-      <span className="hidden sm:inline text-xs text-zinc-500">Speed</span>
-      <div className="flex flex-wrap gap-1">
-        {SPEEDS.map((r) => (
-          <button
-            key={r}
-            type="button"
-            className={`rounded-md px-2 py-1 text-xs font-medium ${
-              playbackRate === r
-                ? "bg-orange-500 text-white"
-                : "bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50"
-            }`}
-            onClick={() => setPlaybackRate(r)}
-          >
-            {r}x
-          </button>
-        ))}
+    <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:py-2">
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+        <button
+          type="button"
+          className="btn-ghost min-h-[44px] min-w-[44px] px-2 py-1.5 sm:min-h-0 sm:min-w-[2.5rem]"
+          onClick={goPrev}
+          disabled={currentIndex <= 0}
+          aria-label="Previous step"
+        >
+          ⏮
+        </button>
+        <button
+          type="button"
+          className="btn-ghost min-h-[44px] min-w-[44px] px-2 py-1.5 sm:min-h-0 sm:min-w-[2.5rem]"
+          onClick={togglePlay}
+          aria-label={playing ? "Pause" : "Play"}
+        >
+          {playing ? "⏸" : "▶"}
+        </button>
+        <button
+          type="button"
+          className="btn-ghost min-h-[44px] min-w-[44px] px-2 py-1.5 sm:min-h-0 sm:min-w-[2.5rem]"
+          onClick={goNext}
+          disabled={currentIndex >= steps.length - 1}
+          aria-label="Next step"
+        >
+          ⏭
+        </button>
       </div>
-      <label className="flex min-w-[120px] flex-1 items-center gap-2 sm:min-w-[140px]">
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+        <span className="text-xs text-zinc-500">Speed</span>
+        <div className="flex flex-wrap gap-1">
+          {SPEEDS.map((r) => (
+            <button
+              key={r}
+              type="button"
+              className={`min-h-[40px] min-w-[2.75rem] rounded-md px-2 py-1.5 text-xs font-medium sm:min-h-0 sm:min-w-0 ${
+                playbackRate === r
+                  ? "bg-orange-500 text-white"
+                  : "bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50"
+              }`}
+              onClick={() => setPlaybackRate(r)}
+            >
+              {r}x
+            </button>
+          ))}
+        </div>
+      </div>
+      <label className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2 sm:min-w-[140px]">
         <span className="text-xs" aria-hidden>
           🔊
         </span>
@@ -317,14 +321,16 @@ export function TutorialViewClient({
           aria-label="Volume"
         />
       </label>
-      <button
-        type="button"
-        className="btn-ghost px-2 py-1.5"
-        onClick={toggleFullscreen}
-        aria-label="Fullscreen"
-      >
-        ⛶
-      </button>
+      <div className="flex justify-center sm:justify-start">
+        <button
+          type="button"
+          className="btn-ghost min-h-[44px] min-w-[44px] px-2 py-1.5 sm:min-h-0 sm:min-w-0"
+          onClick={toggleFullscreen}
+          aria-label="Fullscreen"
+        >
+          ⛶
+        </button>
+      </div>
     </div>
   );
 
@@ -368,19 +374,19 @@ export function TutorialViewClient({
       >
         <div id={containerId} className="aspect-video w-full" />
       </div>
-      <div className="mt-3 hidden lg:block">{controlsBar}</div>
+      <div className="mt-3">{controlsBar}</div>
     </>
   );
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-2">
+      <div className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
         <VoiceMicCluster
           voiceArmed={voiceArmed}
           voiceAwake={voiceAwake}
           onToggle={toggleVoiceArm}
         />
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs leading-snug text-zinc-500">
           Say <span className="font-semibold">Hey Link</span>, then replay, pause,
           play, next, or previous.
         </p>
@@ -463,35 +469,6 @@ export function TutorialViewClient({
               {videoBlock}
             </div>
             <div className="w-full lg:w-[40%] lg:pt-0">{stepPanel}</div>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between gap-3 lg:hidden">
-            <button
-              type="button"
-              className="btn-ghost flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-zinc-200 px-4 text-lg"
-              onClick={goPrev}
-              disabled={currentIndex <= 0}
-              aria-label="Previous step"
-            >
-              ←
-            </button>
-            <button
-              type="button"
-              className="btn-primary min-h-[44px] min-w-[44px] rounded-xl px-4 text-lg"
-              onClick={togglePlay}
-              aria-label={playing ? "Pause" : "Play"}
-            >
-              {playing ? "⏸" : "▶"}
-            </button>
-            <button
-              type="button"
-              className="btn-ghost flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-zinc-200 px-4 text-lg"
-              onClick={goNext}
-              disabled={currentIndex >= steps.length - 1}
-              aria-label="Next step"
-            >
-              →
-            </button>
           </div>
 
         </div>
