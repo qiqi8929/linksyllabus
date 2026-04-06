@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import QRCode from "qrcode";
 import { publicSiteOriginFromRequest } from "@/lib/publicOrigin";
+import { qrPngBuffer } from "@/lib/qrPng";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,15 +22,7 @@ export async function GET(
       ? `${base}${tutorialPath}`
       : `${base}${tutorialPath}?step=${encodeURIComponent(step)}`;
 
-  const png = await QRCode.toBuffer(target, {
-    type: "png",
-    width: 512,
-    margin: 1,
-    color: {
-      dark: "#111111",
-      light: "#FFFFFF"
-    }
-  });
+  const png = await qrPngBuffer(target);
 
   const download = urlObj.searchParams.get("download") === "1";
   const body = new Uint8Array(png);

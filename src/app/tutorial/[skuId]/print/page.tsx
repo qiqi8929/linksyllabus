@@ -59,6 +59,10 @@ export default async function TutorialPrintPage({
       <style>{`
         @media print {
           @page { margin: 12mm; }
+          .qr-print-img {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
         }
       `}</style>
 
@@ -84,8 +88,9 @@ export default async function TutorialPrintPage({
           <p className="mt-3 text-sm leading-relaxed text-zinc-600">{sku.description}</p>
         ) : null}
         <p className="mt-4 text-sm text-zinc-600">
-          Scan the QR code for each step to open this tutorial and play that
-          step&apos;s video on your phone.
+          Scan the QR code for each step to open the step video on your phone
+          (same clip as the interactive tutorial). Codes use a short link for
+          reliable scanning.
         </p>
       </header>
 
@@ -105,14 +110,14 @@ export default async function TutorialPrintPage({
                   </p>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`/api/qr/tutorial/${encodeURIComponent(sku.id)}?step=${encodeURIComponent(String(s.step_number))}`}
+                    src={`/api/qr/${encodeURIComponent(s.id)}`}
                     alt=""
-                    width={180}
-                    height={180}
-                    className="mt-2 h-40 w-40 rounded-lg border border-zinc-200 bg-white p-1 object-contain"
+                    width={256}
+                    height={256}
+                    className="qr-print-img mt-2 h-52 w-52 rounded-lg border-2 border-zinc-200 bg-white p-2 object-contain md:h-56 md:w-56 print:h-72 print:w-72 print:border-zinc-300"
                   />
                   <p className="mt-2 text-center text-[10px] text-zinc-500">
-                    Scan to watch
+                    Scan to watch this step
                   </p>
                 </div>
                 <div className="min-w-0 flex-1">
