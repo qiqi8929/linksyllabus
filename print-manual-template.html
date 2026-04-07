@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Step Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream:       #FAF8F5;
+    --white:       #FFFFFF;
+    --accent:      #C4622D;
+    --charcoal:    #1A1A1A;
+    --muted:       #78716C;
+    --light-muted: #B4B2A9;
+    --border:      #E8E4DF;
+    --text-step:   #5C5855;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #F5F2EE;
+    color: var(--charcoal);
+    padding: 40px 24px;
+  }
+
+  .manual {
+    max-width: 760px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .print-bar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .print-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    text-decoration: none;
+  }
+  .print-btn:hover { background: #A8501F; }
+
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .cover {
+    background: var(--cream);
+    border: 0.5px solid var(--border);
+    border-radius: 14px;
+    padding: 60px;
+    text-align: center;
+  }
+
+  .creator-logo {
+    margin-bottom: 32px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .creator-logo img { height: 40px; object-fit: contain; }
+
+  .creator-logo-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--charcoal);
+    letter-spacing: -0.3px;
+  }
+
+  .cover-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 34px;
+    font-weight: 600;
+    color: var(--charcoal);
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+    margin-bottom: 14px;
+  }
+
+  .cover-desc {
+    font-size: 14px;
+    color: var(--muted);
+    font-weight: 300;
+    line-height: 1.7;
+    max-width: 440px;
+    margin: 0 auto 40px;
+  }
+
+  .cover-meta {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding-top: 28px;
+    border-top: 0.5px solid var(--border);
+  }
+
+  .meta-item { text-align: center; }
+
+  .meta-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--light-muted);
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  .meta-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--charcoal);
+  }
+
+  .page {
+    background: var(--white);
+    border: 0.5px solid var(--border);
+    border-radius: 14px;
+    padding: 44px 52px;
+  }
+
+  .steps-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 36px;
+  }
+
+  .divider {
+    height: 0.5px;
+    background: var(--border);
+    margin: 32px 0;
+  }
+
+  .step-block { display: flex; flex-direction: column; }
+
+  .step-header {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .step-num {
+    font-size: 10px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 500;
+    margin-bottom: 5px;
+    display: block;
+  }
+
+  .step-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--charcoal);
+    line-height: 1.3;
+  }
+
+  .step-body {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .step-text {
+    flex: 1;
+    font-size: 12.5px;
+    color: var(--text-step);
+    line-height: 1.75;
+    font-weight: 300;
+  }
+
+  .step-text p { margin-bottom: 5px; }
+  .step-text p:last-child { margin-bottom: 0; }
+
+  .qr-wrap {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .qr-box {
+    width: 80px;
+    height: 80px;
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--cream);
+    overflow: hidden;
+    padding: 6px;
+  }
+
+  .qr-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 4px;
+  }
+
+  .qr-caption {
+    font-size: 9px;
+    color: var(--light-muted);
+    letter-spacing: 0.5px;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .page-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 20px;
+    border-top: 0.5px solid var(--border);
+    margin-top: 32px;
+  }
+
+  .footer-creator {
+    font-size: 12px;
+    color: var(--light-muted);
+    font-weight: 300;
+  }
+
+  .footer-page {
+    font-size: 11px;
+    color: var(--light-muted);
+    letter-spacing: 0.5px;
+  }
+
+  @media print {
+    @page { size: A4; margin: 18mm 16mm; }
+
+    body {
+      background: white;
+      padding: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .print-bar { display: none; }
+    .manual { gap: 0; }
+
+    .cover, .page {
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    .cover { padding-top: 60px; }
+    .page:last-child { page-break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="print-bar">
+  <a class="back-btn" id="back-link" href="#">← Back to tutorial</a>
+  <button class="print-btn" onclick="window.print()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="6 9 6 2 18 2 18 9"/>
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+      <rect x="6" y="14" width="12" height="8"/>
+    </svg>
+    Print / Save PDF
+  </button>
+</div>
+
+<div class="manual" id="manual"></div>
+
+<script>
+/* ============================================================
+   CURSOR: Replace TUTORIAL and STEPS with real backend data.
+
+   TUTORIAL:
+     title         — tutorial name shown on cover
+     creator_name  — creator's brand name (on cover + footer)
+     creator_site  — creator's website URL shown in footer
+     creator_logo  — URL to creator logo image, or null for text
+     level         — difficulty string e.g. "Beginner"
+     id            — tutorial UUID for back-link href
+
+   STEPS (array):
+     num     — zero-padded string e.g. "01"
+     title   — step heading
+     paras   — array of paragraph strings
+     qr_url  — QR code image URL (your /play/ endpoint encoded)
+============================================================ */
+const TUTORIAL = {
+  title:        "Crocheting the Plumpy Bunny",
+  creator_name: "Sweet Softies",
+  creator_site: "sweetsofties.com",
+  creator_logo: null,
+  level:        "Beginner",
+  id:           "97a7c1f9-d1f9-4505-89c0-88ad26cdaf9b",
+};
+
+const STEPS = [
+  {
+    num:   "01",
+    title: "Materials & Preparation",
+    paras: [
+      "Yarn: Bulky weight (Level 5) plush yarn in grey and white.",
+      "Hook: 5.0 mm crochet hook.",
+      "Notions: 10mm or 12mm safety eyes, fiberfill stuffing, scissors, yarn needle.",
+    ],
+    qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=STEP_1_PLAY_URL",
+  },
+  {
+    num:   "02",
+    title: "The Head & Nose (Rounds 1–4)",
+    paras: [
+      "Round 1: Chain 2, work 8 sc into the second chain from hook (or magic ring with 8 sc).",
+      "Round 2: Inc in every stitch around — 16 sts total.",
+      "Rounds 3–4: Sc in each stitch around. Flip piece inside out so right side faces out.",
+    ],
+    qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=STEP_2_PLAY_URL",
+  },
+  {
+    num:   "03",
+    title: "Shaping & Color Change (Rounds 5–8)",
+    paras: [
+      "Round 5: 5 sc, 2 dec, 5 sc, then 2 inc in Front Loops Only (FLO).",
+      "Round 6: 2 inc FLO, 3 sc, 2 dec. Switch to white: 5 sc, 2 inc.",
+      "Round 7: (White) 2 inc, 4 sc, 2 dec, 8 sc. Insert safety eyes between Rounds 3–4.",
+    ],
+    qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=STEP_3_PLAY_URL",
+  },
+  {
+    num:   "04",
+    title: "The Body (Rounds 9–13)",
+    paras: [
+      "Rounds 9–10: Sc around with grey yarn for two rounds.",
+      "Round 11: 8 sc, 2 dec, 8 sc. Round 12: 7 sc, 2 dec, 7 sc.",
+      "Stuff firmly with fiberfill. Round 13: Dec all around (8 total). Fasten off, leave long tail.",
+    ],
+    qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=STEP_4_PLAY_URL",
+  },
+  {
+    num:   "05",
+    title: "The Cotton Tail",
+    paras: [
+      "Insert hook between Rounds 12–13 at the center back.",
+      "White yarn: Puff stitch (yarn over, insert, pull loop — repeat 3×). Chain 1 to secure.",
+      "Slip stitch back and hide tails inside the body.",
+    ],
+    qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=STEP_5_PLAY_URL",
+  },
+  {
+    num:   "06",
+    title: "Puffy Feet (Front & Back Legs)",
+    paras: [
+      "Front legs: Insert hook between Rounds 7–8.",
+      "Back legs: Insert hook between Rounds 11–12.",
+      "Grey yarn puff stitch for each foot (3 reps). Slip stitch, pull ends inside body.",
+    ],
+    qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=STEP_6_PLAY_URL",
+  },
+  {
+    num:   "07",
+    title: "The Ears (Make 2)",
+    paras: [
+      "Foundation Single Crochet (FSC): FSC 5 (or ch 6, sc 5).",
+      "Work 2 sc into the base of the last stitch to turn.",
+      "Work back with 3 sc and 1 sl st to create a teardrop shape.",
+    ],
+    qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=STEP_7_PLAY_URL",
+  },
+  {
+    num:   "08",
+    title: "Final Assembly & Closing",
+    paras: [
+      "Sew ears between Rounds 5–6 on the sides of the head.",
+      "Thread needle through front loops of remaining 8 sts, pull tight to close. Knot and hide inside.",
+      "Pro tip: These bunnies fit perfectly inside large plastic Easter eggs!",
+    ],
+    qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=STEP_8_PLAY_URL",
+  },
+];
+
+/* ---- Renderer — no need to edit below ---- */
+function stepHtml(step) {
+  const paras = step.paras.map(p => `<p>${p}</p>`).join('');
+  return `
+    <div class="step-block">
+      <div class="step-header">
+        <span class="step-num">Step ${step.num}</span>
+        <h3 class="step-title">${step.title}</h3>
+      </div>
+      <div class="step-body">
+        <div class="step-text">${paras}</div>
+        <div class="qr-wrap">
+          <div class="qr-box">
+            <img src="${step.qr_url}" alt="QR step ${step.num}" loading="lazy">
+          </div>
+          <span class="qr-caption">Scan to watch</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function coverHtml() {
+  const logo = TUTORIAL.creator_logo
+    ? `<img src="${TUTORIAL.creator_logo}" alt="${TUTORIAL.creator_name}">`
+    : `<span class="creator-logo-text">${TUTORIAL.creator_name}</span>`;
+
+  return `
+    <div class="cover">
+      <div class="creator-logo">${logo}</div>
+      <h1 class="cover-title">${TUTORIAL.title}</h1>
+      <p class="cover-desc">
+        Scan the QR code next to each step to watch that moment in the video.<br>
+        No searching. No scrubbing. Just make.
+      </p>
+      <div class="cover-meta">
+        <div class="meta-item">
+          <span class="meta-label">Steps</span>
+          <span class="meta-value">${STEPS.length}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Creator</span>
+          <span class="meta-value">${TUTORIAL.creator_name}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Level</span>
+          <span class="meta-value">${TUTORIAL.level}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function pagesHtml() {
+  const pairs = [];
+  for (let i = 0; i < STEPS.length; i += 2) {
+    pairs.push(STEPS.slice(i, i + 2));
+  }
+  const total = pairs.length;
+
+  return pairs.map((pair, idx) => {
+    const right = pair[1] ? stepHtml(pair[1]) : '<div></div>';
+    return `
+      <div class="page">
+        <div class="steps-pair">
+          ${stepHtml(pair[0])}
+          ${right}
+        </div>
+        <div class="page-footer">
+          <span class="footer-creator">${TUTORIAL.creator_name} · ${TUTORIAL.creator_site}</span>
+          <span class="footer-page">Page ${idx + 1} of ${total}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('back-link').href = `/tutorial/${TUTORIAL.id}`;
+  document.getElementById('manual').innerHTML = coverHtml() + pagesHtml();
+});
+</script>
+</body>
+</html>

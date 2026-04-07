@@ -16,6 +16,8 @@ export type SkuPrint = {
   creator_site: string | null;
   creator_logo: string | null;
   level: string | null;
+  materials_text: string | null;
+  tools_text: string | null;
   /** Resolved on server: skus.creator_name or skus.author only (never account username) */
   display_creator_name: string;
   /** Resolved on server: DB level or "General" */
@@ -94,6 +96,10 @@ export function PrintManualView({
   const footerLeft =
     creatorSite.length > 0 ? `${creatorName} · ${creatorSite}` : creatorName;
 
+  const materialsBody = sku.materials_text?.trim() ?? "";
+  const toolsBody = sku.tools_text?.trim() ?? "";
+  const showMaterialsSheet = materialsBody.length > 0 || toolsBody.length > 0;
+
   return (
     <div className="pm-manual">
       <div className="pm-cover">
@@ -125,44 +131,71 @@ export function PrintManualView({
         </div>
       </div>
 
-        {steps.length === 0 ? (
-          <div className="pm-page">
-            <p className="pm-step-text">No steps to print yet.</p>
-            <div className="pm-page-footer">
-              <span className="pm-footer-creator">{footerLeft}</span>
-              <span className="pm-footer-page">Page 1 of 1</span>
-            </div>
+      {showMaterialsSheet ? (
+        <div className="pm-page pm-materials-sheet">
+          <div className="pm-materials-inner">
+            <h2 className="pm-materials-title">Materials & Tools</h2>
+            <p className="pm-materials-sub">
+              List everything your viewer needs before they start
+            </p>
+            {materialsBody ? (
+              <section className="pm-materials-section">
+                <h3 className="pm-materials-label">Materials</h3>
+                <div className="pm-materials-body">{materialsBody}</div>
+              </section>
+            ) : null}
+            {toolsBody ? (
+              <section className="pm-materials-section">
+                <h3 className="pm-materials-label">Tools</h3>
+                <div className="pm-materials-body">{toolsBody}</div>
+              </section>
+            ) : null}
           </div>
-        ) : (
-          pairs.map((pair, idx) => {
-            const [left, right] = pair;
-            const pageNum = idx + 1;
-            return (
-              <div key={left.id} className="pm-page">
-                <div className="pm-steps-pair">
+          <div className="pm-page-footer">
+            <span className="pm-footer-creator">{footerLeft}</span>
+            <span className="pm-footer-page">Before you start</span>
+          </div>
+        </div>
+      ) : null}
+
+      {steps.length === 0 ? (
+        <div className="pm-page">
+          <p className="pm-step-text">No steps to print yet.</p>
+          <div className="pm-page-footer">
+            <span className="pm-footer-creator">{footerLeft}</span>
+            <span className="pm-footer-page">Page 1 of 1</span>
+          </div>
+        </div>
+      ) : (
+        pairs.map((pair, idx) => {
+          const [left, right] = pair;
+          const pageNum = idx + 1;
+          return (
+            <div key={left.id} className="pm-page">
+              <div className="pm-steps-pair">
+                <StepBlock
+                  step={left}
+                  qrSrc={`/api/qr/${encodeURIComponent(left.id)}`}
+                />
+                {right ? (
                   <StepBlock
-                    step={left}
-                    qrSrc={`/api/qr/${encodeURIComponent(left.id)}`}
+                    step={right}
+                    qrSrc={`/api/qr/${encodeURIComponent(right.id)}`}
                   />
-                  {right ? (
-                    <StepBlock
-                      step={right}
-                      qrSrc={`/api/qr/${encodeURIComponent(right.id)}`}
-                    />
-                  ) : (
-                    <div aria-hidden />
-                  )}
-                </div>
-                <div className="pm-page-footer">
-                  <span className="pm-footer-creator">{footerLeft}</span>
-                  <span className="pm-footer-page">
-                    Page {pageNum} of {totalContentPages}
-                  </span>
-                </div>
+                ) : (
+                  <div aria-hidden />
+                )}
               </div>
-            );
-          })
-        )}
-      </div>
+              <div className="pm-page-footer">
+                <span className="pm-footer-creator">{footerLeft}</span>
+                <span className="pm-footer-page">
+                  Page {pageNum} of {totalContentPages}
+                </span>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
   );
 }

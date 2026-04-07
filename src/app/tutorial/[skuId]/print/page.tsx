@@ -25,6 +25,8 @@ type SkuRow = {
   creator_site?: string | null;
   creator_logo?: string | null;
   level?: string | null;
+  materials_text?: string | null;
+  tools_text?: string | null;
 };
 
 export async function generateMetadata({
@@ -82,6 +84,8 @@ export default async function TutorialPrintPage({
     creator_site: row.creator_site ?? null,
     creator_logo: row.creator_logo ?? null,
     level: row.level ?? null,
+    materials_text: row.materials_text ?? null,
+    tools_text: row.tools_text ?? null,
     display_creator_name: displayCreatorName,
     display_level: displayLevel
   };

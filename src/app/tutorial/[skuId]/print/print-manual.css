@@ -181,6 +181,58 @@
   padding: 44px 52px;
 }
 
+#pm-root .pm-materials-sheet {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 420px;
+}
+
+#pm-root .pm-materials-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+#pm-root .pm-materials-title {
+  font-family: var(--font-pm-playfair), "Playfair Display", Georgia, serif;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--charcoal);
+  margin: 0;
+  letter-spacing: -0.4px;
+}
+
+#pm-root .pm-materials-sub {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 300;
+  line-height: 1.6;
+  margin: -8px 0 0;
+}
+
+#pm-root .pm-materials-section {
+  margin: 0;
+}
+
+#pm-root .pm-materials-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 500;
+  margin: 0 0 8px;
+}
+
+#pm-root .pm-materials-body {
+  font-size: 12.5px;
+  color: var(--text-step);
+  line-height: 1.75;
+  font-weight: 300;
+  white-space: pre-wrap;
+}
+
 #pm-root .pm-steps-pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -362,6 +414,10 @@
     break-after: page;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  #pm-root .pm-materials-sheet {
+    min-height: 261mm;
   }
 
   #pm-root .pm-cover {

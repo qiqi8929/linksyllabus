@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   updateTutorialAction,
   type TutorialStepUpdateInput
 } from "@/app/dashboard/serverActions";
+import { extractYouTubeVideoId } from "@/lib/video";
 
 type StepRow = {
   id: string;
@@ -22,6 +23,8 @@ type Props = {
   skuId: string;
   initialName: string;
   initialDescription: string;
+  initialMaterials: string;
+  initialTools: string;
   steps: StepRow[];
 };
 
@@ -29,18 +32,63 @@ export function TutorialEditForm({
   skuId,
   initialName,
   initialDescription,
+  initialMaterials,
+  initialTools,
   steps: initialSteps
 }: Props) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
+  const [materialsText, setMaterialsText] = useState(initialMaterials);
+  const [toolsText, setToolsText] = useState(initialTools);
   const [steps, setSteps] = useState<StepRow[]>(initialSteps);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [materialsExtractLoading, setMaterialsExtractLoading] = useState(false);
+
+  const primaryYoutubeUrl = useMemo(() => {
+    const s = steps.find((x) => x.youtube_url?.trim());
+    return s?.youtube_url?.trim() ?? "";
+  }, [steps]);
 
   const updateStep = useCallback((id: string, patch: Partial<StepRow>) => {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }, []);
+
+  const extractMaterialsFromTranscript = async () => {
+    const url = primaryYoutubeUrl;
+    if (!url) {
+      setError("Add a YouTube URL on at least one step first.");
+      return;
+    }
+    if (!extractYouTubeVideoId(url)) {
+      setError("Use a valid YouTube URL on the step.");
+      return;
+    }
+    setError(null);
+    setMaterialsExtractLoading(true);
+    try {
+      const res = await fetch("/api/gemini/extract-materials", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ youtubeUrl: url })
+      });
+      const data = (await res.json()) as {
+        materials?: string;
+        tools?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || "Could not extract materials & tools.");
+      }
+      setMaterialsText(String(data.materials ?? "").trim());
+      setToolsText(String(data.tools ?? "").trim());
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Materials extraction failed.");
+    } finally {
+      setMaterialsExtractLoading(false);
+    }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,10 +98,14 @@ export function TutorialEditForm({
       const payload: {
         name: string;
         description: string;
+        materialsText: string;
+        toolsText: string;
         steps: TutorialStepUpdateInput[];
       } = {
         name,
         description,
+        materialsText: materialsText.trim(),
+        toolsText: toolsText.trim(),
         steps: steps.map((s) => ({
           id: s.id,
           step_name: s.step_name,
@@ -103,6 +155,58 @@ export function TutorialEditForm({
             rows={4}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            className="w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="card space-y-4 p-6">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
+            Materials & Tools
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            List everything your viewer needs before they start
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="btn-ghost text-sm"
+            disabled={materialsExtractLoading || !primaryYoutubeUrl}
+            onClick={() => void extractMaterialsFromTranscript()}
+          >
+            {materialsExtractLoading
+              ? "Extracting…"
+              : "✨ Auto-extract materials & tools"}
+          </button>
+          <span className="text-xs text-zinc-500">
+            Uses captions from the first step&apos;s video URL + Gemini.
+          </span>
+        </div>
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-zinc-900" htmlFor="edit-materials">
+            Materials
+          </label>
+          <textarea
+            id="edit-materials"
+            rows={4}
+            value={materialsText}
+            onChange={(e) => setMaterialsText(e.target.value)}
+            placeholder="e.g. Bulky weight yarn in grey and white, fiberfill stuffing, safety eyes 10mm"
+            className="w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-zinc-900" htmlFor="edit-tools">
+            Tools
+          </label>
+          <textarea
+            id="edit-tools"
+            rows={3}
+            value={toolsText}
+            onChange={(e) => setToolsText(e.target.value)}
+            placeholder="e.g. 5.0mm crochet hook, yarn needle, scissors"
             className="w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
           />
         </div>

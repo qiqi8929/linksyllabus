@@ -24,6 +24,8 @@ create table if not exists public.skus (
   creator_logo text,
   level text,
   author text,
+  materials_text text,
+  tools_text text,
   created_at timestamptz not null default now()
 );
 

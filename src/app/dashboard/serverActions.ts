@@ -32,6 +32,8 @@ export async function createInactiveSkuWithSteps(payload: {
   steps: TutorialStepInput[];
   /** When a step has no per-step URL, use this (chapter YouTube URL from the form). */
   defaultYoutubeUrl?: string;
+  materialsText?: string;
+  toolsText?: string;
 }): Promise<{ skuId: string }> {
   const supabase = createSupabaseServerClient();
   const {
@@ -91,6 +93,9 @@ export async function createInactiveSkuWithSteps(payload: {
 
   await supabase.from("users").upsert({ id: user.id, email: user.email ?? null });
 
+  const materialsText = String(payload.materialsText ?? "").trim();
+  const toolsText = String(payload.toolsText ?? "").trim();
+
   const { data: sku, error: skuErr } = await supabase
     .from("skus")
     .insert({
@@ -101,7 +106,9 @@ export async function createInactiveSkuWithSteps(payload: {
       start_time: 0,
       end_time: 0,
       scan_count: 0,
-      is_active: false
+      is_active: false,
+      materials_text: materialsText || null,
+      tools_text: toolsText || null
     })
     .select("id")
     .single();
@@ -262,6 +269,8 @@ export async function updateTutorialAction(
   payload: {
     name: string;
     description: string;
+    materialsText?: string;
+    toolsText?: string;
     steps: TutorialStepUpdateInput[];
   }
 ) {
@@ -284,9 +293,17 @@ export async function updateTutorialAction(
   const name = payload.name.trim();
   if (!name) throw new Error("Tutorial name is required.");
 
+  const materialsText = String(payload.materialsText ?? "").trim();
+  const toolsText = String(payload.toolsText ?? "").trim();
+
   const { error: upSku } = await supabase
     .from("skus")
-    .update({ name, description: String(payload.description ?? "").trim() })
+    .update({
+      name,
+      description: String(payload.description ?? "").trim(),
+      materials_text: materialsText || null,
+      tools_text: toolsText || null
+    })
     .eq("id", skuId)
     .eq("user_id", user.id);
 

@@ -30,7 +30,7 @@ export default async function EditTutorialPage({
 
   const { data: sku, error: skuErr } = await supabase
     .from("skus")
-    .select("id,name,description,user_id")
+    .select("id,name,description,user_id,materials_text,tools_text")
     .eq("id", skuId)
     .maybeSingle();
 
@@ -74,6 +74,8 @@ export default async function EditTutorialPage({
         skuId={sku.id}
         initialName={sku.name}
         initialDescription={sku.description ?? ""}
+        initialMaterials={(sku as { materials_text?: string | null }).materials_text ?? ""}
+        initialTools={(sku as { tools_text?: string | null }).tools_text ?? ""}
         steps={steps}
       />
     </div>

@@ -54,6 +54,9 @@ export function TutorialCreator() {
   const [payLoading, setPayLoading] = useState(false);
   const [chapterVideoUrl, setChapterVideoUrl] = useState("");
   const [descExtractLoading, setDescExtractLoading] = useState(false);
+  const [materialsExtractLoading, setMaterialsExtractLoading] = useState(false);
+  const [materialsText, setMaterialsText] = useState("");
+  const [toolsText, setToolsText] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const updateStep = useCallback((id: string, patch: Partial<StepRow>) => {
@@ -165,6 +168,41 @@ export function TutorialCreator() {
     }
   };
 
+  const extractMaterialsFromTranscript = async () => {
+    const url = chapterVideoUrl.trim();
+    if (!url) {
+      setError("Paste a YouTube URL above to extract materials & tools.");
+      return;
+    }
+    if (!extractYouTubeVideoId(url)) {
+      setError("Use a valid YouTube URL.");
+      return;
+    }
+    setError(null);
+    setMaterialsExtractLoading(true);
+    try {
+      const res = await fetch("/api/gemini/extract-materials", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ youtubeUrl: url })
+      });
+      const data = (await res.json()) as {
+        materials?: string;
+        tools?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || "Could not extract materials & tools.");
+      }
+      setMaterialsText(String(data.materials ?? "").trim());
+      setToolsText(String(data.tools ?? "").trim());
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Materials extraction failed.");
+    } finally {
+      setMaterialsExtractLoading(false);
+    }
+  };
+
   const onGenerateAi = async () => {
     setError(null);
     const v = validateSteps();
@@ -226,7 +264,9 @@ export function TutorialCreator() {
       const result = await createInactiveSkuWithSteps({
         tutorialName: tutorialName.trim(),
         steps: payload,
-        defaultYoutubeUrl: chapterVideoUrl.trim()
+        defaultYoutubeUrl: chapterVideoUrl.trim(),
+        materialsText: materialsText.trim(),
+        toolsText: toolsText.trim()
       });
       const skuId = result?.skuId;
       if (!skuId) {
@@ -280,22 +320,77 @@ export function TutorialCreator() {
             placeholder="https://www.youtube.com/watch?v=…"
             className="w-full"
           />
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button
-              type="button"
-              className="btn-ghost text-sm"
-              disabled={
-                descExtractLoading ||
-                !chapterVideoUrl.trim() ||
-                !steps.some((s) => s.step_name.trim())
-              }
-              onClick={() => void extractTimestampsFromYouTubeVideo()}
-            >
-              {descExtractLoading ? "Analyzing video…" : "✨ Auto-extract timestamps"}
-            </button>
-            <span className="text-xs text-zinc-500">
-              Uses YouTube captions plus Gemini to match step names to clip times (no YouTube Data API).
-            </span>
+          <div className="space-y-2 pt-1">
+            <div className="flex flex-wrap items-stretch gap-2">
+              <button
+                type="button"
+                className="btn-ghost shrink-0 text-sm"
+                disabled={
+                  descExtractLoading ||
+                  !chapterVideoUrl.trim() ||
+                  !steps.some((s) => s.step_name.trim())
+                }
+                onClick={() => void extractTimestampsFromYouTubeVideo()}
+              >
+                {descExtractLoading ? "Analyzing video…" : "✨ Auto-extract timestamps"}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost shrink-0 text-sm"
+                disabled={materialsExtractLoading || !chapterVideoUrl.trim()}
+                onClick={() => void extractMaterialsFromTranscript()}
+              >
+                {materialsExtractLoading
+                  ? "Extracting…"
+                  : "✨ Auto-extract materials & tools"}
+              </button>
+            </div>
+            <p className="text-xs leading-relaxed text-zinc-500">
+              <span className="font-medium text-zinc-600">Timestamps:</span> captions + Gemini match
+              each step name to clip times (no YouTube Data API).{" "}
+              <span className="font-medium text-zinc-600">Materials & tools:</span> same transcript
+              to list supplies for the printable manual.
+            </p>
+          </div>
+        </div>
+
+        <div
+          id="materials-tools"
+          className="space-y-3 rounded-lg border border-orange-200/90 bg-gradient-to-b from-orange-50/80 to-amber-50/40 p-4 shadow-sm ring-1 ring-orange-100"
+        >
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
+              Materials & Tools
+            </h2>
+            <p className="mt-1 text-sm text-zinc-600">
+              List everything your viewer needs before they start
+            </p>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-zinc-900" htmlFor="materials-text">
+              Materials
+            </label>
+            <textarea
+              id="materials-text"
+              rows={4}
+              value={materialsText}
+              onChange={(e) => setMaterialsText(e.target.value)}
+              placeholder="e.g. Bulky weight yarn in grey and white, fiberfill stuffing, safety eyes 10mm"
+              className="w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-zinc-900" htmlFor="tools-text">
+              Tools
+            </label>
+            <textarea
+              id="tools-text"
+              rows={3}
+              value={toolsText}
+              onChange={(e) => setToolsText(e.target.value)}
+              placeholder="e.g. 5.0mm crochet hook, yarn needle, scissors"
+              className="w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+            />
           </div>
         </div>
 

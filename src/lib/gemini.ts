@@ -425,3 +425,112 @@ There must be exactly ${steps.length} strings in "descriptions", in the same ord
 
   return descriptions.map((d) => String(d ?? "").trim());
 }
+
+function parseMaterialsToolsPayload(raw: string): { materials: string; tools: string } {
+  let s = raw.trim();
+  s = s.replace(/^```(?:json)?\s*\r?\n?/i, "");
+  s = s.replace(/\r?\n?```\s*$/i, "");
+  s = s.trim();
+
+  const coerce = (chunk: string) => {
+    const o = JSON.parse(chunk) as { materials?: unknown; tools?: unknown };
+    return {
+      materials: String(o.materials ?? "").trim(),
+      tools: String(o.tools ?? "").trim()
+    };
+  };
+
+  try {
+    return coerce(s);
+  } catch {
+    /* fall through */
+  }
+
+  const start = s.indexOf("{");
+  const end = s.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    return coerce(s.slice(start, end + 1));
+  }
+
+  throw new Error(
+    `Gemini returned non-JSON: ${raw.length > 200 ? `${raw.slice(0, 200)}…` : raw}`
+  );
+}
+
+/**
+ * Uses YouTube transcript + Gemini to list materials vs tools (for print / tutorial intro).
+ */
+export async function extractMaterialsAndToolsFromYouTube(
+  youtubeUrl: string
+): Promise<{ materials: string; tools: string }> {
+  const urlTrim = youtubeUrl.trim();
+  const videoId = extractYouTubeVideoId(urlTrim);
+  if (!videoId) {
+    throw new Error("A valid YouTube URL is required.");
+  }
+
+  const apiKey = env.geminiApiKey();
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured");
+  }
+
+  const fetched = await getTranscriptWithFallbacks(videoId);
+  const cues = fetched?.cues ?? [];
+  const transcriptText = cues
+    .map((c) => c.text.trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120000);
+
+  if (!transcriptText) {
+    throw new Error(
+      "No captions found for this video. Enter materials manually or use a video with captions."
+    );
+  }
+
+  const prompt = `You help with DIY / craft / tutorial videos. Below is the spoken transcript (often the creator lists materials and tools near the start).
+
+Extract two plain-text lists for the viewer:
+
+1) "materials" — yarns, fabric, stuffing, glue, quantities, colors, etc. Use short lines separated by newlines, or comma-separated if compact. Do not invent items not clearly implied in the transcript.
+
+2) "tools" — hooks, needles, scissors, looms, etc. Same formatting. If something could be either, prefer "materials" unless it is clearly a tool.
+
+Transcript:
+${transcriptText}
+
+Respond only with valid JSON, no markdown, no backticks. Exact shape:
+{"materials":"...","tools":"..."}
+Use empty string "" if a category has nothing in the transcript.`;
+
+  const url = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.4
+      }
+    })
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini request failed: ${res.status} ${errText}`);
+  }
+
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error("Empty response from Gemini");
+  }
+
+  return parseMaterialsToolsPayload(text);
+}
