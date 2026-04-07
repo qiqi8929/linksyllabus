@@ -169,7 +169,9 @@ export function TutorialViewClient({
           controls: 0,
           fs: 0,
           playsinline: 1,
-          disablekb: 1
+          disablekb: 1,
+          /** Fewer on-screen overlays; does not remove channel/title per YouTube policy. */
+          iv_load_policy: 3
         },
         events: {
           onReady: (e: { target: any }) => {

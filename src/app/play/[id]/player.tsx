@@ -468,7 +468,8 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime, s
           controls: 0,
           disablekb: 1,
           fs: 0,
-          playsinline: 1
+          playsinline: 1,
+          iv_load_policy: 3
         },
         events: {
           onReady: () => {
