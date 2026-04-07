@@ -4,6 +4,9 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import "./landing.css";
 
+/** Avoid stale static HTML: landing copy is read at request time after deploy. */
+export const dynamic = "force-dynamic";
+
 const getLandingMarkup = cache(() =>
   fs.readFileSync(
     path.join(process.cwd(), "src/app/landing-body.html"),

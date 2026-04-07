@@ -249,6 +249,41 @@
     #lp-root .stext { font-size: 13px; color: #888; line-height: 1.5; }
     #lp-root .step-item.active .stext { color: var(--ink); font-weight: 600; }
 
+    /* ─── LIVE DEMO IFRAMES (replaces static mocks) ─── */
+    #lp-root .landing-embed {
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: #0a0a0a;
+      border: 1px solid var(--border);
+    }
+    #lp-root .landing-embed-hero {
+      max-width: 680px;
+      margin: 0 auto;
+      border-radius: var(--radius-xl);
+      box-shadow: 0 4px 40px rgba(0,0,0,0.08);
+    }
+    #lp-root .landing-embed iframe {
+      width: 100%;
+      border: 0;
+      display: block;
+    }
+    #lp-root .landing-embed-hero iframe {
+      height: min(68vh, 620px);
+      min-height: 440px;
+    }
+    @media (max-width: 680px) {
+      #lp-root .landing-embed-hero iframe {
+        min-height: 360px;
+        height: 55vh;
+      }
+    }
+    #lp-root .landing-embed-card iframe {
+      height: 320px;
+    }
+    #lp-root .landing-embed-print iframe {
+      height: 400px;
+    }
+
     /* ─── DUAL DELIVERY ─── */
     #lp-root .dual-intro {
       text-align: center;
@@ -311,10 +346,12 @@
     #lp-root .print .dh-title { color: var(--ink); }
     #lp-root .print .dh-sub { color: var(--ink-3); }
 
-    #lp-root .delivery-#lp-root {
+    #lp-root .delivery-body {
       padding: 1.25rem;
       background: var(--white);
-      display: flex; flex-direction: column; gap: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
     /* online mini mock */
@@ -552,7 +589,7 @@
     #lp-root .hero p { animation-delay: .2s; }
     #lp-root .hero-btns { animation-delay: .28s; }
     #lp-root .hero-note { animation-delay: .34s; }
-    #lp-root .player-wrap { animation-delay: .4s; }
+    #lp-root .landing-embed-hero { animation-delay: .4s; }
 
     /* ─── RESPONSIVE ─── */
     @media (max-width: 640px) {
