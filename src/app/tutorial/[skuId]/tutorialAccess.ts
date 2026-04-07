@@ -33,11 +33,10 @@ export async function fetchSkuVisibleToViewer(skuId: string) {
 
   if (isPublicDemoSkuId(skuId)) {
     const admin = createSupabaseAdminClient();
+    // Use * so production DBs without print-branding columns still work (no failed select).
     const { data: sku, error } = await admin
       .from("skus")
-      .select(
-        "id,name,description,is_active,user_id,creator_name,creator_site,creator_logo,level"
-      )
+      .select("*")
       .eq("id", skuId)
       .maybeSingle();
 
@@ -49,9 +48,7 @@ export async function fetchSkuVisibleToViewer(skuId: string) {
 
   const { data: sku, error } = await supabase
     .from("skus")
-    .select(
-      "id,name,description,is_active,user_id,creator_name,creator_site,creator_logo,level"
-    )
+    .select("*")
     .eq("id", skuId)
     .maybeSingle();
 
