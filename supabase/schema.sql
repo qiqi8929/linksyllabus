@@ -23,6 +23,7 @@ create table if not exists public.skus (
   creator_site text,
   creator_logo text,
   level text,
+  author text,
   created_at timestamptz not null default now()
 );
 

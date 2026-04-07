@@ -1,3 +1,4 @@
+import { stripLeadingStepNumberFromTitle } from "@/lib/stepTitle";
 import "./print-manual.css";
 
 type StepRow = {
@@ -15,7 +16,7 @@ export type SkuPrint = {
   creator_site: string | null;
   creator_logo: string | null;
   level: string | null;
-  /** Resolved on server: DB creator_name or fallback from owner email */
+  /** Resolved on server: skus.creator_name or skus.author only (never account username) */
   display_creator_name: string;
   /** Resolved on server: DB level or "General" */
   display_level: string;
@@ -48,7 +49,9 @@ function StepBlock({
     <div className="pm-step-block">
       <div className="pm-step-header">
         <span className="pm-step-num">Step {formatStepNum(step.step_number)}</span>
-        <h3 className="pm-step-title">{step.step_name}</h3>
+        <h3 className="pm-step-title">
+          {stripLeadingStepNumberFromTitle(step.step_name)}
+        </h3>
       </div>
       <div className="pm-step-body">
         <div className="pm-step-text">

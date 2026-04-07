@@ -21,6 +21,7 @@ type SkuRow = {
   description: string | null;
   user_id: string;
   creator_name?: string | null;
+  author?: string | null;
   creator_site?: string | null;
   creator_logo?: string | null;
   level?: string | null;
@@ -67,9 +68,9 @@ export default async function TutorialPrintPage({
   const steps = stepRows ?? [];
 
   const row = sku as SkuRow;
-  const { displayCreatorName, displayLevel } = await resolvePrintBranding({
-    user_id: row.user_id,
+  const { displayCreatorName, displayLevel } = resolvePrintBranding({
     creator_name: row.creator_name,
+    author: row.author,
     level: row.level
   });
 

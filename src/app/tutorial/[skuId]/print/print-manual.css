@@ -326,7 +326,11 @@
 }
 
 @media print {
-  /* Margins here define the printable area; browser URL/date headers are toggled in the print dialog (Chrome: disable "Headers and footers"). */
+  /*
+   * @page margin sets the content box. URL and print time in the margin are drawn by the
+   * browser (not your HTML). Turn them off in the print dialog: Chrome → More settings →
+   * uncheck "Headers and footers". CSS cannot remove them reliably.
+   */
   @page {
     size: A4;
     margin: 18mm 16mm;
