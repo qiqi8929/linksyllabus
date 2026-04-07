@@ -35,7 +35,9 @@ export async function fetchSkuVisibleToViewer(skuId: string) {
     const admin = createSupabaseAdminClient();
     const { data: sku, error } = await admin
       .from("skus")
-      .select("id,name,description,is_active,user_id")
+      .select(
+        "id,name,description,is_active,user_id,creator_name,creator_site,creator_logo,level"
+      )
       .eq("id", skuId)
       .maybeSingle();
 
@@ -47,7 +49,9 @@ export async function fetchSkuVisibleToViewer(skuId: string) {
 
   const { data: sku, error } = await supabase
     .from("skus")
-    .select("id,name,description,is_active,user_id")
+    .select(
+      "id,name,description,is_active,user_id,creator_name,creator_site,creator_logo,level"
+    )
     .eq("id", skuId)
     .maybeSingle();
 

@@ -19,6 +19,10 @@ create table if not exists public.skus (
   end_time int not null default 0,
   scan_count int not null default 0,
   is_active boolean not null default true,
+  creator_name text,
+  creator_site text,
+  creator_logo text,
+  level text,
   created_at timestamptz not null default now()
 );
 
