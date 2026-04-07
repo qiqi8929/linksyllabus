@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TutorialViewClient, type TutorialStepPayload } from "./TutorialViewClient";
-import { fetchSkuVisibleToViewer } from "./tutorialAccess";
+import { fetchSkuVisibleToViewer, isPublicDemoSkuId } from "./tutorialAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +82,7 @@ export default async function TutorialPage({
 
   return (
     <main className="container-page py-8 md:py-12">
-      {!sku.is_active ? (
+      {!sku.is_active && !isPublicDemoSkuId(skuId) ? (
         <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <span className="font-medium">Preview</span> — This tutorial is not published yet.
           After payment completes, anyone with the link can open it.
