@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { fetchSkuVisibleToViewer } from "../tutorialAccess";
 import { PrintBar } from "./PrintBar";
 import { PrintManualView, type SkuPrint } from "./PrintManualView";
+import { resolvePrintBranding } from "./resolvePrintBranding";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,17 @@ async function resolveParams(
 ): Promise<PageParams> {
   return Promise.resolve(params);
 }
+
+type SkuRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  user_id: string;
+  creator_name?: string | null;
+  creator_site?: string | null;
+  creator_logo?: string | null;
+  level?: string | null;
+};
 
 export async function generateMetadata({
   params
@@ -54,7 +66,24 @@ export default async function TutorialPrintPage({
 
   const steps = stepRows ?? [];
 
-  const skuPrint = sku as SkuPrint;
+  const row = sku as SkuRow;
+  const { displayCreatorName, displayLevel } = await resolvePrintBranding({
+    user_id: row.user_id,
+    creator_name: row.creator_name,
+    level: row.level
+  });
+
+  const skuPrint: SkuPrint = {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? "",
+    creator_name: row.creator_name ?? null,
+    creator_site: row.creator_site ?? null,
+    creator_logo: row.creator_logo ?? null,
+    level: row.level ?? null,
+    display_creator_name: displayCreatorName,
+    display_level: displayLevel
+  };
 
   return (
     <div id="pm-root">

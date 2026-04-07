@@ -83,12 +83,28 @@
   background: var(--cream);
   border: 0.5px solid var(--border);
   border-radius: 14px;
-  padding: 60px;
+  padding: 32px 40px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+#pm-root .pm-cover-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
 }
 
 #pm-root .pm-creator-logo {
-  margin-bottom: 32px;
+  margin: 0;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -116,7 +132,7 @@
   color: var(--charcoal);
   line-height: 1.2;
   letter-spacing: -0.5px;
-  margin-bottom: 14px;
+  margin: 0;
 }
 
 #pm-root .pm-cover-desc {
@@ -125,16 +141,18 @@
   font-weight: 300;
   line-height: 1.7;
   max-width: 440px;
-  margin: 0 auto 40px;
+  margin: 0;
 }
 
 #pm-root .pm-cover-meta {
   display: flex;
   justify-content: center;
   gap: 40px;
-  padding-top: 28px;
+  padding-top: 24px;
+  margin-top: 8px;
   border-top: 0.5px solid var(--border);
   flex-wrap: wrap;
+  width: 100%;
 }
 
 #pm-root .pm-meta-item {
@@ -308,6 +326,7 @@
 }
 
 @media print {
+  /* Margins here define the printable area; browser URL/date headers are toggled in the print dialog (Chrome: disable "Headers and footers"). */
   @page {
     size: A4;
     margin: 18mm 16mm;
@@ -318,6 +337,7 @@
     padding: 0;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    color-adjust: exact;
   }
 
   #pm-root .pm-print-bar {
@@ -336,10 +356,20 @@
     box-shadow: none;
     page-break-after: always;
     break-after: page;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   #pm-root .pm-cover {
-    padding-top: 60px;
+    min-height: 261mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0;
+  }
+
+  #pm-root .pm-cover-inner {
+    gap: 20px;
   }
 
   #pm-root .pm-page:last-child {

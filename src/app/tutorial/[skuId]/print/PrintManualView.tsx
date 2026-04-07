@@ -15,6 +15,10 @@ export type SkuPrint = {
   creator_site: string | null;
   creator_logo: string | null;
   level: string | null;
+  /** Resolved on server: DB creator_name or fallback from owner email */
+  display_creator_name: string;
+  /** Resolved on server: DB level or "General" */
+  display_level: string;
 };
 
 function formatStepNum(n: number): string {
@@ -73,9 +77,9 @@ export function PrintManualView({
   sku: SkuPrint;
   steps: StepRow[];
 }) {
-  const creatorName = sku.creator_name?.trim() || "Creator";
+  const creatorName = sku.display_creator_name;
   const creatorSite = sku.creator_site?.trim() || "";
-  const level = sku.level?.trim() || "—";
+  const level = sku.display_level;
   const subtitle = sku.description?.trim() || DEFAULT_COVER_BLURB;
 
   const pairs: [StepRow, StepRow | null][] = [];
@@ -90,6 +94,7 @@ export function PrintManualView({
   return (
     <div className="pm-manual">
       <div className="pm-cover">
+        <div className="pm-cover-inner">
           <div className="pm-creator-logo">
             {sku.creator_logo?.trim() ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -114,6 +119,7 @@ export function PrintManualView({
               <span className="pm-meta-value">{level}</span>
             </div>
           </div>
+        </div>
       </div>
 
         {steps.length === 0 ? (
