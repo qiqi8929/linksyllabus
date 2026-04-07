@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ActivateSkuButton } from "@/app/dashboard/CheckoutButtons";
-import { deleteSkuAction, unpublishSkuAction } from "@/app/dashboard/serverActions";
+import {
+  deleteSkuAction,
+  syncSkuActivationFromStripe,
+  unpublishSkuAction
+} from "@/app/dashboard/serverActions";
 
 type Props = {
   skuId: string;
@@ -29,6 +33,18 @@ export function DashboardTutorialActions({ skuId, isActive }: Props) {
       window.location.assign("/dashboard");
     } catch (e) {
       alert(e instanceof Error ? e.message : "Delete failed.");
+      setPending(false);
+    }
+  }
+
+  async function onSyncPayment() {
+    setPending(true);
+    try {
+      await syncSkuActivationFromStripe(skuId);
+      router.refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not sync payment.");
+    } finally {
       setPending(false);
     }
   }
@@ -78,7 +94,18 @@ export function DashboardTutorialActions({ skuId, isActive }: Props) {
           </button>
         </>
       ) : (
-        <ActivateSkuButton skuId={skuId} disabled={pending} />
+        <>
+          <ActivateSkuButton skuId={skuId} disabled={pending} />
+          <button
+            type="button"
+            className="btn-ghost shrink-0 text-sm text-zinc-600"
+            disabled={pending}
+            onClick={() => void onSyncPayment()}
+            title="If you already paid but status is still unpublished, try this"
+          >
+            Sync payment
+          </button>
+        </>
       )}
       <button
         type="button"

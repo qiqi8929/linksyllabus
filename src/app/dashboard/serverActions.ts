@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { activateSkuFromCheckoutSession } from "@/lib/stripe/skuActivation";
+import { getStripe } from "@/lib/stripe/server";
+import { env } from "@/lib/env";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function signOutAction() {
@@ -169,6 +173,76 @@ export async function unpublishSkuAction(skuId: string) {
     throw new Error("Unpublish failed: no rows updated.");
   }
 
+  revalidatePath("/dashboard");
+  revalidatePath(`/tutorial/${skuId}`);
+  revalidatePath(`/tutorial/${skuId}/print`);
+}
+
+/**
+ * If checkout succeeded but webhook never activated the SKU, find a paid Checkout Session
+ * for this customer + tutorial and set `is_active` (same as webhook).
+ */
+export async function syncSkuActivationFromStripe(skuId: string) {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user?.id) throw new Error("Unauthorized");
+
+  if (!env.stripe.secretKey()) {
+    throw new Error("Stripe is not configured.");
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: sku } = await admin
+    .from("skus")
+    .select("id,is_active,user_id")
+    .eq("id", skuId)
+    .maybeSingle();
+
+  if (!sku || sku.user_id !== user.id) {
+    throw new Error("Tutorial not found.");
+  }
+  if (sku.is_active) {
+    revalidatePath("/dashboard");
+    revalidatePath(`/tutorial/${skuId}`);
+    return;
+  }
+
+  const { data: subRow } = await admin
+    .from("subscriptions")
+    .select("stripe_customer_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const customerId = subRow?.stripe_customer_id;
+  if (!customerId) {
+    throw new Error(
+      "No Stripe customer yet. Use Activate to open checkout at least once."
+    );
+  }
+
+  const stripe = getStripe();
+  const sessions = await stripe.checkout.sessions.list({
+    customer: customerId,
+    limit: 100
+  });
+
+  const paid = sessions.data.find(
+    (s) =>
+      s.metadata?.type === "sku" &&
+      s.metadata?.sku_id === skuId &&
+      s.metadata?.user_id === user.id &&
+      s.payment_status === "paid"
+  );
+
+  if (!paid) {
+    throw new Error(
+      "No paid Stripe checkout found for this tutorial. If you paid recently, wait a minute or use Activate again."
+    );
+  }
+
+  await activateSkuFromCheckoutSession(paid);
   revalidatePath("/dashboard");
   revalidatePath(`/tutorial/${skuId}`);
   revalidatePath(`/tutorial/${skuId}/print`);

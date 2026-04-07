@@ -2,8 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
+import { tryActivateSkuFromCheckoutSessionId } from "@/lib/stripe/skuActivation";
 
-type Search = { skuId?: string; checkout?: string };
+type Search = { skuId?: string; checkout?: string; session_id?: string | string[] };
 
 export default async function DashboardSuccessPage({
   searchParams
@@ -16,6 +17,9 @@ export default async function DashboardSuccessPage({
     redirect("/dashboard");
   }
 
+  const rawSessionId = sp.session_id;
+  const sessionId = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
+
   const supabase = createSupabaseServerClient();
   const {
     data: { user }
@@ -24,12 +28,33 @@ export default async function DashboardSuccessPage({
     redirect("/login");
   }
 
-  const { data: sku } = await supabase
+  let { data: sku } = await supabase
     .from("skus")
     .select("id,name,is_active")
     .eq("id", skuId)
     .eq("user_id", user.id)
     .maybeSingle();
+
+  if (sku && !sku.is_active && sessionId?.trim()) {
+    try {
+      await tryActivateSkuFromCheckoutSessionId(
+        sessionId.trim(),
+        sku.id,
+        user.id
+      );
+    } catch {
+      /* Stripe misconfigured or invalid session — webhook may still activate later */
+    }
+    const { data: refreshed } = await supabase
+      .from("skus")
+      .select("id,name,is_active")
+      .eq("id", skuId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (refreshed) {
+      sku = refreshed;
+    }
+  }
 
   if (!sku) {
     return (

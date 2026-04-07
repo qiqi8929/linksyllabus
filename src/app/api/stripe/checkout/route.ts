@@ -84,7 +84,7 @@ export async function POST(req: Request) {
 
     const successSkuUrl = `${appUrl}/dashboard/success?checkout=success&skuId=${encodeURIComponent(
       skuId
-    )}`;
+    )}&session_id={CHECKOUT_SESSION_ID}`;
     if (sku.is_active) return NextResponse.json({ url: successSkuUrl });
 
     const session = await stripe.checkout.sessions.create({
