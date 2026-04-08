@@ -1,8 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { env } from "@/lib/env";
+import { extractMaterialsAndToolsFromYouTube } from "@/lib/gemini";
+import {
+  isMaterialsToolsStepTitle,
+  splitDescriptionIntoMaterialsAndTools
+} from "@/lib/materialsToolsDisplay";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { extractYouTubeVideoId } from "@/lib/video";
 import { TutorialViewClient, type TutorialStepPayload } from "./TutorialViewClient";
-import { fetchSkuVisibleToViewer, isPublicDemoSkuId } from "./tutorialAccess";
+import {
+  fetchSkuVisibleToViewer,
+  fetchTutorialSteps,
+  isPublicDemoSkuId
+} from "./tutorialAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +36,21 @@ function parseStepParam(sp: Record<string, string | string[] | undefined>) {
   const n = stepStr != null ? parseInt(String(stepStr), 10) : NaN;
   if (!Number.isFinite(n) || n < 1) return undefined;
   return n;
+}
+
+function readSkuTextField(sku: unknown, key: string): string | null {
+  if (sku == null || typeof sku !== "object") return null;
+  const r = sku as Record<string, unknown>;
+  const camel =
+    key === "materials_text"
+      ? "materialsText"
+      : key === "tools_text"
+        ? "toolsText"
+        : null;
+  const v = r[key] ?? (camel ? r[camel] : undefined);
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  return String(v);
 }
 
 export async function generateMetadata({
@@ -58,13 +85,10 @@ export default async function TutorialPage({
     notFound();
   }
 
-  const { data: stepRows, error: stepsErr } = await supabase
-    .from("steps")
-    .select(
-      "id,step_number,step_name,description,youtube_url,start_time,end_time,sku_id"
-    )
-    .eq("sku_id", sku.id)
-    .order("step_number", { ascending: true });
+  const { data: stepRows, error: stepsErr } = await fetchTutorialSteps(
+    sku.id,
+    sku
+  );
 
   if (stepsErr) {
     notFound();
@@ -80,6 +104,86 @@ export default async function TutorialPage({
     end_time: s.end_time
   }));
 
+  let materialsText = readSkuTextField(sku, "materials_text");
+  let toolsText = readSkuTextField(sku, "tools_text");
+  if (!materialsText?.trim() && !toolsText?.trim()) {
+    const { data: mtRow } = await supabase
+      .from("skus")
+      .select("materials_text, tools_text")
+      .eq("id", sku.id)
+      .maybeSingle();
+    if (mtRow) {
+      materialsText = readSkuTextField(mtRow, "materials_text");
+      toolsText = readSkuTextField(mtRow, "tools_text");
+    }
+  }
+  if (!materialsText?.trim() && !toolsText?.trim()) {
+    try {
+      const admin = createSupabaseAdminClient();
+      const { data: adminRow } = await admin
+        .from("skus")
+        .select("materials_text, tools_text")
+        .eq("id", sku.id)
+        .maybeSingle();
+      if (adminRow) {
+        materialsText = readSkuTextField(adminRow, "materials_text");
+        toolsText = readSkuTextField(adminRow, "tools_text");
+      }
+    } catch {
+      /* ignore — e.g. missing service role locally */
+    }
+  }
+
+  if (!materialsText?.trim() && !toolsText?.trim() && steps.length > 0) {
+    const chapterUrl = steps[0]?.youtube_url?.trim();
+    if (chapterUrl && extractYouTubeVideoId(chapterUrl) && env.geminiApiKey()) {
+      try {
+        const { materials, tools } =
+          await extractMaterialsAndToolsFromYouTube(chapterUrl);
+        const m = String(materials ?? "").trim();
+        const t = String(tools ?? "").trim();
+        if (m || t) {
+          materialsText = m || null;
+          toolsText = t || null;
+          try {
+            const admin = createSupabaseAdminClient();
+            await admin
+              .from("skus")
+              .update({
+                materials_text: m || null,
+                tools_text: t || null
+              })
+              .eq("id", sku.id);
+          } catch {
+            /* still show this response even if persist fails */
+          }
+        }
+      } catch {
+        /* no captions / Gemini error — leave empty */
+      }
+    }
+  }
+
+  let stepsForViewer = steps;
+  if (!materialsText?.trim() && !toolsText?.trim() && steps.length > 0) {
+    const matIdx = steps.findIndex((s) => isMaterialsToolsStepTitle(s.step_name));
+    if (matIdx >= 0) {
+      const split = splitDescriptionIntoMaterialsAndTools(
+        steps[matIdx].description ?? ""
+      );
+      const m = split.materialsText.trim();
+      const t = split.toolsText.trim();
+      if (m || t) {
+        materialsText = m || null;
+        toolsText = t || null;
+        const rest = steps.filter((_, i) => i !== matIdx);
+        if (rest.length > 0) {
+          stepsForViewer = rest;
+        }
+      }
+    }
+  }
+
   return (
     <main className="container-page py-8 md:py-12">
       {!sku.is_active && !isPublicDemoSkuId(skuId) ? (
@@ -88,18 +192,28 @@ export default async function TutorialPage({
           After payment completes, anyone with the link can open it.
         </div>
       ) : null}
-      <div className="mb-8 space-y-2 border-b border-zinc-100 pb-8">
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-          Tutorial
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 md:text-3xl">
-          {sku.name}
-        </h1>
-        {sku.description?.trim() ? (
-          <p className="max-w-2xl text-sm leading-relaxed text-zinc-600">
-            {sku.description}
+      <div className="mb-8 flex flex-col gap-4 border-b border-zinc-100 pb-8 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+            Tutorial
           </p>
-        ) : null}
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 md:text-3xl">
+            {sku.name}
+          </h1>
+          {sku.description?.trim() ? (
+            <p className="max-w-2xl text-sm leading-relaxed text-zinc-600">
+              {sku.description}
+            </p>
+          ) : null}
+        </div>
+        <a
+          href={`/tutorial/${encodeURIComponent(sku.id)}/print`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex shrink-0 items-center justify-center gap-2 self-stretch rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 sm:self-auto"
+        >
+          🖨️ Print QR Guide
+        </a>
       </div>
 
       {steps.length === 0 ? (
@@ -109,18 +223,15 @@ export default async function TutorialPage({
       ) : (
         <TutorialViewClient
           skuId={sku.id}
-          steps={steps}
+          steps={stepsForViewer}
           initialStepNumber={initialStepNumber}
+          materialsText={materialsText}
+          toolsText={toolsText}
+          printHref={`/tutorial/${encodeURIComponent(sku.id)}/print`}
         />
       )}
 
       <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-center">
-        <Link
-          className="text-sm font-medium text-orange-700 hover:text-orange-900"
-          href={`/tutorial/${encodeURIComponent(sku.id)}/print`}
-        >
-          Print manual (QR codes)
-        </Link>
         <Link className="text-sm text-zinc-500 hover:text-zinc-800" href="/">
           Home
         </Link>

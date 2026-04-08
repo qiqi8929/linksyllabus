@@ -13,6 +13,14 @@ export function extractYouTubeVideoId(url: string): string | null {
       const parts = u.pathname.split("/").filter(Boolean);
       const embedIdx = parts.indexOf("embed");
       if (embedIdx >= 0 && parts[embedIdx + 1]) return parts[embedIdx + 1];
+      const shortsIdx = parts.indexOf("shorts");
+      if (shortsIdx >= 0 && parts[shortsIdx + 1]) {
+        return parts[shortsIdx + 1].split(/[?&#]/)[0] || null;
+      }
+      const liveIdx = parts.indexOf("live");
+      if (liveIdx >= 0 && parts[liveIdx + 1]) {
+        return parts[liveIdx + 1].split(/[?&#]/)[0] || null;
+      }
     }
     return null;
   } catch {

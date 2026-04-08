@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { fetchSkuVisibleToViewer } from "../tutorialAccess";
+import { fetchSkuVisibleToViewer, fetchTutorialSteps } from "../tutorialAccess";
 import { PrintBar } from "./PrintBar";
 import { PrintManualView, type SkuPrint } from "./PrintManualView";
 import { resolvePrintBranding } from "./resolvePrintBranding";
@@ -51,17 +51,16 @@ export default async function TutorialPrintPage({
   params: PageParams | Promise<PageParams>;
 }) {
   const { skuId } = await resolveParams(params);
-  const { supabase, sku } = await fetchSkuVisibleToViewer(skuId);
+  const { sku } = await fetchSkuVisibleToViewer(skuId);
 
   if (!sku) {
     notFound();
   }
 
-  const { data: stepRows, error: stepsErr } = await supabase
-    .from("steps")
-    .select("id,step_number,step_name,description")
-    .eq("sku_id", sku.id)
-    .order("step_number", { ascending: true });
+  const { data: stepRows, error: stepsErr } = await fetchTutorialSteps(
+    sku.id,
+    sku
+  );
 
   if (stepsErr) {
     notFound();

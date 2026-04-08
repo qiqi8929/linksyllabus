@@ -62,3 +62,44 @@ export async function fetchSkuVisibleToViewer(skuId: string) {
 
   return { supabase, sku, user: user ?? null };
 }
+
+const TUTORIAL_STEP_COLUMNS =
+  "id,step_number,step_name,description,youtube_url,start_time,end_time,sku_id";
+
+/**
+ * Step rows for `/tutorial` and `/tutorial/.../print`.
+ *
+ * For **published** tutorials (`is_active`) and the **public demo** SKU, load via
+ * the service role so anonymous visitors get the same rows as the owner (RLS
+ * cannot hide or filter steps for public links). Draft tutorials use the server
+ * client so only the owner sees steps.
+ */
+export async function fetchTutorialSteps(
+  skuId: string,
+  sku: { is_active: boolean; user_id: string }
+) {
+  if (isPublicDemoSkuId(skuId)) {
+    const admin = createSupabaseAdminClient();
+    return admin
+      .from("steps")
+      .select(TUTORIAL_STEP_COLUMNS)
+      .eq("sku_id", skuId)
+      .order("step_number", { ascending: true });
+  }
+
+  if (sku.is_active) {
+    const admin = createSupabaseAdminClient();
+    return admin
+      .from("steps")
+      .select(TUTORIAL_STEP_COLUMNS)
+      .eq("sku_id", skuId)
+      .order("step_number", { ascending: true });
+  }
+
+  const supabase = createSupabaseServerClient();
+  return supabase
+    .from("steps")
+    .select(TUTORIAL_STEP_COLUMNS)
+    .eq("sku_id", skuId)
+    .order("step_number", { ascending: true });
+}

@@ -116,21 +116,23 @@ export function TutorialCreator() {
       setError("Use a valid YouTube URL.");
       return;
     }
-    const stepNames = steps.map((s) => s.step_name.trim()).filter(Boolean);
-    if (stepNames.length === 0) {
-      setError("Enter at least one step name in the steps below.");
-      return;
-    }
     setError(null);
     setDescExtractLoading(true);
     try {
       const res = await fetch("/api/gemini/extract-timestamps-from-description", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ youtubeUrl: url, stepNames })
+        body: JSON.stringify({ youtubeUrl: url })
       });
       const data = (await res.json()) as {
-        steps?: Array<{ stepName: string; start_time: number; end_time: number }>;
+        steps?: Array<{
+          stepName: string;
+          description?: string;
+          start_time: number;
+          end_time: number;
+        }>;
+        materialsText?: string;
+        toolsText?: string;
         error?: string;
       };
       if (!res.ok) {
@@ -138,29 +140,19 @@ export function TutorialCreator() {
       }
       const list = data.steps ?? [];
       if (!list.length) {
-        throw new Error("The model did not return timestamps for any step.");
+        throw new Error("The model did not return any instructional steps.");
       }
-      const byName = new Map(
-        list.map((s) => [s.stepName.trim(), s] as const)
+      setMaterialsText(String(data.materialsText ?? "").trim());
+      setToolsText(String(data.toolsText ?? "").trim());
+      setSteps(
+        list.map((s) => ({
+          id: makeId(),
+          step_name: s.stepName.trim(),
+          description: String(s.description ?? "").trim(),
+          start_time: Math.floor(s.start_time),
+          end_time: Math.floor(s.end_time)
+        }))
       );
-      let matched = 0;
-      setSteps((prev) =>
-        prev.map((row) => {
-          const m = byName.get(row.step_name.trim());
-          if (!m) return row;
-          matched += 1;
-          return {
-            ...row,
-            start_time: Math.floor(m.start_time),
-            end_time: Math.floor(m.end_time)
-          };
-        })
-      );
-      if (matched === 0) {
-        throw new Error(
-          "No step names matched the response. Use the exact same labels you asked the model to find."
-        );
-      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Timestamp extraction failed.");
     } finally {
@@ -325,11 +317,7 @@ export function TutorialCreator() {
               <button
                 type="button"
                 className="btn-ghost shrink-0 text-sm"
-                disabled={
-                  descExtractLoading ||
-                  !chapterVideoUrl.trim() ||
-                  !steps.some((s) => s.step_name.trim())
-                }
+                disabled={descExtractLoading || !chapterVideoUrl.trim()}
                 onClick={() => void extractTimestampsFromYouTubeVideo()}
               >
                 {descExtractLoading ? "Analyzing video…" : "✨ Auto-extract timestamps"}
@@ -346,10 +334,10 @@ export function TutorialCreator() {
               </button>
             </div>
             <p className="text-xs leading-relaxed text-zinc-500">
-              <span className="font-medium text-zinc-600">Timestamps:</span> captions + Gemini match
-              each step name to clip times (no YouTube Data API).{" "}
-              <span className="font-medium text-zinc-600">Materials & tools:</span> same transcript
-              to list supplies for the printable manual.
+              <span className="font-medium text-zinc-600">Timestamps:</span> captions + Gemini build
+              Materials & Tools plus instructional steps (names, descriptions, clip times).{" "}
+              <span className="font-medium text-zinc-600">Materials & tools button:</span> separate
+              transcript pass for the printable manual lists.
             </p>
           </div>
         </div>
