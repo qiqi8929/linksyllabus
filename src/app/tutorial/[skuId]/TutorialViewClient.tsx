@@ -16,9 +16,7 @@ import {
 import { formatStepNameForDisplay } from "@/lib/stepTitle";
 import {
   buildYouTubeEmbedUrl,
-  buildYouTubeWatchUrl,
-  getYouTubeThumbnailUrl,
-  YOUTUBE_EMBED_MESSAGE_ORIGINS
+  buildYouTubeWatchUrl
 } from "@/lib/youtubeUrls";
 import { detectVideoKind, extractYouTubeVideoId } from "@/lib/video";
 
@@ -45,6 +43,8 @@ type Props = {
 
 const printQrGuideClassName =
   "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3.5 text-sm font-semibold text-white shadow-md transition hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2";
+
+const SPEEDS = [0.5, 1, 1.5, 2] as const;
 
 /** nocookie host + controls — improves Safari / Edge when third-party cookies block youtube.com */
 const TUTORIAL_EMBED_BASE = {
@@ -78,8 +78,7 @@ export function TutorialViewClient({
   const hasMaterialsNav = materialsBody.length > 0 || toolsBody.length > 0;
   const [view, setView] = useState<"materials" | "step">("step");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  /** YouTube blocked embedding (error 101/150 etc.) — show thumbnail + Watch on YouTube. */
-  const [embedBlocked, setEmbedBlocked] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState<(typeof SPEEDS)[number]>(1);
 
   const step = view === "step" ? steps[currentIndex] ?? steps[0] : undefined;
   const videoId = step ? extractYouTubeVideoId(step.youtube_url) : null;
@@ -117,50 +116,39 @@ export function TutorialViewClient({
     return buildYouTubeEmbedUrl(videoId, startTime, { ...TUTORIAL_EMBED_BASE });
   }, [isYoutube, videoId, step?.id, startTime, endTime]);
 
-  useEffect(() => {
-    setEmbedBlocked(false);
-  }, [step?.id, videoId, startTime, endTime]);
+  const playbackRateRef = useRef(playbackRate);
+  playbackRateRef.current = playbackRate;
 
-  /** YouTube iframe posts onError when embedding is disabled (101, 150, …). */
   useEffect(() => {
-    function onMessage(e: MessageEvent) {
-      if (!YOUTUBE_EMBED_MESSAGE_ORIGINS.some((o) => o === e.origin)) {
-        return;
+    setPlaybackRate(1);
+  }, [step?.id]);
+
+  const postYtIframeCommand = useCallback(
+    (func: string, args: unknown[]) => {
+      const iframe = iframeRef.current;
+      if (!iframe?.contentWindow || !embedSrc) return;
+      const origin = embedSrc.includes("youtube-nocookie.com")
+        ? "https://www.youtube-nocookie.com"
+        : "https://www.youtube.com";
+      try {
+        iframe.contentWindow.postMessage(
+          JSON.stringify({ event: "command", func, args }),
+          origin
+        );
+      } catch {
+        /* ignore */
       }
-      let parsed: { event?: string; info?: unknown } | null = null;
-      if (typeof e.data === "string") {
-        try {
-          parsed = JSON.parse(e.data) as { event?: string; info?: unknown };
-        } catch {
-          return;
-        }
-      } else if (e.data && typeof e.data === "object") {
-        parsed = e.data as { event?: string; info?: unknown };
-      }
-      if (!parsed || parsed.event !== "onError") return;
-      const raw = parsed.info;
-      const code =
-        typeof raw === "number"
-          ? raw
-          : raw &&
-              typeof raw === "object" &&
-              "code" in raw &&
-              typeof (raw as { code: unknown }).code === "number"
-            ? (raw as { code: number }).code
-            : NaN;
-      if (
-        code === 2 ||
-        code === 5 ||
-        code === 100 ||
-        code === 101 ||
-        code === 150
-      ) {
-        setEmbedBlocked(true);
-      }
-    }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
+    },
+    [embedSrc]
+  );
+
+  const onSpeedClick = useCallback(
+    (r: (typeof SPEEDS)[number]) => {
+      setPlaybackRate(r);
+      postYtIframeCommand("setPlaybackRate", [r]);
+    },
+    [postYtIframeCommand]
+  );
 
   /** Optional autoplay when landing with ?step=N (browser may still require a gesture). */
   useEffect(() => {
@@ -185,7 +173,6 @@ export function TutorialViewClient({
             ...TUTORIAL_EMBED_BASE,
             autoplay: true
           });
-    setEmbedBlocked(false);
   }, [
     embedSrc,
     videoId,
@@ -224,14 +211,6 @@ export function TutorialViewClient({
 
   const replay = useCallback(() => {
     if (!videoId) return;
-    if (embedBlocked) {
-      window.open(
-        buildYouTubeWatchUrl(videoId, timesRef.current.start),
-        "_blank",
-        "noopener,noreferrer"
-      );
-      return;
-    }
     const el = iframeRef.current;
     if (!el) return;
     const { start: rs, end: re } = timesRef.current;
@@ -248,8 +227,10 @@ export function TutorialViewClient({
           });
     el.src = "";
     el.src = src;
-    setEmbedBlocked(false);
-  }, [videoId, embedBlocked]);
+    window.setTimeout(() => {
+      postYtIframeCommand("setPlaybackRate", [playbackRateRef.current]);
+    }, 900);
+  }, [videoId, postYtIframeCommand]);
 
   const voiceNoop = useCallback(() => {}, []);
 
@@ -305,6 +286,25 @@ export function TutorialViewClient({
         >
           ⏭
         </button>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+        <span className="text-xs text-zinc-500">Speed</span>
+        <div className="flex flex-wrap gap-1">
+          {SPEEDS.map((r) => (
+            <button
+              key={r}
+              type="button"
+              className={`min-h-[40px] min-w-[2.75rem] rounded-md px-2 py-1.5 text-xs font-medium sm:min-h-0 sm:min-w-0 ${
+                playbackRate === r
+                  ? "bg-orange-500 text-white"
+                  : "bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50"
+              }`}
+              onClick={() => onSpeedClick(r)}
+            >
+              {r}x
+            </button>
+          ))}
+        </div>
       </div>
       <div className="flex justify-center sm:justify-start">
         <button
@@ -424,51 +424,29 @@ export function TutorialViewClient({
           className="relative w-full min-h-0 min-w-0 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-black shadow-sm"
         >
           {embedSrc && videoId && step ? (
-            embedBlocked ? (
-              <div className="relative h-0 w-full pb-[56.25%]">
-                <div
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900 bg-cover bg-center"
-                  style={{
-                    backgroundImage: `url(${getYouTubeThumbnailUrl(videoId)})`
-                  }}
-                >
-                  <div
-                    className="absolute inset-0 bg-zinc-950/75"
-                    aria-hidden
-                  />
-                  <div className="relative z-10 flex max-w-sm flex-col items-center gap-4 px-6 text-center">
-                    <p className="text-sm text-zinc-100">
-                      This video can&apos;t be played embedded here (owner
-                      restricted embedding).
-                    </p>
-                    <a
-                      href={buildYouTubeWatchUrl(videoId, startTime)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-red-700"
-                    >
-                      ▶ Watch on YouTube
-                    </a>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="relative h-0 w-full pb-[56.25%]">
-                <iframe
-                  ref={iframeRef}
-                  key={`${skuId}-${step.id}-${videoId}-${startTime}-${endTime}`}
-                  src={embedSrc}
-                  width="100%"
-                  height="100%"
-                  className="absolute left-0 top-0 box-border block h-full w-full border-0"
-                  style={{ border: "none" }}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  title="YouTube video"
-                  frameBorder={0}
-                />
-              </div>
-            )
+            <div className="relative h-0 w-full pb-[56.25%]">
+              <iframe
+                ref={iframeRef}
+                key={`${skuId}-${step.id}-${videoId}-${startTime}-${endTime}`}
+                src={embedSrc}
+                width="100%"
+                height="100%"
+                className="absolute left-0 top-0 box-border block h-full w-full border-0"
+                style={{ border: "none" }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title="YouTube video"
+                frameBorder={0}
+              />
+              <a
+                href={buildYouTubeWatchUrl(videoId, startTime)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="pointer-events-auto absolute bottom-1.5 right-1.5 z-20 max-w-[min(100%,11rem)] text-right text-[11px] leading-snug text-zinc-500 no-underline hover:text-zinc-700 hover:underline"
+              >
+                Video blank? Open on YouTube
+              </a>
+            </div>
           ) : (
             <div className="flex min-h-[12rem] flex-col items-center justify-center gap-2 bg-zinc-950 px-4 py-12 text-center text-sm text-zinc-300">
               <p>Could not build a video URL for this step (missing YouTube link).</p>
@@ -476,24 +454,6 @@ export function TutorialViewClient({
           )}
         </div>
         <div className="mt-3">{controlsBar}</div>
-        <p className="mt-2 text-center text-xs text-zinc-500">
-          Use the player controls inside the frame for play and pause. Embed uses{" "}
-          <span className="font-medium">youtube-nocookie.com</span> for broader
-          browser support.
-          {embedSrc && videoId && step && !embedBlocked ? (
-            <>
-              {" "}
-              <a
-                href={buildYouTubeWatchUrl(videoId, startTime)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-orange-600 underline decoration-orange-300 underline-offset-2 hover:text-orange-800"
-              >
-                Video blank? Open on YouTube
-              </a>
-            </>
-          ) : null}
-        </p>
       </>
     );
 

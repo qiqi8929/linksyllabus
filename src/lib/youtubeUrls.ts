@@ -3,22 +3,6 @@
  * Embed: https://www.youtube.com/embed/VIDEO_ID?start=seconds
  */
 
-export function getYouTubeThumbnailUrl(
-  videoId: string,
-  quality: "hq" | "maxres" = "hq"
-): string {
-  const id = encodeURIComponent(videoId);
-  return quality === "maxres"
-    ? `https://img.youtube.com/vi/${id}/maxresdefault.jpg`
-    : `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
-}
-
-/** Origins that may postMessage from YouTube embed iframes (enablejsapi=1). */
-export const YOUTUBE_EMBED_MESSAGE_ORIGINS = [
-  "https://www.youtube.com",
-  "https://www.youtube-nocookie.com"
-] as const;
-
 export function buildYouTubeEmbedUrl(
   videoId: string,
   startSec: number,
