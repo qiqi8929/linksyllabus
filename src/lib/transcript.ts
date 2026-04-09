@@ -21,7 +21,9 @@ export type TranscriptFetchSource =
   | "youtube-transcript-package"
   | "timedtext-json3"
   | "timedtext-xml"
-  | "watch-page-caption-track";
+  | "watch-page-caption-track"
+  | "youtubei-caption-track"
+  | "youtubei-transcript-panel";
 
 export type TranscriptFetchResult = {
   cues: TranscriptCue[];
@@ -51,14 +53,26 @@ function tlog(
   );
 }
 
-/** Browser-like fetch for YouTube (datacenter IPs often need this). */
+export type YoutubeFetchContext = {
+  /** Sets Referer/Origin to the watch page — improves success on timedtext + caption URLs. */
+  videoId?: string;
+};
+
+/** Browser-like fetch for YouTube (datacenter / Vercel serverless IPs need realistic headers). */
 export function fetchWithYoutubeHeaders(
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: RequestInit,
+  ctx?: YoutubeFetchContext
 ): Promise<Response> {
   const h = new Headers(init?.headers);
   if (!h.has("User-Agent")) h.set("User-Agent", BROWSER_USER_AGENT);
   if (!h.has("Accept-Language")) h.set("Accept-Language", "en-US,en;q=0.9");
+  if (!h.has("Accept")) h.set("Accept", "application/json, text/xml, text/plain, */*");
+  if (ctx?.videoId) {
+    const watch = `https://www.youtube.com/watch?v=${encodeURIComponent(ctx.videoId)}`;
+    if (!h.has("Referer")) h.set("Referer", watch);
+    if (!h.has("Origin")) h.set("Origin", "https://www.youtube.com");
+  }
   return fetch(input, { ...init, headers: h });
 }
 
@@ -82,7 +96,7 @@ async function tryYoutubeTranscriptPackage(
 ): Promise<TranscriptFetchResult | null> {
   try {
     const raw = await fetchTranscript(videoId, {
-      fetch: (url, init) => fetchWithYoutubeHeaders(url, init)
+      fetch: (url, init) => fetchWithYoutubeHeaders(url, init, { videoId })
     });
     if (!raw?.length) {
       tlog(videoId, "youtube-transcript-package", { ok: false, reason: "empty" });
@@ -161,19 +175,35 @@ function parseJson3ToCues(data: Json3Root): TranscriptCue[] {
   return cues;
 }
 
-function timedtextJson3Url(videoId: string, withLangEn: boolean): string {
-  const u = new URL("https://www.youtube.com/api/timedtext");
-  u.searchParams.set("v", videoId);
-  u.searchParams.set("fmt", "json3");
-  if (withLangEn) u.searchParams.set("lang", "en");
-  return u.toString();
-}
+/** Query variants for `https://www.youtube.com/api/timedtext` (manual + ASR + a few locales). */
+const TIMEDTEXT_JSON3_PARAM_VARIANTS: Record<string, string>[] = [
+  { lang: "en" },
+  {},
+  { lang: "en", kind: "asr" },
+  { kind: "asr" },
+  { lang: "zh-Hans" },
+  { lang: "zh" },
+  { lang: "ja" }
+];
 
-/** https://www.youtube.com/api/timedtext?v={id}&lang=en (XML) */
-function timedtextXmlUrl(videoId: string, withLangEn: boolean): string {
+const TIMEDTEXT_XML_PARAM_VARIANTS: Record<string, string>[] = [
+  { lang: "en" },
+  {},
+  { lang: "en", kind: "asr" },
+  { kind: "asr" }
+];
+
+function buildTimedtextUrl(
+  videoId: string,
+  fmt: "json3" | null,
+  extra: Record<string, string>
+): string {
   const u = new URL("https://www.youtube.com/api/timedtext");
   u.searchParams.set("v", videoId);
-  if (withLangEn) u.searchParams.set("lang", "en");
+  if (fmt) u.searchParams.set("fmt", fmt);
+  for (const [k, v] of Object.entries(extra)) {
+    if (v) u.searchParams.set(k, v);
+  }
   return u.toString();
 }
 
@@ -218,23 +248,25 @@ function parseTimedtextXml(xml: string): TranscriptCue[] {
 }
 
 async function tryTimedtextJson3(videoId: string): Promise<TranscriptFetchResult | null> {
-  for (const withLang of [true, false]) {
-    const url = timedtextJson3Url(videoId, withLang);
+  for (let i = 0; i < TIMEDTEXT_JSON3_PARAM_VARIANTS.length; i++) {
+    const params = TIMEDTEXT_JSON3_PARAM_VARIANTS[i];
+    const url = buildTimedtextUrl(videoId, "json3", params);
     try {
-      const res = await fetchWithYoutubeHeaders(url);
+      const res = await fetchWithYoutubeHeaders(url, undefined, { videoId });
       const snippet = (await res.clone().text()).slice(0, 400);
       if (!res.ok) {
         tlog(videoId, "timedtext-json3", {
           ok: false,
           status: res.status,
-          withLangEn: withLang,
+          variantIndex: i,
+          params,
           bodySnippet: snippet
         });
         continue;
       }
       const text = await res.text();
       if (!text.trim()) {
-        tlog(videoId, "timedtext-json3", { ok: false, reason: "empty body", withLangEn: withLang });
+        tlog(videoId, "timedtext-json3", { ok: false, reason: "empty body", variantIndex: i, params });
         continue;
       }
       let data: Json3Root;
@@ -244,7 +276,8 @@ async function tryTimedtextJson3(videoId: string): Promise<TranscriptFetchResult
         tlog(videoId, "timedtext-json3", {
           ok: false,
           reason: "json parse",
-          withLangEn: withLang,
+          variantIndex: i,
+          params,
           bodySnippet: snippet,
           error: e
         });
@@ -252,28 +285,30 @@ async function tryTimedtextJson3(videoId: string): Promise<TranscriptFetchResult
       }
       const cues = parseJson3ToCues(data);
       if (cuesUsable(cues)) {
-        tlog(videoId, "timedtext-json3", { ok: true, cueCount: cues.length, withLangEn: withLang });
+        tlog(videoId, "timedtext-json3", { ok: true, cueCount: cues.length, variantIndex: i, params });
         return { cues, source: "timedtext-json3" };
       }
-      tlog(videoId, "timedtext-json3", { ok: false, reason: "no cues", withLangEn: withLang });
+      tlog(videoId, "timedtext-json3", { ok: false, reason: "no cues", variantIndex: i, params });
     } catch (error: unknown) {
-      tlog(videoId, "timedtext-json3", { ok: false, withLangEn: withLang, error });
+      tlog(videoId, "timedtext-json3", { ok: false, variantIndex: i, params, error });
     }
   }
   return null;
 }
 
 async function tryTimedtextXml(videoId: string): Promise<TranscriptFetchResult | null> {
-  for (const withLang of [true, false]) {
-    const url = timedtextXmlUrl(videoId, withLang);
+  for (let i = 0; i < TIMEDTEXT_XML_PARAM_VARIANTS.length; i++) {
+    const params = TIMEDTEXT_XML_PARAM_VARIANTS[i];
+    const url = buildTimedtextUrl(videoId, null, params);
     try {
-      const res = await fetchWithYoutubeHeaders(url);
+      const res = await fetchWithYoutubeHeaders(url, undefined, { videoId });
       const snippet = (await res.clone().text()).slice(0, 400);
       if (!res.ok) {
         tlog(videoId, "timedtext-xml", {
           ok: false,
           status: res.status,
-          withLangEn: withLang,
+          variantIndex: i,
+          params,
           bodySnippet: snippet
         });
         continue;
@@ -283,21 +318,133 @@ async function tryTimedtextXml(videoId: string): Promise<TranscriptFetchResult |
         tlog(videoId, "timedtext-xml", {
           ok: false,
           reason: "not xml cues",
-          withLangEn: withLang,
+          variantIndex: i,
+          params,
           bodySnippet: snippet
         });
         continue;
       }
       const cues = parseTimedtextXml(xml);
       if (cuesUsable(cues)) {
-        tlog(videoId, "timedtext-xml", { ok: true, cueCount: cues.length, withLangEn: withLang });
+        tlog(videoId, "timedtext-xml", { ok: true, cueCount: cues.length, variantIndex: i, params });
         return { cues, source: "timedtext-xml" };
       }
     } catch (error: unknown) {
-      tlog(videoId, "timedtext-xml", { ok: false, withLangEn: withLang, error });
+      tlog(videoId, "timedtext-xml", { ok: false, variantIndex: i, params, error });
     }
   }
   return null;
+}
+
+type CaptionTrackLike = {
+  base_url: string;
+  language_code?: string;
+  kind?: string;
+};
+
+function pickCaptionTrack(tracks: CaptionTrackLike[]): CaptionTrackLike | null {
+  if (!tracks.length) return null;
+  const en = tracks.find((t) => t.language_code === "en");
+  if (en) return en;
+  const asr = tracks.find((t) => t.kind === "asr");
+  if (asr) return asr;
+  return tracks[0];
+}
+
+function transcriptPanelToCues(transcriptInfo: {
+  transcript?: {
+    content?: {
+      body?: {
+        initial_segments?: Array<{
+          type?: string;
+          start_ms?: string;
+          end_ms?: string;
+          snippet?: { text?: string };
+        }>;
+      } | null;
+    } | null;
+  };
+}): TranscriptCue[] {
+  const segs = transcriptInfo.transcript?.content?.body?.initial_segments;
+  if (!segs?.length) return [];
+  const cues: TranscriptCue[] = [];
+  for (const seg of segs) {
+    if (seg.type !== "TranscriptSegment") continue;
+    const text = String(seg.snippet?.text ?? "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) continue;
+    const startMs = Number(seg.start_ms);
+    const endMs = Number(seg.end_ms);
+    const start = startMs / 1000;
+    const end = endMs / 1000;
+    const duration = Math.max(0.1, end - start);
+    cues.push({ text, start, duration });
+  }
+  return cues;
+}
+
+/**
+ * youtubei.js (InnerTube): player caption `base_url` is a timedtext URL with token params;
+ * `getTranscript()` uses the searchable transcript engagement panel when present.
+ */
+async function tryYoutubeiJs(videoId: string): Promise<TranscriptFetchResult | null> {
+  try {
+    const { Innertube } = await import("youtubei.js");
+    const yt = await Innertube.create();
+    const info = await yt.getInfo(videoId);
+
+    const tracks = info.captions?.caption_tracks as CaptionTrackLike[] | undefined;
+    const track = tracks?.length ? pickCaptionTrack(tracks) : null;
+    if (track?.base_url) {
+      const capUrl = new URL(track.base_url);
+      capUrl.searchParams.set("fmt", "json3");
+      const res = await fetchWithYoutubeHeaders(capUrl.toString(), undefined, { videoId });
+      const body = await res.text();
+      if (res.ok && body.trim().startsWith("{")) {
+        try {
+          const data = JSON.parse(body) as Json3Root;
+          const cues = parseJson3ToCues(data);
+          if (cuesUsable(cues)) {
+            tlog(videoId, "youtubei-caption-track", {
+              ok: true,
+              cueCount: cues.length,
+              language: track.language_code,
+              kind: track.kind
+            });
+            return { cues, source: "youtubei-caption-track" };
+          }
+        } catch (e: unknown) {
+          tlog(videoId, "youtubei-caption-track", { ok: false, reason: "json parse", error: e });
+        }
+      } else {
+        tlog(videoId, "youtubei-caption-track", {
+          ok: false,
+          status: res.status,
+          bodySnippet: body.slice(0, 200)
+        });
+      }
+    }
+
+    try {
+      const transcriptInfo = await info.getTranscript();
+      const cues = transcriptPanelToCues(transcriptInfo);
+      if (cuesUsable(cues)) {
+        tlog(videoId, "youtubei-transcript-panel", { ok: true, cueCount: cues.length });
+        return { cues, source: "youtubei-transcript-panel" };
+      }
+    } catch (e: unknown) {
+      tlog(videoId, "youtubei-transcript-panel", {
+        ok: false,
+        reason: "no panel or failed",
+        error: e
+      });
+    }
+    return null;
+  } catch (error: unknown) {
+    tlog(videoId, "youtubei.js", { ok: false, error });
+    return null;
+  }
 }
 
 /**
@@ -306,7 +453,7 @@ async function tryTimedtextXml(videoId: string): Promise<TranscriptFetchResult |
 async function tryWatchPageCaptionTrack(videoId: string): Promise<TranscriptFetchResult | null> {
   const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
   try {
-    const res = await fetchWithYoutubeHeaders(watchUrl);
+    const res = await fetchWithYoutubeHeaders(watchUrl, undefined, { videoId });
     const htmlSnippet = (await res.clone().text()).slice(0, 500);
     if (!res.ok) {
       tlog(videoId, "watch-page-caption-track", {
@@ -334,7 +481,7 @@ async function tryWatchPageCaptionTrack(videoId: string): Promise<TranscriptFetc
       captionUrl.searchParams.set("fmt", "json3");
     }
 
-    const cres = await fetchWithYoutubeHeaders(captionUrl.toString());
+    const cres = await fetchWithYoutubeHeaders(captionUrl.toString(), undefined, { videoId });
     const body = await cres.text();
     if (cres.ok && body.trim().startsWith("{")) {
       try {
@@ -350,7 +497,7 @@ async function tryWatchPageCaptionTrack(videoId: string): Promise<TranscriptFetc
     }
     const xmlUrl = new URL(baseUrl);
     xmlUrl.searchParams.delete("fmt");
-    const xres = await fetchWithYoutubeHeaders(xmlUrl.toString());
+    const xres = await fetchWithYoutubeHeaders(xmlUrl.toString(), undefined, { videoId });
     const xml = await xres.text();
     if (xres.ok && (xml.includes("<text") || xml.includes("<p "))) {
       const cues = parseTimedtextXml(xml);
@@ -379,10 +526,11 @@ export async function getTranscriptWithFallbacks(
   }
 
   const chain: Array<() => Promise<TranscriptFetchResult | null>> = [
-    () => tryYoutubeTranscriptPackage(id),
     () => tryTimedtextJson3(id),
     () => tryTimedtextXml(id),
-    () => tryWatchPageCaptionTrack(id)
+    () => tryWatchPageCaptionTrack(id),
+    () => tryYoutubeiJs(id),
+    () => tryYoutubeTranscriptPackage(id)
   ];
 
   for (let i = 0; i < chain.length; i++) {
