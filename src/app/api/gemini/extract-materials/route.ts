@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import {
   extractMaterialsAndToolsFromVideoBuffer,
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseRouteHandlerClient(req);
   const {
     data: { user }
   } = await supabase.auth.getUser();

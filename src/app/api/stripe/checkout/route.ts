@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe/server";
 import { STRIPE_PRICES } from "@/lib/stripe/prices";
@@ -14,7 +14,7 @@ type Payload =
 
 export async function POST(req: Request) {
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = createSupabaseRouteHandlerClient(req);
     const {
       data: { user }
     } = await supabase.auth.getUser();

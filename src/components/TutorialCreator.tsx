@@ -49,10 +49,38 @@ function emptyStep(): StepRow {
   };
 }
 
+/** POST /api/* with session cookie; surfaces non-JSON errors (e.g. Vercel timeout HTML). */
+async function fetchJsonFromApi(
+  url: string,
+  body: unknown
+): Promise<Record<string, unknown>> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body)
+  });
+  const text = await res.text();
+  let data: Record<string, unknown>;
+  try {
+    data = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  } catch {
+    throw new Error(
+      text.slice(0, 280) ||
+        `Server returned non-JSON (HTTP ${res.status}). If this persists, check Vercel logs / function timeout.`
+    );
+  }
+  if (!res.ok) {
+    throw new Error(String(data.error ?? `Request failed (HTTP ${res.status}).`));
+  }
+  return data;
+}
+
 async function startCheckout(skuId: string) {
   const res = await fetch("/api/stripe/checkout", {
     method: "POST",
     headers: { "content-type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({ type: "sku", skuId })
   });
   if (!res.ok) {
@@ -221,46 +249,40 @@ export function TutorialCreator() {
     setDescExtractLoading(true);
     try {
       const storagePath = parseStorageVideoPath(url);
-      const res = await fetch("/api/gemini/extract-timestamps-from-description", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          storagePath
-            ? { storagePath }
-            : {
-                youtubeUrl: url
-              }
-        )
-      });
-      const data = (await res.json()) as {
-        steps?: Array<{
-          stepName: string;
-          description?: string;
-          start_time: number;
-          end_time: number;
-        }>;
-        materialsText?: string;
-        toolsText?: string;
-        error?: string;
-      };
-      if (!res.ok) {
-        throw new Error(data.error || "Could not extract timestamps.");
-      }
-      const list = data.steps ?? [];
+      const data = await fetchJsonFromApi(
+        "/api/gemini/extract-timestamps-from-description",
+        storagePath ? { storagePath } : { youtubeUrl: url }
+      );
+      const rawSteps = data.steps;
+      const list = Array.isArray(rawSteps) ? rawSteps : [];
       if (!list.length) {
         throw new Error("The model did not return any instructional steps.");
       }
-      setMaterialsText(String(data.materialsText ?? "").trim());
-      setToolsText(String(data.toolsText ?? "").trim());
-      setSteps(
-        list.map((s) => ({
-          id: makeId(),
-          step_name: s.stepName.trim(),
-          description: String(s.description ?? "").trim(),
-          start_time: Math.floor(s.start_time),
-          end_time: Math.floor(s.end_time)
-        }))
+      setMaterialsText(
+        String(data.materialsText ?? data.materials_text ?? "").trim()
       );
+      setToolsText(String(data.toolsText ?? data.tools_text ?? "").trim());
+      const mapped = list.map((item) => {
+        const s = item as Record<string, unknown>;
+        const stepName = String(s.stepName ?? s.step_name ?? "").trim();
+        const description = String(s.description ?? "").trim();
+        const start = Math.floor(Number(s.start_time ?? s.startTime ?? 0));
+        const end = Math.floor(Number(s.end_time ?? s.endTime ?? 0));
+        return {
+          id: makeId(),
+          step_name: stepName,
+          description,
+          start_time: start,
+          end_time: end
+        };
+      });
+      const withNames = mapped.filter((row) => row.step_name.length > 0);
+      if (!withNames.length) {
+        throw new Error(
+          "The model returned steps without titles. Try again or add steps manually."
+        );
+      }
+      setSteps(withNames);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Timestamp extraction failed.");
     } finally {
@@ -290,25 +312,10 @@ export function TutorialCreator() {
     setMaterialsExtractLoading(true);
     try {
       const storagePath = parseStorageVideoPath(url);
-      const res = await fetch("/api/gemini/extract-materials", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          storagePath
-            ? { storagePath }
-            : {
-                youtubeUrl: url
-              }
-        )
-      });
-      const data = (await res.json()) as {
-        materials?: string;
-        tools?: string;
-        error?: string;
-      };
-      if (!res.ok) {
-        throw new Error(data.error || "Could not extract materials & tools.");
-      }
+      const data = await fetchJsonFromApi(
+        "/api/gemini/extract-materials",
+        storagePath ? { storagePath } : { youtubeUrl: url }
+      );
       setMaterialsText(String(data.materials ?? "").trim());
       setToolsText(String(data.tools ?? "").trim());
     } catch (e: unknown) {
@@ -328,24 +335,16 @@ export function TutorialCreator() {
     const chapter = chapterVideoUrl.trim();
     setAiLoading(true);
     try {
-      const res = await fetch("/api/gemini/generate-descriptions", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          tutorialName: tutorialName.trim(),
-          steps: steps.map((s) => ({
-            stepName: s.step_name.trim(),
-            videoUrl: chapter,
-            startTime: s.start_time,
-            endTime: s.end_time
-          }))
-        })
+      const data = await fetchJsonFromApi("/api/gemini/generate-descriptions", {
+        tutorialName: tutorialName.trim(),
+        steps: steps.map((s) => ({
+          stepName: s.step_name.trim(),
+          videoUrl: chapter,
+          startTime: s.start_time,
+          endTime: s.end_time
+        }))
       });
-      const data = (await res.json()) as { descriptions?: string[]; error?: string };
-      if (!res.ok) {
-        throw new Error(data.error || "AI request failed");
-      }
-      const descriptions = data.descriptions;
+      const descriptions = data.descriptions as string[] | undefined;
       if (!descriptions || descriptions.length !== steps.length) {
         throw new Error("Unexpected AI response shape.");
       }

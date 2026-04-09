@@ -181,12 +181,55 @@ function sanitizeTutorialStepName(name: string): string {
 }
 
 function isMaterialsToolsStepName(name: string): boolean {
-  const n = name.trim().toLowerCase();
-  return (
+  const raw = name.trim();
+  const n = raw.toLowerCase();
+  if (
     (n.includes("material") && n.includes("tool")) ||
     n === "materials & tools" ||
     n === "materials and tools"
-  );
+  ) {
+    return true;
+  }
+  // Chinese / mixed headings models often emit
+  if (/材料/.test(raw) && /工具/.test(raw)) return true;
+  if (/材料/.test(raw) && /与|和|＆|&/.test(raw)) return true;
+  // Variants that omit "tool(s)" in the title
+  if (/^materials?$/.test(n)) return true;
+  if (/\bsuppl(?:y|ies)\b/.test(n)) return true;
+  if (/\bwhat you(?:'ll| will)? need\b/.test(n)) return true;
+  if (/\bgather(?:ing)? (?:your )?materials\b/.test(n)) return true;
+  if (/\blist of materials\b/.test(n)) return true;
+  return false;
+}
+
+/**
+ * First JSON row should be Materials & Tools; models sometimes rename it. If we still have 2+
+ * rows and the first block looks like a supplies list, peel it so UI gets materials/tools text.
+ */
+function peelLeadingMaterialsRow(
+  rows: Array<{ name: string; description: string; start: number; end: number }>
+): { materialsDescription: string; work: typeof rows } {
+  if (rows.length === 0) {
+    return { materialsDescription: "", work: rows };
+  }
+  if (isMaterialsToolsStepName(rows[0].name)) {
+    return { materialsDescription: rows[0].description, work: rows.slice(1) };
+  }
+  if (rows.length >= 2) {
+    const first = rows[0];
+    const second = rows[1];
+    const dur = first.end - first.start;
+    const firstShort = Number.isFinite(dur) && dur >= 0 && dur <= 240;
+    const desc = first.description.trim();
+    const looksLikeSuppliesList =
+      desc.length > 40 &&
+      (/\n\s*[-*•\d]/.test(desc) ||
+        /yarn|fabric|hook|needle|scissors|mm\b|oz\b|gram|stuffing/i.test(desc));
+    if (first.start <= second.start && (firstShort || looksLikeSuppliesList)) {
+      return { materialsDescription: desc, work: rows.slice(1) };
+    }
+  }
+  return { materialsDescription: "", work: rows };
 }
 
 function splitMaterialsToolsFromDescription(description: string): {
@@ -238,13 +281,34 @@ function parseTutorialStructureJsonArray(raw: string): Array<{
   } | null => {
     if (!item || typeof item !== "object") return null;
     const o = item as Record<string, unknown>;
-    const rawName = String(o.name ?? o.stepName ?? "").trim();
+    const rawName = String(
+      o.name ??
+        o.stepName ??
+        o.title ??
+        o.step ??
+        o.label ??
+        (o as { 名称?: unknown }).名称 ??
+        ""
+    ).trim();
     const name = sanitizeTutorialStepName(rawName);
-    const description = String(o.description ?? "").trim();
+    const description = String(
+      o.description ?? o.details ?? o.summary ?? o.body ?? ""
+    ).trim();
     // Prefer explicit start/end; avoid mixing up with unrelated keys
-    const startRaw = o.start ?? o.start_time ?? o.start_time_seconds ?? o.startSec;
-    let endRaw = o.end ?? o.end_time ?? o.end_time_seconds ?? o.endSec;
-    const durRaw = o.duration ?? o.duration_seconds ?? o.duration_sec;
+    let startRaw =
+      o.start ??
+      o.start_time ??
+      o.start_time_seconds ??
+      o.startSec ??
+      o.begin;
+    let endRaw =
+      o.end ?? o.end_time ?? o.end_time_seconds ?? o.endSec ?? o.finish ?? o.stop;
+    const durRaw = o.duration ?? o.duration_seconds ?? o.duration_sec ?? o.length;
+    const range = o.range ?? o.time_range ?? o.timeRange;
+    if (Array.isArray(range) && range.length >= 2) {
+      startRaw = range[0];
+      endRaw = range[1];
+    }
     let start = Math.floor(Number(startRaw));
     let end = Math.floor(Number(endRaw));
     if (!name || !Number.isFinite(start)) return null;
@@ -363,13 +427,9 @@ ${formatted}`;
     throw new Error("The model did not return any steps. Try again or shorten the video.");
   }
 
-  let materialsDescription = "";
-  let work = rows;
-
-  if (isMaterialsToolsStepName(rows[0].name)) {
-    materialsDescription = rows[0].description;
-    work = rows.slice(1);
-  }
+  const peeled = peelLeadingMaterialsRow(rows);
+  const materialsDescription = peeled.materialsDescription;
+  const work = peeled.work;
 
   if (work.length === 0) {
     throw new Error(
@@ -711,6 +771,17 @@ There must be exactly ${steps.length} strings in "descriptions", in the same ord
   return descriptions.map((d) => String(d ?? "").trim());
 }
 
+function normalizeMaterialsToolsField(v: unknown): string {
+  if (v == null) return "";
+  if (Array.isArray(v)) {
+    return v
+      .map((x) => String(x ?? "").trim())
+      .filter(Boolean)
+      .join("\n");
+  }
+  return String(v).trim();
+}
+
 function parseMaterialsToolsPayload(raw: string): { materials: string; tools: string } {
   let s = raw.trim();
   s = s.replace(/^```(?:json)?\s*\r?\n?/i, "");
@@ -720,8 +791,8 @@ function parseMaterialsToolsPayload(raw: string): { materials: string; tools: st
   const coerce = (chunk: string) => {
     const o = JSON.parse(chunk) as { materials?: unknown; tools?: unknown };
     return {
-      materials: String(o.materials ?? "").trim(),
-      tools: String(o.tools ?? "").trim()
+      materials: normalizeMaterialsToolsField(o.materials),
+      tools: normalizeMaterialsToolsField(o.tools)
     };
   };
 
@@ -870,13 +941,9 @@ export async function extractTutorialStructureFromUploadedVideoBuffer(
       throw new Error("The model did not return any steps. Try again or shorten the video.");
     }
 
-    let materialsDescription = "";
-    let work = rows;
-
-    if (isMaterialsToolsStepName(rows[0].name)) {
-      materialsDescription = rows[0].description;
-      work = rows.slice(1);
-    }
+    const peeled = peelLeadingMaterialsRow(rows);
+    const materialsDescription = peeled.materialsDescription;
+    const work = peeled.work;
 
     if (work.length === 0) {
       throw new Error(

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { parseStorageVideoPath, TUTORIAL_VIDEO_BUCKET } from "@/lib/storageVideoUrl";
 
 export const runtime = "nodejs";
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "stepId is required." }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseRouteHandlerClient(req);
   const admin = createSupabaseAdminClient();
 
   const { data: stepRow, error: stepErr } = await admin
