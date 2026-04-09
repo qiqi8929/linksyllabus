@@ -25,6 +25,13 @@ export const env = {
   },
 
   /** Server-only. Step description generation via Gemini; omit in env to disable AI. */
-  geminiApiKey: () => process.env.GEMINI_API_KEY as string | undefined
+  geminiApiKey: () => process.env.GEMINI_API_KEY as string | undefined,
+
+  /**
+   * Optional. YouTube Data API v3 key (server-only).
+   * Enables `captions.list` to discover track languages, then we fetch timedtext with those params.
+   * Downloading caption files via `captions.download` still requires OAuth; we do not use it here.
+   */
+  youtubeDataApiKey: () => process.env.YOUTUBE_API_KEY as string | undefined
 };
 

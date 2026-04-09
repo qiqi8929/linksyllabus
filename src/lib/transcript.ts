@@ -1,4 +1,5 @@
 import { fetchTranscript, type TranscriptResponse } from "youtube-transcript";
+import { env } from "@/lib/env";
 
 export const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -23,12 +24,26 @@ export type TranscriptFetchSource =
   | "timedtext-xml"
   | "watch-page-caption-track"
   | "youtubei-caption-track"
-  | "youtubei-transcript-panel";
+  | "youtubei-transcript-panel"
+  | "youtube-data-api-guided-timedtext";
 
 export type TranscriptFetchResult = {
   cues: TranscriptCue[];
   source: TranscriptFetchSource;
 };
+
+/** Plain console lines for Vercel logs (easier to grep than JSON `tlog` alone). */
+function transcriptConsole(message: string, detail?: unknown) {
+  if (detail !== undefined) {
+    console.log("[transcript]", message, detail);
+  } else {
+    console.log("[transcript]", message);
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 function tlog(
   videoId: string,
@@ -94,22 +109,27 @@ function packageRowsToCues(raw: TranscriptResponse[]): TranscriptCue[] {
 async function tryYoutubeTranscriptPackage(
   videoId: string
 ): Promise<TranscriptFetchResult | null> {
+  transcriptConsole("trying youtube-transcript package (npm)...", { videoId });
   try {
     const raw = await fetchTranscript(videoId, {
       fetch: (url, init) => fetchWithYoutubeHeaders(url, init, { videoId })
     });
     if (!raw?.length) {
+      transcriptConsole("youtube-transcript package failed: empty rows", { videoId });
       tlog(videoId, "youtube-transcript-package", { ok: false, reason: "empty" });
       return null;
     }
     const cues = packageRowsToCues(raw);
     if (!cuesUsable(cues)) {
+      transcriptConsole("youtube-transcript package failed: no usable text in cues", { videoId });
       tlog(videoId, "youtube-transcript-package", { ok: false, reason: "no text" });
       return null;
     }
+    transcriptConsole("youtube-transcript package ok", { videoId, cueCount: cues.length });
     tlog(videoId, "youtube-transcript-package", { ok: true, cueCount: cues.length });
     return { cues, source: "youtube-transcript-package" };
   } catch (error: unknown) {
+    transcriptConsole("youtube-transcript package failed:", errorMessage(error));
     tlog(videoId, "youtube-transcript-package", { ok: false, error });
     return null;
   }
@@ -248,12 +268,22 @@ function parseTimedtextXml(xml: string): TranscriptCue[] {
 }
 
 async function tryTimedtextJson3(videoId: string): Promise<TranscriptFetchResult | null> {
+  transcriptConsole("trying timedtext json3...", { videoId });
   for (let i = 0; i < TIMEDTEXT_JSON3_PARAM_VARIANTS.length; i++) {
     const params = TIMEDTEXT_JSON3_PARAM_VARIANTS[i];
     const url = buildTimedtextUrl(videoId, "json3", params);
     try {
       const res = await fetchWithYoutubeHeaders(url, undefined, { videoId });
       const snippet = (await res.clone().text()).slice(0, 400);
+      transcriptConsole("timedtext json3 request", {
+        videoId,
+        variantIndex: i,
+        params,
+        status: res.status,
+        ...(res.status === 403 || res.status === 429
+          ? { hint: "possible YouTube IP block / rate limit on www.youtube.com" }
+          : {})
+      });
       if (!res.ok) {
         tlog(videoId, "timedtext-json3", {
           ok: false,
@@ -266,6 +296,7 @@ async function tryTimedtextJson3(videoId: string): Promise<TranscriptFetchResult
       }
       const text = await res.text();
       if (!text.trim()) {
+        transcriptConsole("timedtext json3 empty body", { videoId, variantIndex: i, params });
         tlog(videoId, "timedtext-json3", { ok: false, reason: "empty body", variantIndex: i, params });
         continue;
       }
@@ -273,6 +304,7 @@ async function tryTimedtextJson3(videoId: string): Promise<TranscriptFetchResult
       try {
         data = JSON.parse(text) as Json3Root;
       } catch (e) {
+        transcriptConsole("timedtext json3 JSON parse failed:", errorMessage(e));
         tlog(videoId, "timedtext-json3", {
           ok: false,
           reason: "json parse",
@@ -285,24 +317,38 @@ async function tryTimedtextJson3(videoId: string): Promise<TranscriptFetchResult
       }
       const cues = parseJson3ToCues(data);
       if (cuesUsable(cues)) {
+        transcriptConsole("timedtext json3 ok", { videoId, variantIndex: i, cueCount: cues.length });
         tlog(videoId, "timedtext-json3", { ok: true, cueCount: cues.length, variantIndex: i, params });
         return { cues, source: "timedtext-json3" };
       }
+      transcriptConsole("timedtext json3 no usable cues", { videoId, variantIndex: i, params });
       tlog(videoId, "timedtext-json3", { ok: false, reason: "no cues", variantIndex: i, params });
     } catch (error: unknown) {
+      transcriptConsole("timedtext json3 failed:", errorMessage(error));
       tlog(videoId, "timedtext-json3", { ok: false, variantIndex: i, params, error });
     }
   }
+  transcriptConsole("timedtext json3 failed: all variants exhausted", { videoId });
   return null;
 }
 
 async function tryTimedtextXml(videoId: string): Promise<TranscriptFetchResult | null> {
+  transcriptConsole("trying timedtext xml...", { videoId });
   for (let i = 0; i < TIMEDTEXT_XML_PARAM_VARIANTS.length; i++) {
     const params = TIMEDTEXT_XML_PARAM_VARIANTS[i];
     const url = buildTimedtextUrl(videoId, null, params);
     try {
       const res = await fetchWithYoutubeHeaders(url, undefined, { videoId });
       const snippet = (await res.clone().text()).slice(0, 400);
+      transcriptConsole("timedtext xml request", {
+        videoId,
+        variantIndex: i,
+        params,
+        status: res.status,
+        ...(res.status === 403 || res.status === 429
+          ? { hint: "possible YouTube IP block / rate limit on www.youtube.com" }
+          : {})
+      });
       if (!res.ok) {
         tlog(videoId, "timedtext-xml", {
           ok: false,
@@ -315,6 +361,7 @@ async function tryTimedtextXml(videoId: string): Promise<TranscriptFetchResult |
       }
       const xml = await res.text();
       if (!xml.includes("<text") && !xml.includes("<p ")) {
+        transcriptConsole("timedtext xml not cue markup", { videoId, variantIndex: i });
         tlog(videoId, "timedtext-xml", {
           ok: false,
           reason: "not xml cues",
@@ -326,13 +373,154 @@ async function tryTimedtextXml(videoId: string): Promise<TranscriptFetchResult |
       }
       const cues = parseTimedtextXml(xml);
       if (cuesUsable(cues)) {
+        transcriptConsole("timedtext xml ok", { videoId, variantIndex: i, cueCount: cues.length });
         tlog(videoId, "timedtext-xml", { ok: true, cueCount: cues.length, variantIndex: i, params });
         return { cues, source: "timedtext-xml" };
       }
+      transcriptConsole("timedtext xml no usable cues", { videoId, variantIndex: i });
     } catch (error: unknown) {
+      transcriptConsole("timedtext xml failed:", errorMessage(error));
       tlog(videoId, "timedtext-xml", { ok: false, variantIndex: i, params, error });
     }
   }
+  transcriptConsole("timedtext xml failed: all variants exhausted", { videoId });
+  return null;
+}
+
+/**
+ * Uses YouTube Data API `captions.list` (googleapis.com — stable on serverless) to discover
+ * language/kind, then fetches `www.youtube.com/api/timedtext` with those exact params.
+ * Note: `captions.download` requires OAuth; we only use list + public timedtext here.
+ */
+async function tryYoutubeDataApiGuidedTimedtext(
+  videoId: string
+): Promise<TranscriptFetchResult | null> {
+  const key = env.youtubeDataApiKey();
+  if (!key) {
+    transcriptConsole("skipping youtube data api — YOUTUBE_API_KEY not set", { videoId });
+    return null;
+  }
+
+  transcriptConsole("trying youtube data api captions.list + guided timedtext...", { videoId });
+  const listUrl = new URL("https://www.googleapis.com/youtube/v3/captions");
+  listUrl.searchParams.set("part", "snippet");
+  listUrl.searchParams.set("videoId", videoId);
+  listUrl.searchParams.set("key", key);
+
+  let res: Response;
+  try {
+    res = await fetch(listUrl.toString());
+  } catch (e: unknown) {
+    transcriptConsole("youtube data api captions.list failed:", errorMessage(e));
+    tlog(videoId, "youtube-data-api-guided-timedtext", { ok: false, step: "list_fetch", error: e });
+    return null;
+  }
+
+  transcriptConsole("captions.list response.status", { videoId, status: res.status });
+  if (res.status === 403 || res.status === 429) {
+    transcriptConsole(
+      "captions.list forbidden/rate-limited — enable YouTube Data API v3 for this key and check quota",
+      { status: res.status }
+    );
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    transcriptConsole("captions.list failed body:", body.slice(0, 500));
+    tlog(videoId, "youtube-data-api-guided-timedtext", {
+      ok: false,
+      step: "list",
+      status: res.status,
+      bodySnippet: body.slice(0, 400)
+    });
+    return null;
+  }
+
+  const data = (await res.json()) as {
+    items?: Array<{ snippet: { language: string; trackKind?: string } }>;
+  };
+  const items = data.items ?? [];
+  if (!items.length) {
+    transcriptConsole(
+      "captions.list returned no tracks (no captions or API cannot list this video)",
+      { videoId }
+    );
+    return null;
+  }
+
+  transcriptConsole("captions.list tracks", {
+    videoId,
+    count: items.length,
+    languages: items.map((x) => ({ lang: x.snippet.language, kind: x.snippet.trackKind }))
+  });
+
+  const seen = new Set<string>();
+  const attempts: Array<Record<string, string>> = [];
+  const sorted = [...items].sort((a, b) => {
+    const aEn = a.snippet.language.toLowerCase().startsWith("en") ? 0 : 1;
+    const bEn = b.snippet.language.toLowerCase().startsWith("en") ? 0 : 1;
+    return aEn - bEn;
+  });
+
+  for (const it of sorted) {
+    const lang = it.snippet.language;
+    const kind = (it.snippet.trackKind ?? "").toUpperCase();
+    const isAsr = kind === "ASR";
+    const dedupeKey = `${lang}|${isAsr ? "asr" : "std"}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    const params: Record<string, string> = { lang };
+    if (isAsr) params.kind = "asr";
+    attempts.push(params);
+  }
+
+  const maxAttempts = Math.min(attempts.length, 12);
+  for (let i = 0; i < maxAttempts; i++) {
+    const params = attempts[i];
+    const url = buildTimedtextUrl(videoId, "json3", params);
+    try {
+      const tres = await fetchWithYoutubeHeaders(url, undefined, { videoId });
+      transcriptConsole("data-api-guided timedtext json3 request", {
+        videoId,
+        attempt: i,
+        params,
+        status: tres.status,
+        ...(tres.status === 403 || tres.status === 429
+          ? { hint: "timedtext is still on youtube.com — possible IP block" }
+          : {})
+      });
+      if (!tres.ok) continue;
+      const text = await tres.text();
+      if (!text.trim()) continue;
+      let parsed: Json3Root;
+      try {
+        parsed = JSON.parse(text) as Json3Root;
+      } catch (e: unknown) {
+        transcriptConsole("data-api-guided timedtext JSON parse failed:", errorMessage(e));
+        continue;
+      }
+      const cues = parseJson3ToCues(parsed);
+      if (cuesUsable(cues)) {
+        transcriptConsole("youtube data api guided timedtext ok", {
+          videoId,
+          params,
+          cueCount: cues.length
+        });
+        tlog(videoId, "youtube-data-api-guided-timedtext", {
+          ok: true,
+          cueCount: cues.length,
+          params
+        });
+        return { cues, source: "youtube-data-api-guided-timedtext" };
+      }
+    } catch (e: unknown) {
+      transcriptConsole("data-api-guided timedtext failed:", errorMessage(e));
+    }
+  }
+
+  transcriptConsole("youtube data api guided timedtext failed: all listed languages exhausted", {
+    videoId
+  });
   return null;
 }
 
@@ -389,6 +577,7 @@ function transcriptPanelToCues(transcriptInfo: {
  * `getTranscript()` uses the searchable transcript engagement panel when present.
  */
 async function tryYoutubeiJs(videoId: string): Promise<TranscriptFetchResult | null> {
+  transcriptConsole("trying youtubei.js (innertube)...", { videoId });
   try {
     const { Innertube } = await import("youtubei.js");
     const yt = await Innertube.create();
@@ -400,12 +589,22 @@ async function tryYoutubeiJs(videoId: string): Promise<TranscriptFetchResult | n
       const capUrl = new URL(track.base_url);
       capUrl.searchParams.set("fmt", "json3");
       const res = await fetchWithYoutubeHeaders(capUrl.toString(), undefined, { videoId });
+      transcriptConsole("youtubei.js caption track timedtext request", {
+        videoId,
+        status: res.status,
+        language: track.language_code,
+        kind: track.kind,
+        ...(res.status === 403 || res.status === 429
+          ? { hint: "possible YouTube IP block on caption URL" }
+          : {})
+      });
       const body = await res.text();
       if (res.ok && body.trim().startsWith("{")) {
         try {
           const data = JSON.parse(body) as Json3Root;
           const cues = parseJson3ToCues(data);
           if (cuesUsable(cues)) {
+            transcriptConsole("youtubei.js caption track ok", { videoId, cueCount: cues.length });
             tlog(videoId, "youtubei-caption-track", {
               ok: true,
               cueCount: cues.length,
@@ -415,33 +614,46 @@ async function tryYoutubeiJs(videoId: string): Promise<TranscriptFetchResult | n
             return { cues, source: "youtubei-caption-track" };
           }
         } catch (e: unknown) {
+          transcriptConsole("youtubei.js caption track JSON parse failed:", errorMessage(e));
           tlog(videoId, "youtubei-caption-track", { ok: false, reason: "json parse", error: e });
         }
       } else {
+        transcriptConsole("youtubei.js caption track unusable response", {
+          videoId,
+          status: res.status
+        });
         tlog(videoId, "youtubei-caption-track", {
           ok: false,
           status: res.status,
           bodySnippet: body.slice(0, 200)
         });
       }
+    } else {
+      transcriptConsole("youtubei.js: no caption_tracks on player response", { videoId });
     }
 
     try {
+      transcriptConsole("youtubei.js trying getTranscript() panel...", { videoId });
       const transcriptInfo = await info.getTranscript();
       const cues = transcriptPanelToCues(transcriptInfo);
       if (cuesUsable(cues)) {
+        transcriptConsole("youtubei.js transcript panel ok", { videoId, cueCount: cues.length });
         tlog(videoId, "youtubei-transcript-panel", { ok: true, cueCount: cues.length });
         return { cues, source: "youtubei-transcript-panel" };
       }
+      transcriptConsole("youtubei.js transcript panel: no usable cues", { videoId });
     } catch (e: unknown) {
+      transcriptConsole("youtubei.js getTranscript failed:", errorMessage(e));
       tlog(videoId, "youtubei-transcript-panel", {
         ok: false,
         reason: "no panel or failed",
         error: e
       });
     }
+    transcriptConsole("youtubei.js failed: no transcript from innertube paths", { videoId });
     return null;
   } catch (error: unknown) {
+    transcriptConsole("youtubei.js failed:", errorMessage(error));
     tlog(videoId, "youtubei.js", { ok: false, error });
     return null;
   }
@@ -451,11 +663,20 @@ async function tryYoutubeiJs(videoId: string): Promise<TranscriptFetchResult | n
  * Parse watch page HTML for caption track baseUrl, then fetch json3 or XML.
  */
 async function tryWatchPageCaptionTrack(videoId: string): Promise<TranscriptFetchResult | null> {
+  transcriptConsole("trying watch page captionTracks + timedtext...", { videoId });
   const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
   try {
     const res = await fetchWithYoutubeHeaders(watchUrl, undefined, { videoId });
     const htmlSnippet = (await res.clone().text()).slice(0, 500);
+    transcriptConsole("watch page /watch fetch", {
+      videoId,
+      status: res.status,
+      ...(res.status === 403 || res.status === 429
+        ? { hint: "possible YouTube IP block on watch page" }
+        : {})
+    });
     if (!res.ok) {
+      transcriptConsole("watch page failed:", { status: res.status, snippet: htmlSnippet.slice(0, 200) });
       tlog(videoId, "watch-page-caption-track", {
         ok: false,
         status: res.status,
@@ -466,12 +687,14 @@ async function tryWatchPageCaptionTrack(videoId: string): Promise<TranscriptFetc
     const html = await res.text();
     const idx = html.indexOf('"captionTracks"');
     if (idx === -1) {
+      transcriptConsole("watch page: no captionTracks in HTML", { videoId });
       tlog(videoId, "watch-page-caption-track", { ok: false, reason: "no captionTracks in HTML" });
       return null;
     }
     const sub = html.slice(idx, idx + 80000);
     const baseUrlMatch = sub.match(/"baseUrl":"([^"]+)"/);
     if (!baseUrlMatch) {
+      transcriptConsole("watch page: no baseUrl in captionTracks", { videoId });
       tlog(videoId, "watch-page-caption-track", { ok: false, reason: "no baseUrl" });
       return null;
     }
@@ -482,34 +705,42 @@ async function tryWatchPageCaptionTrack(videoId: string): Promise<TranscriptFetc
     }
 
     const cres = await fetchWithYoutubeHeaders(captionUrl.toString(), undefined, { videoId });
+    transcriptConsole("watch page caption json3 fetch", { videoId, status: cres.status });
     const body = await cres.text();
     if (cres.ok && body.trim().startsWith("{")) {
       try {
         const data = JSON.parse(body) as Json3Root;
         const cues = parseJson3ToCues(data);
         if (cuesUsable(cues)) {
+          transcriptConsole("watch page caption json3 ok", { videoId, cueCount: cues.length });
           tlog(videoId, "watch-page-caption-track", { ok: true, cueCount: cues.length, fmt: "json3" });
           return { cues, source: "watch-page-caption-track" };
         }
-      } catch (e) {
+      } catch (e: unknown) {
+        transcriptConsole("watch page caption json3 parse failed:", errorMessage(e));
         tlog(videoId, "watch-page-caption-track", { ok: false, reason: "json3 parse", error: e });
       }
     }
     const xmlUrl = new URL(baseUrl);
     xmlUrl.searchParams.delete("fmt");
     const xres = await fetchWithYoutubeHeaders(xmlUrl.toString(), undefined, { videoId });
+    transcriptConsole("watch page caption xml fetch", { videoId, status: xres.status });
     const xml = await xres.text();
     if (xres.ok && (xml.includes("<text") || xml.includes("<p "))) {
       const cues = parseTimedtextXml(xml);
       if (cuesUsable(cues)) {
+        transcriptConsole("watch page caption xml ok", { videoId, cueCount: cues.length });
         tlog(videoId, "watch-page-caption-track", { ok: true, cueCount: cues.length, fmt: "xml" });
         return { cues, source: "watch-page-caption-track" };
       }
     }
+    transcriptConsole("watch page caption fetch unusable", { videoId });
     tlog(videoId, "watch-page-caption-track", { ok: false, reason: "caption fetch unusable" });
   } catch (error: unknown) {
+    transcriptConsole("watch page caption track failed:", errorMessage(error));
     tlog(videoId, "watch-page-caption-track", { ok: false, error });
   }
+  transcriptConsole("watch page caption track failed: exhausted", { videoId });
   return null;
 }
 
@@ -528,6 +759,7 @@ export async function getTranscriptWithFallbacks(
   const chain: Array<() => Promise<TranscriptFetchResult | null>> = [
     () => tryTimedtextJson3(id),
     () => tryTimedtextXml(id),
+    () => tryYoutubeDataApiGuidedTimedtext(id),
     () => tryWatchPageCaptionTrack(id),
     () => tryYoutubeiJs(id),
     () => tryYoutubeTranscriptPackage(id)
@@ -536,10 +768,14 @@ export async function getTranscriptWithFallbacks(
   for (let i = 0; i < chain.length; i++) {
     const result = await chain[i]();
     if (result && cuesUsable(result.cues)) {
+      transcriptConsole("transcript success", { videoId: id, source: result.source });
       return result;
     }
   }
 
+  transcriptConsole("all transcript fallbacks failed — see logs above for each status/error", {
+    videoId: id
+  });
   tlog(id, "getTranscriptWithFallbacks", { ok: false, reason: "all methods exhausted" });
   return null;
 }
