@@ -61,6 +61,7 @@ export function TutorialViewClient({
   printHref
 }: Props) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const htmlVideoRef = useRef<HTMLVideoElement | null>(null);
   const videoWrapRef = useRef<HTMLDivElement | null>(null);
   const timesRef = useRef({ start: 0, end: 0 });
   const autoplayFromUrlOnceRef = useRef(
@@ -85,6 +86,13 @@ export function TutorialViewClient({
   const kind = step ? detectVideoKind(step.youtube_url) : "unknown";
   const isYoutube =
     view === "step" && Boolean(videoId && kind === "youtube");
+  const isStorageVideo =
+    view === "step" && Boolean(step && kind === "storage");
+
+  const storagePlaybackSrc = useMemo(() => {
+    if (!isStorageVideo || !step) return "";
+    return `/api/video/playback?stepId=${encodeURIComponent(step.id)}`;
+  }, [isStorageVideo, step?.id]);
 
   useEffect(() => {
     if (currentIndex >= steps.length) {
@@ -116,6 +124,39 @@ export function TutorialViewClient({
     return buildYouTubeEmbedUrl(videoId, startTime, { ...TUTORIAL_EMBED_BASE });
   }, [isYoutube, videoId, step?.id, startTime, endTime]);
 
+  useEffect(() => {
+    if (!isStorageVideo || !step) return;
+    const el = htmlVideoRef.current;
+    if (!el) return;
+    const apply = () => {
+      el.currentTime = startTime;
+      el.playbackRate = playbackRateRef.current;
+    };
+    if (el.readyState >= 1) apply();
+    else el.addEventListener("loadedmetadata", apply, { once: true });
+    return () => {
+      el.removeEventListener("loadedmetadata", apply);
+    };
+  }, [isStorageVideo, step?.id, startTime, endTime]);
+
+  useEffect(() => {
+    if (!isStorageVideo) return;
+    const el = htmlVideoRef.current;
+    if (!el) return;
+    const onTimeUpdate = () => {
+      if (el.currentTime >= endTime) el.pause();
+    };
+    const onSeeking = () => {
+      if (el.currentTime < startTime) el.currentTime = startTime;
+    };
+    el.addEventListener("timeupdate", onTimeUpdate);
+    el.addEventListener("seeking", onSeeking);
+    return () => {
+      el.removeEventListener("timeupdate", onTimeUpdate);
+      el.removeEventListener("seeking", onSeeking);
+    };
+  }, [isStorageVideo, startTime, endTime, step?.id]);
+
   const playbackRateRef = useRef(playbackRate);
   playbackRateRef.current = playbackRate;
 
@@ -145,9 +186,13 @@ export function TutorialViewClient({
   const onSpeedClick = useCallback(
     (r: (typeof SPEEDS)[number]) => {
       setPlaybackRate(r);
+      if (isStorageVideo && htmlVideoRef.current) {
+        htmlVideoRef.current.playbackRate = r;
+        return;
+      }
       postYtIframeCommand("setPlaybackRate", [r]);
     },
-    [postYtIframeCommand]
+    [postYtIframeCommand, isStorageVideo]
   );
 
   /** Optional autoplay when landing with ?step=N (browser may still require a gesture). */
@@ -210,6 +255,15 @@ export function TutorialViewClient({
   }, []);
 
   const replay = useCallback(() => {
+    if (isStorageVideo) {
+      const v = htmlVideoRef.current;
+      if (!v) return;
+      const { start: rs } = timesRef.current;
+      v.currentTime = rs;
+      v.playbackRate = playbackRateRef.current;
+      void v.play();
+      return;
+    }
     if (!videoId) return;
     const el = iframeRef.current;
     if (!el) return;
@@ -230,9 +284,15 @@ export function TutorialViewClient({
     window.setTimeout(() => {
       postYtIframeCommand("setPlaybackRate", [playbackRateRef.current]);
     }, 900);
-  }, [videoId, postYtIframeCommand]);
+  }, [videoId, postYtIframeCommand, isStorageVideo]);
 
-  const voiceNoop = useCallback(() => {}, []);
+  const onVoicePause = useCallback(() => {
+    if (isStorageVideo) htmlVideoRef.current?.pause();
+  }, [isStorageVideo]);
+
+  const onVoicePlay = useCallback(() => {
+    if (isStorageVideo) void htmlVideoRef.current?.play();
+  }, [isStorageVideo]);
 
   const {
     voiceArmed,
@@ -241,13 +301,22 @@ export function TutorialViewClient({
     toggleVoiceArm
   } = useLinkVoiceControl({
     onReplay: replay,
-    onPause: voiceNoop,
-    onPlay: voiceNoop,
+    onPause: onVoicePause,
+    onPlay: onVoicePlay,
     onNext: goNext,
     onPrevious: goPrev
   });
 
   const toggleFullscreen = useCallback(() => {
+    if (isStorageVideo && htmlVideoRef.current) {
+      const v = htmlVideoRef.current;
+      if (document.fullscreenElement) {
+        void document.exitFullscreen();
+      } else {
+        void v.requestFullscreen?.();
+      }
+      return;
+    }
     const el = videoWrapRef.current;
     if (!el) return;
     if (document.fullscreenElement) {
@@ -255,7 +324,7 @@ export function TutorialViewClient({
     } else {
       void el.requestFullscreen?.();
     }
-  }, []);
+  }, [isStorageVideo]);
 
   const controlsBar = (
     <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:py-2">
@@ -403,10 +472,30 @@ export function TutorialViewClient({
   const videoBlock =
     materialsVideoPlaceholder ? (
       materialsVideoPlaceholder
+    ) : isStorageVideo && step && storagePlaybackSrc ? (
+      <>
+        <div
+          ref={videoWrapRef}
+          className="relative aspect-video w-full min-h-0 min-w-0 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-black shadow-sm"
+        >
+          <video
+            ref={htmlVideoRef}
+            key={`${skuId}-${step.id}-storage-${startTime}-${endTime}`}
+            src={storagePlaybackSrc}
+            className="absolute left-0 top-0 h-full w-full object-contain"
+            controls
+            playsInline
+            preload="metadata"
+            title="Tutorial video clip"
+          />
+        </div>
+        <div className="mt-3">{controlsBar}</div>
+      </>
     ) : !isYoutube ? (
       <div className="flex aspect-video flex-col items-center justify-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-6 text-center text-sm text-amber-950">
         <p>
-          This step needs a YouTube URL for the tutorial view.{" "}
+          This step needs a supported video URL (YouTube or an uploaded file) for the tutorial
+          view.{" "}
           {step ? (
             <Link
               className="font-medium text-orange-700 underline"

@@ -5,7 +5,11 @@ import {
   extractVimeoVideoId,
   extractYouTubeVideoId
 } from "@/lib/video";
-import { VimeoPlayerClient, YouTubePlayerClient } from "@/app/play/[id]/player";
+import {
+  StorageVideoClipPlayer,
+  VimeoPlayerClient,
+  YouTubePlayerClient
+} from "@/app/play/[id]/player";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +62,7 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
   const vimeoId = extractVimeoVideoId(step.youtube_url);
   const showYoutube = kind === "youtube" && Boolean(youtubeId);
   const showVimeo = kind === "vimeo" && Boolean(vimeoId);
+  const showStorage = kind === "storage";
 
   return (
     <main className="container-page py-6 md:py-10">
@@ -102,11 +107,22 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
           />
         ) : null}
 
-        {!showYoutube && !showVimeo ? (
+        {showStorage ? (
+          <div className="card aspect-video overflow-hidden rounded-xl border border-zinc-200 bg-black p-0">
+            <StorageVideoClipPlayer
+              stepId={step.id}
+              startTime={step.start_time}
+              endTime={step.end_time}
+            />
+          </div>
+        ) : null}
+
+        {!showYoutube && !showVimeo && !showStorage ? (
           <div className="card p-6">
             <div className="text-sm font-medium">Unsupported or invalid video URL</div>
             <div className="mt-1 text-sm text-zinc-600">
-              Use a standard YouTube or Vimeo link for this step. Contact the author if this persists.
+              Use a standard YouTube or Vimeo link, or an uploaded video, for this step. Contact the
+              author if this persists.
             </div>
           </div>
         ) : null}

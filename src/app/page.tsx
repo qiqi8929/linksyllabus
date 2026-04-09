@@ -17,7 +17,7 @@ const getLandingMarkup = cache(() =>
 export const metadata: Metadata = {
   title: "LinkSyllabus — Turn Your Tutorial Into a Step-by-Step Experience",
   description:
-    "Cut your long tutorial video into guided steps. Print a QR-code instruction sheet. Buyers scan any step, jump straight to that clip — voice controlled, ad-free, at their own pace."
+    "Paste a YouTube link or upload your own video. AI splits it into steps in seconds — distraction-free, scannable, and ready to print."
 };
 
 export default function HomePage() {

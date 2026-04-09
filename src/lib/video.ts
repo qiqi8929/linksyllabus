@@ -1,4 +1,6 @@
-export type VideoKind = "youtube" | "vimeo" | "unknown";
+import { isStorageVideoUrl } from "@/lib/storageVideoUrl";
+
+export type VideoKind = "youtube" | "vimeo" | "storage" | "unknown";
 
 export function extractYouTubeVideoId(url: string): string | null {
   try {
@@ -48,6 +50,7 @@ export function extractVimeoVideoId(url: string): string | null {
 }
 
 export function detectVideoKind(url: string): VideoKind {
+  if (isStorageVideoUrl(url)) return "storage";
   if (extractYouTubeVideoId(url)) return "youtube";
   if (extractVimeoVideoId(url)) return "vimeo";
   return "unknown";

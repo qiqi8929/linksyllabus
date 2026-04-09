@@ -373,6 +373,54 @@ export function VoiceFeedbackBanners({
   );
 }
 
+/** HTML5 clip for tutorial steps backed by Supabase Storage (`ls-storage://…`). */
+export function StorageVideoClipPlayer({
+  stepId,
+  startTime,
+  endTime
+}: {
+  stepId: string;
+  startTime: number;
+  endTime: number;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const src = `/api/video/playback?stepId=${encodeURIComponent(stepId)}`;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onTimeUpdate = () => {
+      if (el.currentTime >= endTime) el.pause();
+    };
+    const onSeeking = () => {
+      if (el.currentTime < startTime) el.currentTime = startTime;
+    };
+    const onMeta = () => {
+      el.currentTime = startTime;
+    };
+    el.addEventListener("timeupdate", onTimeUpdate);
+    el.addEventListener("seeking", onSeeking);
+    el.addEventListener("loadedmetadata", onMeta);
+    return () => {
+      el.removeEventListener("timeupdate", onTimeUpdate);
+      el.removeEventListener("seeking", onSeeking);
+      el.removeEventListener("loadedmetadata", onMeta);
+    };
+  }, [stepId, startTime, endTime]);
+
+  return (
+    <video
+      ref={ref}
+      src={src}
+      controls
+      playsInline
+      preload="metadata"
+      className="h-full w-full object-contain"
+      title="Tutorial video clip"
+    />
+  );
+}
+
 export function loadYouTubeIframeApi(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (window.YT?.Player) return Promise.resolve();

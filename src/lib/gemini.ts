@@ -4,6 +4,12 @@ import {
   getTranscriptWithFallbacks,
   type TranscriptCue
 } from "@/lib/transcript";
+import {
+  deleteGeminiFileByName,
+  generateContentWithVideoFile,
+  uploadVideoToGemini,
+  waitForGeminiFileReady
+} from "@/lib/geminiVideoFileApi";
 import { extractYouTubeVideoId } from "@/lib/video";
 
 /** Stable successor to deprecated `gemini-2.0-flash-lite` (not available to new users). */
@@ -812,4 +818,137 @@ Use empty string "" if a category has nothing in the transcript.`;
   }
 
   return parseMaterialsToolsPayload(text);
+}
+
+/** Auto-extract from uploaded files: keep under this to avoid timeouts / OOM on typical serverless hosts. */
+export const MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS = 80 * 1024 * 1024;
+
+/**
+ * Same output shape as {@link extractTutorialStructureFromYouTubeVideo}, but analyzes an uploaded
+ * video file via Gemini File API (no YouTube transcript).
+ */
+export async function extractTutorialStructureFromUploadedVideoBuffer(
+  buffer: Buffer,
+  mimeType: string,
+  options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
+): Promise<ExtractTutorialStructureResult> {
+  const displayName = `upload-${Date.now()}.bin`;
+  let fileName: string | null = null;
+  try {
+    const uploaded = await uploadVideoToGemini(buffer, mimeType, displayName);
+    fileName = uploaded.name;
+    await waitForGeminiFileReady(uploaded.name);
+
+    const prompt = `${TUTORIAL_ANALYST_SYSTEM_PROMPT}
+
+---
+
+下面是用户上传的视频（无单独字幕文本）。请**直接观看视频**（画面与声音），按上述规则输出 JSON 数组。
+- start、end：仅在此两处写整数秒（从视频 0 秒算起）；name/description 中不要写秒数。
+- 除 Materials & Tools 外，每一步必须满足 end > start；相邻实际操作步骤的 start 应随时间递增，不要两段共用同一 start。
+- 若视频较短，步骤数量可少于 6，但必须覆盖主要操作过程。
+
+`;
+
+    const text = await generateContentWithVideoFile(
+      uploaded.uri,
+      mimeType,
+      prompt,
+      0.2,
+      options?.onGemini
+        ? (p) =>
+            options.onGemini?.({
+              responseJson: p.responseJson,
+              modelText: p.modelText
+            })
+        : undefined
+    );
+
+    const rows = parseTutorialStructureJsonArray(text);
+
+    if (rows.length === 0) {
+      throw new Error("The model did not return any steps. Try again or shorten the video.");
+    }
+
+    let materialsDescription = "";
+    let work = rows;
+
+    if (isMaterialsToolsStepName(rows[0].name)) {
+      materialsDescription = rows[0].description;
+      work = rows.slice(1);
+    }
+
+    if (work.length === 0) {
+      throw new Error(
+        "The model returned only a Materials & Tools block. Try again or add instructional steps manually."
+      );
+    }
+
+    const mapped: TutorialStructureStep[] = work.map((r) => ({
+      stepName: sanitizeTutorialStepName(r.name),
+      description: r.description,
+      start_time: r.start,
+      end_time: r.end
+    }));
+
+    const steps = normalizeContiguousSteps(mapped);
+    const { materialsText, toolsText } = splitMaterialsToolsFromDescription(materialsDescription);
+
+    return {
+      materialsText,
+      toolsText,
+      steps,
+      estimated: false
+    };
+  } finally {
+    if (fileName) {
+      await deleteGeminiFileByName(fileName).catch(() => {});
+    }
+  }
+}
+
+export async function extractMaterialsAndToolsFromVideoBuffer(
+  buffer: Buffer,
+  mimeType: string,
+  options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
+): Promise<{ materials: string; tools: string }> {
+  const displayName = `materials-${Date.now()}.bin`;
+  let fileName: string | null = null;
+  try {
+    const uploaded = await uploadVideoToGemini(buffer, mimeType, displayName);
+    fileName = uploaded.name;
+    await waitForGeminiFileReady(uploaded.name);
+
+    const prompt = `You are helping with DIY / craft / tutorial videos. Watch the uploaded video.
+
+Extract two plain-text lists:
+
+1) "materials" — yarns, fabric, stuffing, glue, quantities, colors, etc. Use short lines separated by newlines, or comma-separated if compact. Do not invent items not clearly shown or said.
+
+2) "tools" — hooks, needles, scissors, looms, etc. Same formatting. If something could be either, prefer "materials" unless it is clearly a tool.
+
+Respond only with valid JSON, no markdown, no backticks. Exact shape:
+{"materials":"...","tools":"..."}
+Use empty string "" if a category has nothing in the video.`;
+
+    const text = await generateContentWithVideoFile(
+      uploaded.uri,
+      mimeType,
+      prompt,
+      0.35,
+      options?.onGemini
+        ? (p) =>
+            options.onGemini?.({
+              responseJson: p.responseJson,
+              modelText: p.modelText
+            })
+        : undefined
+    );
+
+    return parseMaterialsToolsPayload(text);
+  } finally {
+    if (fileName) {
+      await deleteGeminiFileByName(fileName).catch(() => {});
+    }
+  }
 }
