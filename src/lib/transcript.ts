@@ -91,6 +91,26 @@ export function fetchWithYoutubeHeaders(
   return fetch(input, { ...init, headers: h });
 }
 
+/** Single timedtext probe for API debug payloads when transcript extraction fails (e.g. status 403 from datacenter IP). */
+export type TimedtextDebugResult =
+  | { status: number; body: string }
+  | { error: string };
+
+export async function timedtextDebugProbe(videoId: string): Promise<TimedtextDebugResult> {
+  const v = videoId.trim();
+  const url = new URL("https://www.youtube.com/api/timedtext");
+  url.searchParams.set("v", v);
+  url.searchParams.set("lang", "en");
+  url.searchParams.set("fmt", "json3");
+  try {
+    const r = await fetchWithYoutubeHeaders(url.toString(), undefined, { videoId: v });
+    const body = (await r.text()).substring(0, 500);
+    return { status: r.status, body };
+  } catch (e: unknown) {
+    return { error: errorMessage(e) };
+  }
+}
+
 function cuesUsable(cues: TranscriptCue[]): boolean {
   return cues.some((c) => c.text.trim().length > 0);
 }

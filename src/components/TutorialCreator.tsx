@@ -11,6 +11,7 @@ import {
   parseStorageVideoPath,
   TUTORIAL_VIDEO_BUCKET
 } from "@/lib/storageVideoUrl";
+import { parseAiTutorialPaste } from "@/lib/parseAiTutorialPaste";
 import { extractYouTubeVideoId } from "@/lib/video";
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
@@ -107,6 +108,8 @@ export function TutorialCreator() {
   const [materialsText, setMaterialsText] = useState("");
   const [toolsText, setToolsText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fullAutoLoading, setFullAutoLoading] = useState(false);
+  const [pasteImportText, setPasteImportText] = useState("");
 
   useEffect(() => {
     const path = parseStorageVideoPath(chapterVideoUrl);
@@ -290,6 +293,107 @@ export function TutorialCreator() {
     }
   };
 
+  /** One click: structure from video, then materials/tools only if still empty. */
+  const runFullAutoFromVideo = async () => {
+    const url = chapterVideoUrl.trim();
+    if (!url) {
+      setError(
+        videoSourceTab === "youtube"
+          ? "Paste a YouTube URL above first."
+          : "Upload a video first."
+      );
+      return;
+    }
+    if (videoSourceTab === "youtube" && !extractYouTubeVideoId(url)) {
+      setError("Use a valid YouTube URL.");
+      return;
+    }
+    if (videoSourceTab === "upload") {
+      const p = parseStorageVideoPath(url);
+      if (!p) {
+        setError("Upload a video file first.");
+        return;
+      }
+    }
+    setError(null);
+    setFullAutoLoading(true);
+    try {
+      const storagePath = parseStorageVideoPath(url);
+      const data = await fetchJsonFromApi(
+        "/api/gemini/extract-timestamps-from-description",
+        storagePath ? { storagePath } : { youtubeUrl: url }
+      );
+      const rawSteps = data.steps;
+      const list = Array.isArray(rawSteps) ? rawSteps : [];
+      if (!list.length) {
+        throw new Error("The model did not return any instructional steps.");
+      }
+      const mat = String(data.materialsText ?? data.materials_text ?? "").trim();
+      const tools = String(data.toolsText ?? data.tools_text ?? "").trim();
+      setMaterialsText(mat);
+      setToolsText(tools);
+      const mapped = list.map((item) => {
+        const s = item as Record<string, unknown>;
+        const stepName = String(s.stepName ?? s.step_name ?? "").trim();
+        const description = String(s.description ?? "").trim();
+        const start = Math.floor(Number(s.start_time ?? s.startTime ?? 0));
+        const end = Math.floor(Number(s.end_time ?? s.endTime ?? 0));
+        return {
+          id: makeId(),
+          step_name: stepName,
+          description,
+          start_time: start,
+          end_time: end
+        };
+      });
+      const withNames = mapped.filter((row) => row.step_name.length > 0);
+      if (!withNames.length) {
+        throw new Error(
+          "The model returned steps without titles. Try again or add steps manually."
+        );
+      }
+      setSteps(withNames);
+
+      const needsMaterials = !mat && !tools;
+      if (needsMaterials) {
+        const matData = await fetchJsonFromApi(
+          "/api/gemini/extract-materials",
+          storagePath ? { storagePath } : { youtubeUrl: url }
+        );
+        setMaterialsText(String(matData.materials ?? "").trim());
+        setToolsText(String(matData.tools ?? "").trim());
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Auto-fill from video failed.");
+    } finally {
+      setFullAutoLoading(false);
+    }
+  };
+
+  const applyPasteImport = () => {
+    setError(null);
+    const result = parseAiTutorialPaste(pasteImportText);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    if (result.tutorialName) {
+      setTutorialName(result.tutorialName);
+    }
+    setMaterialsText(result.materialsText);
+    setToolsText(result.toolsText);
+    setSteps(
+      result.steps.map((s) => ({
+        id: makeId(),
+        step_name: s.step_name,
+        description: s.description,
+        start_time: s.start_time,
+        end_time: s.end_time
+      }))
+    );
+    setPasteImportText("");
+  };
+
   const extractMaterialsFromTranscript = async () => {
     const url = chapterVideoUrl.trim();
     if (!url) {
@@ -399,7 +503,9 @@ export function TutorialCreator() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Create tutorial</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Add all steps on this page, generate descriptions with AI, then pay to publish and get QR codes.
+          Link your video, use <span className="font-medium text-zinc-700">Fill from video</span> or{" "}
+          <span className="font-medium text-zinc-700">paste JSON</span> from another AI, then pay to
+          publish and get QR codes.
         </p>
       </div>
 
@@ -542,46 +648,98 @@ export function TutorialCreator() {
             <div className="flex flex-wrap items-stretch gap-2">
               <button
                 type="button"
-                className="btn-ghost shrink-0 text-sm"
+                className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm font-medium text-emerald-900 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={
+                  fullAutoLoading ||
                   descExtractLoading ||
+                  materialsExtractLoading ||
                   !chapterVideoUrl.trim() ||
                   uploading ||
-                  (videoSourceTab === "youtube" && !extractYouTubeVideoId(chapterVideoUrl.trim())) ||
+                  (videoSourceTab === "youtube" &&
+                    !extractYouTubeVideoId(chapterVideoUrl.trim())) ||
                   (videoSourceTab === "upload" && !parseStorageVideoPath(chapterVideoUrl.trim()))
                 }
-                onClick={() => void extractTimestampsFromYouTubeVideo()}
+                onClick={() => void runFullAutoFromVideo()}
               >
-                {descExtractLoading ? "Analyzing video…" : "✨ Auto-extract timestamps"}
+                {fullAutoLoading ? "Filling from video…" : "Fill from video (steps + materials)"}
               </button>
               <button
                 type="button"
                 className="btn-ghost shrink-0 text-sm"
                 disabled={
+                  fullAutoLoading ||
+                  descExtractLoading ||
                   materialsExtractLoading ||
                   !chapterVideoUrl.trim() ||
                   uploading ||
-                  (videoSourceTab === "youtube" && !extractYouTubeVideoId(chapterVideoUrl.trim())) ||
+                  (videoSourceTab === "youtube" &&
+                    !extractYouTubeVideoId(chapterVideoUrl.trim())) ||
+                  (videoSourceTab === "upload" && !parseStorageVideoPath(chapterVideoUrl.trim()))
+                }
+                onClick={() => void extractTimestampsFromYouTubeVideo()}
+              >
+                {descExtractLoading ? "Analyzing video…" : "✨ Steps only (timestamps)"}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost shrink-0 text-sm"
+                disabled={
+                  fullAutoLoading ||
+                  descExtractLoading ||
+                  materialsExtractLoading ||
+                  !chapterVideoUrl.trim() ||
+                  uploading ||
+                  (videoSourceTab === "youtube" &&
+                    !extractYouTubeVideoId(chapterVideoUrl.trim())) ||
                   (videoSourceTab === "upload" && !parseStorageVideoPath(chapterVideoUrl.trim()))
                 }
                 onClick={() => void extractMaterialsFromTranscript()}
               >
                 {materialsExtractLoading
                   ? "Extracting…"
-                  : "✨ Auto-extract materials & tools"}
+                  : "✨ Materials & tools only"}
               </button>
             </div>
             <p className="text-xs leading-relaxed text-zinc-500">
-              <span className="font-medium text-zinc-600">Timestamps:</span>{" "}
-              {videoSourceTab === "youtube"
-                ? "captions + Gemini build Materials & Tools plus instructional steps (names, descriptions, clip times)."
-                : "Gemini analyzes your uploaded file (large files may take longer; auto-extract is limited to ~80MB on the server). "}
-              <span className="font-medium text-zinc-600">Materials & tools:</span>{" "}
-              {videoSourceTab === "youtube"
-                ? "Separate transcript pass for the printable manual lists."
-                : "Second pass focused on supplies and tools from your video."}
+              <span className="font-medium text-zinc-600">Fill from video:</span> runs step
+              detection first; if materials/tools are still empty, runs a second pass for lists.{" "}
+              <span className="font-medium text-zinc-600">Split buttons:</span> same steps, run one
+              pass at a time.{" "}
+              {videoSourceTab === "upload"
+                ? "Uploads: Gemini video analysis; ~80MB server limit."
+                : "YouTube: uses captions when available."}
             </p>
           </div>
+        </div>
+
+        <div className="space-y-2 rounded-lg border border-dashed border-zinc-300 bg-white/80 p-4">
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-900">Paste from another AI</h3>
+            <p className="mt-1 text-xs text-zinc-600">
+              If you already asked ChatGPT / Gemini for JSON, paste it here (optionally inside{" "}
+              <code className="rounded bg-zinc-100 px-1">```json</code> fences). Expected fields:{" "}
+              <code className="rounded bg-zinc-100 px-1">materials</code>,{" "}
+              <code className="rounded bg-zinc-100 px-1">tools</code>,{" "}
+              <code className="rounded bg-zinc-100 px-1">steps</code> with{" "}
+              <code className="rounded bg-zinc-100 px-1">step_name</code>, times,{" "}
+              <code className="rounded bg-zinc-100 px-1">description</code>.
+            </p>
+          </div>
+          <textarea
+            value={pasteImportText}
+            onChange={(e) => setPasteImportText(e.target.value)}
+            rows={5}
+            placeholder={`{\n  "materials": "…",\n  "tools": "…",\n  "steps": [\n    { "step_name": "…", "start_time": 0, "end_time": 60, "description": "…" }\n  ]\n}`}
+            className="w-full resize-y rounded-md border border-zinc-200 bg-zinc-50/80 px-3 py-2 font-mono text-xs text-zinc-900 placeholder:text-zinc-400"
+          />
+          <button
+            type="button"
+            className="btn-ghost text-sm"
+            disabled={!pasteImportText.trim()}
+            onClick={applyPasteImport}
+          >
+            Apply pasted JSON to form
+          </button>
         </div>
 
         <div
