@@ -9,9 +9,6 @@ import {
 } from "@/lib/geminiVideoFileApi";
 import { extractYouTubeVideoId } from "@/lib/video";
 
-/** Default model for REST `generateContent` (`v1` text/uploads; YouTube uses `v1beta` in geminiVideoFileApi). */
-const GEMINI_MODEL = "gemini-2.5-flash-preview-04-17";
-
 function youtubeWatchPageUrl(youtubeUrl: string): string {
   const id = extractYouTubeVideoId(youtubeUrl.trim());
   if (!id) {
@@ -543,7 +540,7 @@ async function generateContentPlainText(
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/${env.geminiModel()}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetch(url, {
     method: "POST",
@@ -705,7 +702,7 @@ Respond only with valid JSON, no markdown, no backticks. Use this exact shape:
 {"descriptions":["...","...",...]}
 There must be exactly ${steps.length} strings in "descriptions", in the same order as the steps.`;
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/${env.geminiModel()}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetch(url, {
     method: "POST",

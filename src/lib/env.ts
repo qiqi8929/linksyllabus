@@ -28,6 +28,16 @@ export const env = {
   geminiApiKey: () => process.env.GEMINI_API_KEY as string | undefined,
 
   /**
+   * Server-only. Model id for `generateContent` paths (`models/{id}`), without the `models/` prefix.
+   * Default is a current preview build. If you set `GEMINI_MODEL` in hosting (e.g. Vercel), do not use
+   * deprecated ids such as `gemini-2.0-flash` — Google returns 404 for new API keys.
+   */
+  geminiModel: (): string => {
+    const v = process.env.GEMINI_MODEL?.trim();
+    return v || "gemini-2.5-flash-preview-04-17";
+  },
+
+  /**
    * Optional. YouTube Data API v3 key (server-only).
    * Enables `captions.list` to discover track languages, then we fetch timedtext with those params.
    * Downloading caption files via `captions.download` still requires OAuth; we do not use it here.

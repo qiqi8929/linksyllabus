@@ -1,13 +1,5 @@
 import { env } from "@/lib/env";
 
-const GEMINI_MODEL = "gemini-2.5-flash-preview-04-17";
-
-/**
- * YouTube watch URLs as video input (no upload). Use the same model as text/upload paths; must support
- * `file_data` with a public `youtube.com/watch` URI (see Gemini video docs).
- */
-export const GEMINI_YOUTUBE_VIDEO_MODEL = GEMINI_MODEL;
-
 export type GeminiVideoDebugPayload = {
   responseJson: unknown;
   modelText: string;
@@ -111,7 +103,7 @@ export async function generateContentWithYouTubeWatchUrl(
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_YOUTUBE_VIDEO_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.geminiModel()}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetch(url, {
     method: "POST",
@@ -165,7 +157,7 @@ export async function generateContentWithVideoFile(
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/${env.geminiModel()}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetch(url, {
     method: "POST",
