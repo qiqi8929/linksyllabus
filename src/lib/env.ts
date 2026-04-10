@@ -1,4 +1,8 @@
 // deploy-bump: new commit triggers a fresh Vercel build; for cache-free redeploy, use Dashboard → Redeploy → uncheck build cache.
+
+/** Default Gemini model for `generateContent` (`models/{id}` path segment). Override with `GEMINI_MODEL` (e.g. on Vercel). */
+export const GEMINI_MODEL_ID = "gemini-2.5-flash";
+
 export const env = {
   // 这些 NEXT_PUBLIC_* 变量会在构建时被 Next.js 内联到前端代码里，
   // 所以这里不要用动态的 process.env[name] 访问方式。
@@ -30,12 +34,11 @@ export const env = {
 
   /**
    * Server-only. Model id for `generateContent` paths (`models/{id}`), without the `models/` prefix.
-   * Default is a current preview build. If you set `GEMINI_MODEL` in hosting (e.g. Vercel), do not use
-   * deprecated ids such as `gemini-2.0-flash` — Google returns 404 for new API keys.
+   * Defaults to {@link GEMINI_MODEL_ID}; set `GEMINI_MODEL` in hosting (recommended on Vercel) to match.
    */
   geminiModel: (): string => {
     const v = process.env.GEMINI_MODEL?.trim();
-    return v || "gemini-2.5-flash-preview-04-17";
+    return v || GEMINI_MODEL_ID;
   },
 
   /**
