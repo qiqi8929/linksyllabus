@@ -7,7 +7,6 @@ import {
   MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS
 } from "@/lib/gemini";
 import { TUTORIAL_VIDEO_BUCKET } from "@/lib/storageVideoUrl";
-import { timedtextDebugProbe } from "@/lib/transcript";
 import { extractYouTubeVideoId } from "@/lib/video";
 
 export const runtime = "nodejs";
@@ -102,17 +101,6 @@ export async function POST(req: Request) {
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Extraction failed";
     console.error("[extract-materials]", e);
-    const vid = extractYouTubeVideoId(youtubeUrl);
-    if (vid && message.includes("No captions found")) {
-      const timedtextTest = await timedtextDebugProbe(vid);
-      return NextResponse.json(
-        {
-          error: "No captions found",
-          debug: { videoId: vid, timedtextTest }
-        },
-        { status: 500 }
-      );
-    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

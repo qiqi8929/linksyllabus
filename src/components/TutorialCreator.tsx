@@ -72,7 +72,16 @@ async function fetchJsonFromApi(
     );
   }
   if (!res.ok) {
-    throw new Error(String(data.error ?? `Request failed (HTTP ${res.status}).`));
+    let msg = String(data.error ?? `Request failed (HTTP ${res.status}).`);
+    const dbg = data.debug;
+    if (dbg !== undefined && dbg !== null) {
+      try {
+        msg += `\n\n— Debug —\n${JSON.stringify(dbg, null, 2)}`;
+      } catch {
+        msg += `\n\n— Debug —\n${String(dbg)}`;
+      }
+    }
+    throw new Error(msg);
   }
   return data;
 }
@@ -110,6 +119,8 @@ export function TutorialCreator() {
   const [error, setError] = useState<string | null>(null);
   const [fullAutoLoading, setFullAutoLoading] = useState(false);
   const [pasteImportText, setPasteImportText] = useState("");
+  /** True when the server fell back to title-based time estimates (rare). */
+  const [outlineEstimated, setOutlineEstimated] = useState(false);
 
   useEffect(() => {
     const path = parseStorageVideoPath(chapterVideoUrl);
@@ -131,6 +142,10 @@ export function TutorialCreator() {
       cancelled = true;
     };
   }, [chapterVideoUrl]);
+
+  useEffect(() => {
+    setOutlineEstimated(false);
+  }, [chapterVideoUrl, videoSourceTab]);
 
   const updateStep = useCallback((id: string, patch: Partial<StepRow>) => {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -261,6 +276,7 @@ export function TutorialCreator() {
       if (!list.length) {
         throw new Error("The model did not return any instructional steps.");
       }
+      setOutlineEstimated(data.estimated === true);
       setMaterialsText(
         String(data.materialsText ?? data.materials_text ?? "").trim()
       );
@@ -328,6 +344,7 @@ export function TutorialCreator() {
       if (!list.length) {
         throw new Error("The model did not return any instructional steps.");
       }
+      setOutlineEstimated(data.estimated === true);
       const mat = String(data.materialsText ?? data.materials_text ?? "").trim();
       const tools = String(data.toolsText ?? data.tools_text ?? "").trim();
       setMaterialsText(mat);
@@ -380,6 +397,7 @@ export function TutorialCreator() {
     if (result.tutorialName) {
       setTutorialName(result.tutorialName);
     }
+    setOutlineEstimated(false);
     setMaterialsText(result.materialsText);
     setToolsText(result.toolsText);
     setSteps(
@@ -503,15 +521,28 @@ export function TutorialCreator() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Create tutorial</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Link your video, use <span className="font-medium text-zinc-700">Fill from video</span> or{" "}
-          <span className="font-medium text-zinc-700">paste JSON</span> from another AI, then pay to
-          publish and get QR codes.
+          Link your video and click <span className="font-medium text-zinc-700">Fill from video</span>
+          — Gemini analyzes the video directly (YouTube URL or your upload). Then pay to publish and get
+          QR codes.
         </p>
       </div>
 
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
+          <p className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">{error}</p>
+          {/not configured|GEMINI_API_KEY|missing.*API/i.test(error) ? (
+            <p className="mt-3 border-t border-red-200/80 pt-3 text-xs font-sans leading-relaxed text-red-900">
+              Set <code className="rounded bg-red-100/80 px-1">GEMINI_API_KEY</code> in the server
+              environment (see project <code className="rounded bg-red-100/80 px-1">.env</code> docs).
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {outlineEstimated ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <span className="font-medium">Estimated outline:</span> Step times were inferred without a
+          full video parse (e.g. title-only fallback). Review and edit before publishing.
         </div>
       ) : null}
 
@@ -701,46 +732,46 @@ export function TutorialCreator() {
               </button>
             </div>
             <p className="text-xs leading-relaxed text-zinc-500">
-              <span className="font-medium text-zinc-600">Fill from video:</span> runs step
-              detection first; if materials/tools are still empty, runs a second pass for lists.{" "}
-              <span className="font-medium text-zinc-600">Split buttons:</span> same steps, run one
-              pass at a time.{" "}
+              <span className="font-medium text-zinc-600">Fill from video:</span> Gemini watches the
+              video (YouTube link or uploaded file) and fills steps, materials, and tools. The full-auto
+              run also fills materials if they were still empty.{" "}
+              <span className="font-medium text-zinc-600">Split buttons:</span> run one pass at a time.{" "}
               {videoSourceTab === "upload"
-                ? "Uploads: Gemini video analysis; ~80MB server limit."
-                : "YouTube: uses captions when available."}
+                ? "Uploads: analyze file directly; ~80MB server limit."
+                : ""}
             </p>
           </div>
         </div>
 
-        <div className="space-y-2 rounded-lg border border-dashed border-zinc-300 bg-white/80 p-4">
-          <div>
-            <h3 className="text-sm font-semibold text-zinc-900">Paste from another AI</h3>
-            <p className="mt-1 text-xs text-zinc-600">
-              If you already asked ChatGPT / Gemini for JSON, paste it here (optionally inside{" "}
-              <code className="rounded bg-zinc-100 px-1">```json</code> fences). Expected fields:{" "}
-              <code className="rounded bg-zinc-100 px-1">materials</code>,{" "}
+        <details className="group rounded-lg border border-dashed border-zinc-200 bg-zinc-50/50 p-3 text-sm">
+          <summary className="cursor-pointer font-medium text-zinc-700 marker:text-zinc-400">
+            Advanced: paste JSON (e.g. from ChatGPT in another tab)
+          </summary>
+          <div className="mt-3 space-y-2 border-t border-zinc-200 pt-3">
+            <p className="text-xs text-zinc-600">
+              Optional <code className="rounded bg-zinc-100 px-1">materials</code>,{" "}
               <code className="rounded bg-zinc-100 px-1">tools</code>,{" "}
-              <code className="rounded bg-zinc-100 px-1">steps</code> with{" "}
+              <code className="rounded bg-zinc-100 px-1">steps</code> (
               <code className="rounded bg-zinc-100 px-1">step_name</code>, times,{" "}
-              <code className="rounded bg-zinc-100 px-1">description</code>.
+              <code className="rounded bg-zinc-100 px-1">description</code>).
             </p>
+            <textarea
+              value={pasteImportText}
+              onChange={(e) => setPasteImportText(e.target.value)}
+              rows={4}
+              placeholder={`{\n  "materials": "…",\n  "tools": "…",\n  "steps": [ … ]\n}`}
+              className="w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 font-mono text-xs text-zinc-900 placeholder:text-zinc-400"
+            />
+            <button
+              type="button"
+              className="btn-ghost text-sm"
+              disabled={!pasteImportText.trim()}
+              onClick={applyPasteImport}
+            >
+              Apply pasted JSON
+            </button>
           </div>
-          <textarea
-            value={pasteImportText}
-            onChange={(e) => setPasteImportText(e.target.value)}
-            rows={5}
-            placeholder={`{\n  "materials": "…",\n  "tools": "…",\n  "steps": [\n    { "step_name": "…", "start_time": 0, "end_time": 60, "description": "…" }\n  ]\n}`}
-            className="w-full resize-y rounded-md border border-zinc-200 bg-zinc-50/80 px-3 py-2 font-mono text-xs text-zinc-900 placeholder:text-zinc-400"
-          />
-          <button
-            type="button"
-            className="btn-ghost text-sm"
-            disabled={!pasteImportText.trim()}
-            onClick={applyPasteImport}
-          >
-            Apply pasted JSON to form
-          </button>
-        </div>
+        </details>
 
         <div
           id="materials-tools"

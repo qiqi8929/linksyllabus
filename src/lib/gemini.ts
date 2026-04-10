@@ -1,12 +1,9 @@
 import { env } from "@/lib/env";
-import {
-  fetchYouTubeOEmbedTitle,
-  getTranscriptWithFallbacks,
-  type TranscriptCue
-} from "@/lib/transcript";
+import { fetchYouTubeOEmbedTitle } from "@/lib/transcript";
 import {
   deleteGeminiFileByName,
   generateContentWithVideoFile,
+  generateContentWithYouTubeWatchUrl,
   uploadVideoToGemini,
   waitForGeminiFileReady
 } from "@/lib/geminiVideoFileApi";
@@ -14,6 +11,14 @@ import { extractYouTubeVideoId } from "@/lib/video";
 
 /** Stable successor to deprecated `gemini-2.0-flash-lite` (not available to new users). */
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
+
+function youtubeWatchPageUrl(youtubeUrl: string): string {
+  const id = extractYouTubeVideoId(youtubeUrl.trim());
+  if (!id) {
+    throw new Error("A valid YouTube URL is required.");
+  }
+  return `https://www.youtube.com/watch?v=${id}`;
+}
 
 export type StepForGemini = {
   stepName: string;
@@ -380,51 +385,33 @@ function normalizeContiguousSteps(steps: TutorialStructureStep[]): TutorialStruc
 }
 
 /**
- * Uses timed YouTube transcript + Gemini to output Materials & Tools plus 6–9 instructional steps
- * (name, description, start/end). Contiguous timeline: each step's end equals the next step's start.
+ * Watches the YouTube video via Gemini (YouTube URL as `file_data`) — no captions / transcript.
+ * Materials & Tools plus instructional steps with start/end seconds from visual/audio analysis.
  */
 export async function extractTutorialStructureFromYouTubeVideo(
   youtubeUrl: string,
   options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
 ): Promise<ExtractTutorialStructureResult> {
-  const urlTrim = youtubeUrl.trim();
-  const videoId = extractYouTubeVideoId(urlTrim);
-  if (!videoId) {
-    throw new Error("A valid YouTube URL is required.");
-  }
-
-  const fetched = await getTranscriptWithFallbacks(videoId);
-  const cues = fetched?.cues ?? [];
-  if (cues.length === 0) {
-    throw new Error(
-      "No captions found for this video. Use a video with captions, or enter steps manually."
-    );
-  }
-
-  const formatted = cues
-    .map((c) => {
-      const end = c.start + c.duration;
-      return `[${c.start.toFixed(2)}s → ${end.toFixed(2)}s] ${c.text}`;
-    })
-    .join("\n");
+  const watch = youtubeWatchPageUrl(youtubeUrl);
 
   const prompt = `${TUTORIAL_ANALYST_SYSTEM_PROMPT}
 
 ---
 
-下面是该视频的带时间戳字幕（单位：秒）。请严格基于字幕内容划分步骤。
-- start、end：仅在此两处写整数秒（从视频 0 秒算起）；name/description 中不要写秒数。
-- Reminder: each "name" must be a short title only — never append "Time Segment", "segment", or any time wording (English rules at top of prompt).
-- 除 Materials & Tools 外，每一步必须满足 end > start；相邻实际操作步骤的 start 应随时间递增，不要两段共用同一 start。
+You are given the full video (watch it — visuals and audio). Do **not** rely on captions; segment the tutorial from what you see and hear.
 
-字幕：
-${formatted}`;
+Rules:
+- start、end：整数秒，从 0 秒起算；name/description 中不要写秒数。
+- Reminder: each "name" must be a short English title only — no "Time Segment" or time wording in names.
+- 除 Materials & Tools 外每一步 end > start；步骤按时间顺序推进。
 
-  const text = await generateContentPlainText(prompt, 0.2, options?.onGemini);
+Output **only** the JSON array specified in the system prompt, no markdown fences.`;
+
+  const text = await generateContentWithYouTubeWatchUrl(watch, prompt, 0.2, options?.onGemini);
   const rows = parseTutorialStructureJsonArray(text);
 
   if (rows.length === 0) {
-    throw new Error("The model did not return any steps. Try again or shorten the video.");
+    throw new Error("The model did not return any steps. Try again or use a shorter public video.");
   }
 
   const peeled = peelLeadingMaterialsRow(rows);
@@ -505,6 +492,47 @@ function parseVideoStepTimestampsArray(raw: string): StepTimestampFromVideo[] {
   );
 }
 
+/** Parse `[{start_time_seconds,end_time_seconds},...]` in lockstep with `stepNames` (video model may omit names). */
+function parseVideoStepTimestampsOrdered(
+  raw: string,
+  stepNames: string[]
+): StepTimestampFromVideo[] {
+  let s = raw.trim();
+  s = s.replace(/^```(?:json)?\s*\r?\n?/i, "");
+  s = s.replace(/\r?\n?```\s*$/i, "");
+  s = s.trim();
+  const lb = s.indexOf("[");
+  const rb = s.lastIndexOf("]");
+  if (lb < 0 || rb <= lb) {
+    throw new Error("Expected a JSON array of timestamp rows");
+  }
+  const arr = JSON.parse(s.slice(lb, rb + 1)) as unknown[];
+  if (!Array.isArray(arr)) {
+    throw new Error("Expected JSON array");
+  }
+  if (arr.length !== stepNames.length) {
+    throw new Error(
+      `Expected ${stepNames.length} timestamp rows, got ${arr.length}. Raw: ${raw.slice(0, 200)}`
+    );
+  }
+  const out: StepTimestampFromVideo[] = [];
+  for (let i = 0; i < stepNames.length; i++) {
+    const o = arr[i] as Record<string, unknown>;
+    const start = Math.floor(Number(o.start_time_seconds ?? o.start_time ?? 0));
+    const end = Math.floor(Number(o.end_time_seconds ?? o.end_time ?? 0));
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+      throw new Error(`Invalid start/end at step index ${i + 1}`);
+    }
+    out.push({
+      stepName: stepNames[i],
+      start_time: start,
+      end_time: end,
+      estimated: false
+    });
+  }
+  return out;
+}
+
 async function generateContentPlainText(
   prompt: string,
   temperature: number,
@@ -543,46 +571,6 @@ async function generateContentPlainText(
   }
   onGemini?.({ responseJson: data, modelText: text });
   return text;
-}
-
-/**
- * Sends timed transcript + step names to Gemini; returns semantic start/end seconds per step.
- */
-export async function matchStepsToTranscript(
-  transcript: TranscriptCue[],
-  stepNames: string[],
-  options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
-): Promise<StepTimestampFromVideo[]> {
-  const names = stepNames.map((n) => n.trim()).filter(Boolean);
-  if (names.length === 0) {
-    throw new Error("Add at least one step name before extracting timestamps.");
-  }
-  if (transcript.length === 0) {
-    throw new Error("Transcript is empty.");
-  }
-
-  const formatted = transcript
-    .map((s) => {
-      const end = s.start + s.duration;
-      return `[${s.start.toFixed(2)}s → ${end.toFixed(2)}s] ${s.text}`;
-    })
-    .join("\n");
-
-  const list = names.map((n) => `- ${n}`).join("\n");
-
-  const prompt = `Given this YouTube transcript with timestamps, find the start and end time (in seconds) for each of these steps:
-
-${list}
-
-Transcript:
-${formatted}
-
-Return only JSON, no markdown or backticks. Use this exact shape:
-[{"stepName":"<exact step name>","start_time_seconds":0,"end_time_seconds":60},...]
-One object per step in the same order as listed above. Use whole seconds from the start of the video. Each end_time_seconds must be greater than start_time_seconds.`;
-
-  const text = await generateContentPlainText(prompt, 0.2, options?.onGemini);
-  return parseVideoStepTimestampsArray(text);
 }
 
 function linearEstimatedTimestamps(
@@ -656,49 +644,33 @@ Whole seconds. end_time_seconds must be greater than start_time_seconds.`;
 }
 
 /**
- * Transcript strategies first; then oEmbed + Gemini; then linear estimates (always returns rows).
+ * Finds start/end seconds per step by **watching** the YouTube video (no transcript).
  */
 export async function extractTimestampsForStepsFromYouTubeVideo(
   youtubeUrl: string,
   stepNames: string[],
   options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
 ): Promise<StepTimestampFromVideo[]> {
-  const urlTrim = youtubeUrl.trim();
-  const videoId = extractYouTubeVideoId(urlTrim);
-  if (!videoId) {
-    throw new Error("A valid YouTube URL is required.");
+  const names = stepNames.map((n) => n.trim()).filter(Boolean);
+  if (!names.length) {
+    throw new Error("Add at least one step name before extracting timestamps.");
   }
+  const watch = youtubeWatchPageUrl(youtubeUrl);
 
-  const expected = stepNames.map((s) => s.trim()).filter(Boolean).length;
+  const list = names.map((n, i) => `${i + 1}. ${n}`).join("\n");
+  const prompt = `Watch this tutorial video carefully (visuals + audio).
 
-  try {
-    const fetched = await getTranscriptWithFallbacks(videoId);
-    if (fetched?.cues?.length) {
-      try {
-        const matched = await matchStepsToTranscript(fetched.cues, stepNames, options);
-        if (matched.length === expected && expected > 0) {
-          return matched;
-        }
-        console.error(
-          "[gemini] matchStepsToTranscript length mismatch, using estimate fallback",
-          matched.length,
-          expected
-        );
-      } catch (e: unknown) {
-        console.error("[gemini] matchStepsToTranscript failed, using estimate fallback", e);
-      }
-    } else {
-      console.log(
-        "[gemini] no transcript from any source; using title/Gemini estimate",
-        JSON.stringify({ videoId })
-      );
-    }
+For each step listed below **in order**, find the **start** and **end** time in **whole seconds** from the beginning of the video (0 = start).
 
-    return await estimateTimestampsFromTitleAndSteps(urlTrim, stepNames, options);
-  } catch (e: unknown) {
-    console.error("[gemini] extractTimestampsForStepsFromYouTubeVideo fatal → estimate", e);
-    return estimateTimestampsFromTitleAndSteps(urlTrim, stepNames, options);
-  }
+Steps:
+${list}
+
+Return **only** a JSON **array** with **exactly ${names.length}** objects, in the **same order**. Each object:
+{"start_time_seconds": <integer>, "end_time_seconds": <integer>}
+Each end_time_seconds must be greater than start_time_seconds. No markdown.`;
+
+  const text = await generateContentWithYouTubeWatchUrl(watch, prompt, 0.2, options?.onGemini);
+  return parseVideoStepTimestampsOrdered(text, names);
 }
 
 /**
@@ -814,80 +786,29 @@ function parseMaterialsToolsPayload(raw: string): { materials: string; tools: st
 }
 
 /**
- * Uses YouTube transcript + Gemini to list materials vs tools (for print / tutorial intro).
+ * Lists materials vs tools by **watching** the YouTube video (no transcript).
  */
 export async function extractMaterialsAndToolsFromYouTube(
-  youtubeUrl: string
+  youtubeUrl: string,
+  options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
 ): Promise<{ materials: string; tools: string }> {
-  const urlTrim = youtubeUrl.trim();
-  const videoId = extractYouTubeVideoId(urlTrim);
-  if (!videoId) {
-    throw new Error("A valid YouTube URL is required.");
-  }
+  const watch = youtubeWatchPageUrl(youtubeUrl);
 
-  const apiKey = env.geminiApiKey();
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured");
-  }
-
-  const fetched = await getTranscriptWithFallbacks(videoId);
-  const cues = fetched?.cues ?? [];
-  const transcriptText = cues
-    .map((c) => c.text.trim())
-    .filter(Boolean)
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 120000);
-
-  if (!transcriptText) {
-    throw new Error(
-      "No captions found for this video. Enter materials manually or use a video with captions."
-    );
-  }
-
-  const prompt = `You help with DIY / craft / tutorial videos. Below is the spoken transcript (often the creator lists materials and tools near the start).
+  const prompt = `Watch this tutorial video (visuals and what people say on screen / in audio).
 
 Extract two plain-text lists for the viewer:
 
-1) "materials" — yarns, fabric, stuffing, glue, quantities, colors, etc. Use short lines separated by newlines, or comma-separated if compact. Do not invent items not clearly implied in the transcript.
+1) "materials" — supplies, yarn, fabric, quantities, colors, etc. Use short lines or comma-separated.
 
-2) "tools" — hooks, needles, scissors, looms, etc. Same formatting. If something could be either, prefer "materials" unless it is clearly a tool.
+2) "tools" — hooks, needles, scissors, etc.
 
-Transcript:
-${transcriptText}
+Base lists on what is **shown or stated** in the video. If something is unclear, infer cautiously from context.
 
 Respond only with valid JSON, no markdown, no backticks. Exact shape:
 {"materials":"...","tools":"..."}
-Use empty string "" if a category has nothing in the transcript.`;
+Use empty string "" if a category truly has nothing relevant.`;
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.4
-      }
-    })
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini request failed: ${res.status} ${errText}`);
-  }
-
-  const data = (await res.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error("Empty response from Gemini");
-  }
-
+  const text = await generateContentWithYouTubeWatchUrl(watch, prompt, 0.35, options?.onGemini);
   return parseMaterialsToolsPayload(text);
 }
 

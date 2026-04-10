@@ -2,6 +2,9 @@ import { env } from "@/lib/env";
 
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
 
+/** YouTube watch URLs as video input (no upload). Per Gemini video docs — public videos only. */
+export const GEMINI_YOUTUBE_VIDEO_MODEL = "gemini-1.5-pro";
+
 export type GeminiVideoDebugPayload = {
   responseJson: unknown;
   modelText: string;
@@ -88,6 +91,63 @@ export async function waitForGeminiFileReady(fileName: string): Promise<void> {
   throw new Error(
     "Video processing timeout — try a shorter clip, reduce resolution, or try again."
   );
+}
+
+/**
+ * Analyze a **public** YouTube video by passing its watch URL as `file_data` (no captions / transcript).
+ * Uses Gemini 1.5 Pro on the v1beta endpoint.
+ */
+export async function generateContentWithYouTubeWatchUrl(
+  watchPageUrl: string,
+  prompt: string,
+  temperature: number,
+  onGemini?: (payload: GeminiVideoDebugPayload) => void
+): Promise<string> {
+  const apiKey = env.geminiApiKey();
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured");
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_YOUTUBE_VIDEO_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            {
+              file_data: {
+                mime_type: "video/mp4",
+                file_uri: watchPageUrl.trim()
+              }
+            },
+            { text: prompt }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature
+      }
+    })
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini YouTube video request failed: ${res.status} ${errText}`);
+  }
+
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error("Empty response from Gemini (YouTube video)");
+  }
+  onGemini?.({ responseJson: data, modelText: text });
+  return text;
 }
 
 export async function generateContentWithVideoFile(
