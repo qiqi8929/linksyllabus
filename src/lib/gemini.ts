@@ -9,8 +9,8 @@ import {
 } from "@/lib/geminiVideoFileApi";
 import { extractYouTubeVideoId } from "@/lib/video";
 
-/** Stable successor to deprecated `gemini-2.0-flash-lite` (not available to new users). */
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
+/** Default model for REST `v1` `generateContent` (text, uploads, and YouTube via geminiVideoFileApi). */
+const GEMINI_MODEL = "gemini-2.0-flash";
 
 function youtubeWatchPageUrl(youtubeUrl: string): string {
   const id = extractYouTubeVideoId(youtubeUrl.trim());

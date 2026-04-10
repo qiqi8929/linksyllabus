@@ -1,11 +1,10 @@
 import { env } from "@/lib/env";
 
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
+const GEMINI_MODEL = "gemini-2.0-flash";
 
 /**
- * YouTube watch URLs as video input (no upload). Must be a model that exists on the **v1** API and
- * supports `file_data` with a public `youtube.com/watch` URI (see Gemini video docs).
- * `gemini-1.5-pro` returns 404 on current API — keep in sync with {@link GEMINI_MODEL}.
+ * YouTube watch URLs as video input (no upload). Use the same model as text/upload paths; must support
+ * `file_data` with a public `youtube.com/watch` URI (see Gemini video docs).
  */
 export const GEMINI_YOUTUBE_VIDEO_MODEL = GEMINI_MODEL;
 
