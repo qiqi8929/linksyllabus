@@ -382,7 +382,7 @@ function normalizeContiguousSteps(steps: TutorialStructureStep[]): TutorialStruc
 }
 
 /**
- * Watches the YouTube video via Gemini (YouTube URL as `file_data`) — no captions / transcript.
+ * Watches the YouTube video via Gemini (YouTube URL as `fileData`) — no captions / transcript.
  * Materials & Tools plus instructional steps with start/end seconds from visual/audio analysis.
  */
 export async function extractTutorialStructureFromYouTubeVideo(

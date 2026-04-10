@@ -89,8 +89,7 @@ export async function waitForGeminiFileReady(fileName: string): Promise<void> {
 }
 
 /**
- * Analyze a **public** YouTube video by passing its watch URL as REST `file_data` (snake_case — not
- * the JS SDK’s `fileData`). YouTube works on **v1beta** with `text` before the video part per API examples.
+ * Analyze a **public** YouTube video by passing its watch URL as `fileData`.
  */
 export async function generateContentWithYouTubeWatchUrl(
   watchPageUrl: string,
@@ -114,9 +113,9 @@ export async function generateContentWithYouTubeWatchUrl(
           parts: [
             { text: prompt },
             {
-              file_data: {
-                mime_type: "video/mp4",
-                file_uri: watchPageUrl.trim()
+              fileData: {
+                mimeType: "video/mp4",
+                fileUri: watchPageUrl.trim()
               }
             }
           ]
@@ -166,7 +165,7 @@ export async function generateContentWithVideoFile(
       contents: [
         {
           parts: [
-            { file_data: { mime_type: mimeType, file_uri: fileUri } },
+            { fileData: { mimeType, fileUri } },
             { text: prompt }
           ]
         }
