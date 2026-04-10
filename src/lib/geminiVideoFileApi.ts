@@ -1,6 +1,6 @@
 import { env } from "@/lib/env";
 
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODEL = "gemini-2.5-flash-preview-04-17";
 
 /**
  * YouTube watch URLs as video input (no upload). Use the same model as text/upload paths; must support
