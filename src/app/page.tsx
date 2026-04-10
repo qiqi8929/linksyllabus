@@ -23,17 +23,12 @@ function escapeHtmlAttr(value: string): string {
     .replace(/</g, "&lt;");
 }
 
-const DEFAULT_LANDING_HERO_DEMO_MP4 =
-  "https://ilmcpmitguphzhhpwbqn.supabase.co/storage/v1/object/public/marketing/hero-demo.mp4";
-
-/** Hero demo: `NEXT_PUBLIC_LANDING_HERO_DEMO_MP4` overrides default Supabase public URL */
 function getLandingHtml(): string {
-  const src =
-    process.env.NEXT_PUBLIC_LANDING_HERO_DEMO_MP4?.trim() ||
-    DEFAULT_LANDING_HERO_DEMO_MP4;
+  const videoSrc =
+    process.env.NEXT_PUBLIC_LANDING_HERO_DEMO_MP4 || "/hero-demo.mp4";
   return getLandingMarkup().replaceAll(
     LANDING_HERO_VIDEO_PLACEHOLDER,
-    escapeHtmlAttr(src)
+    escapeHtmlAttr(videoSrc)
   );
 }
 

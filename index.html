@@ -157,7 +157,7 @@
     }
     .hero-note { font-size: 13px; color: var(--ink-3); margin-bottom: 3.5rem; }
 
-    /* ─── HERO DEMO VIDEO (MP4) — Supabase public marketing asset ─── */
+    /* ─── HERO DEMO VIDEO (MP4) — Next app uses env; static file uses /hero-demo.mp4 ─── */
     .player-wrap {
       max-width: 680px; margin: 0 auto;
       border: 1.5px solid var(--border);
@@ -544,6 +544,7 @@
       <div class="vid-area">
         <video
           class="hero-demo-video"
+          src="/hero-demo.mp4"
           autoplay
           loop
           muted
@@ -551,9 +552,7 @@
           controls
           preload="auto"
           aria-label="LinkSyllabus product demo"
-        >
-          <source src="https://ilmcpmitguphzhhpwbqn.supabase.co/storage/v1/object/public/marketing/hero-demo.mp4" type="video/mp4" />
-        </video>
+        ></video>
       </div>
       <div class="steps-panel">
         <div class="steps-label">All steps</div>
