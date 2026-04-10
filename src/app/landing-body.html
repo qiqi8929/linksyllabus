@@ -24,35 +24,21 @@
     </div>
     <div class="hero-note">Free to start · No app needed for viewers · Works on any device</div>
 
-    <!-- Product preview (static mock — no media; open demo via button above) -->
+    <!-- Demo MP4: default Supabase marketing URL; override with NEXT_PUBLIC_LANDING_HERO_DEMO_MP4 -->
     <div class="player-wrap">
       <div class="vid-area">
-        <div class="vid-overlay">
-          <div class="vid-top">
-            <div class="vid-chapter">Step 2 — Mount onto dowel</div>
-            <div class="vid-step">2 of 9</div>
-          </div>
-          <div class="vid-bottom">
-            <div class="play-circle"><div class="tri"></div></div>
-            <div class="voice-tag"><div class="voice-dot"></div>Listening… "next step"</div>
-          </div>
-        </div>
-      </div>
-      <div class="prog-wrap">
-        <div class="prog-bar">
-          <div class="prog-fill"></div>
-          <div class="prog-dot"></div>
-        </div>
-      </div>
-      <div class="ctrl-bar">
-        <div class="ctrl-l">
-          <span class="ctrl-t hi">⏮</span>
-          <span class="ctrl-t hi">▶</span>
-          <span class="ctrl-t hi">⏭</span>
-          <span class="spd">0.75×</span>
-          <span class="ctrl-t">Loop this step</span>
-        </div>
-        <div class="ctrl-r">0:47 / 2:15</div>
+        <video
+          class="hero-demo-video"
+          autoplay
+          loop
+          muted
+          playsinline
+          controls
+          preload="auto"
+          aria-label="LinkSyllabus product demo"
+        >
+          <source src="%LANDING_HERO_DEMO_VIDEO%" type="video/mp4" />
+        </video>
       </div>
       <div class="steps-panel">
         <div class="steps-label">All steps</div>

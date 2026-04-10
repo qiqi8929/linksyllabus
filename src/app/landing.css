@@ -158,7 +158,7 @@
     }
     #lp-root .hero-note { font-size: 13px; color: var(--ink-3); margin-bottom: 3.5rem; }
 
-    /* ─── PLAYER MOCK ─── */
+    /* ─── HERO DEMO VIDEO (MP4) ─── */
     #lp-root .player-wrap {
       max-width: 680px; margin: 0 auto;
       border: 1.5px solid var(--border);
@@ -170,66 +170,15 @@
       background: #1c1c1e;
       aspect-ratio: 16/9;
       position: relative;
-      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
     }
-    #lp-root .vid-overlay {
-      position: absolute; inset: 0;
-      display: flex; flex-direction: column;
-      justify-content: space-between;
-      padding: 16px 18px;
+    #lp-root .hero-demo-video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      vertical-align: middle;
     }
-    #lp-root .vid-top { display: flex; justify-content: space-between; align-items: flex-start; }
-    #lp-root .vid-chapter {
-      background: rgba(0,0,0,.65);
-      color: #fff; font-size: 12px; font-weight: 600;
-      padding: 6px 12px; border-radius: 8px;
-      backdrop-filter: blur(4px);
-    }
-    #lp-root .vid-step {
-      background: var(--brand); color: #fff;
-      font-size: 11px; font-weight: 700;
-      padding: 6px 12px; border-radius: 8px;
-    }
-    #lp-root .vid-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
-    #lp-root .play-circle {
-      width: 52px; height: 52px;
-      background: rgba(255,255,255,.18);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      border: 2px solid rgba(255,255,255,.4);
-    }
-    #lp-root .tri { width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-left: 18px solid #fff; margin-left: 4px; }
-    #lp-root .voice-tag {
-      display: flex; align-items: center; gap: 6px;
-      background: rgba(0,0,0,.55); color: #fff;
-      font-size: 11px; font-weight: 600;
-      padding: 6px 12px; border-radius: 99px;
-    }
-    #lp-root .voice-dot { width: 7px; height: 7px; background: #4ade80; border-radius: 50%; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-    #lp-root .prog-wrap { background: #1c1c1e; padding: 0 18px; }
-    #lp-root .prog-bar { height: 3px; background: #333; border-radius: 2px; position: relative; margin: 14px 0; }
-    #lp-root .prog-fill { height: 100%; width: 38%; background: var(--brand); border-radius: 2px; }
-    #lp-root .prog-dot {
-      width: 14px; height: 14px;
-      background: var(--brand); border: 2px solid #fff;
-      border-radius: 50%; position: absolute;
-      top: 50%; left: 38%; transform: translate(-50%,-50%);
-    }
-    #lp-root .ctrl-bar {
-      display: flex; align-items: center;
-      justify-content: space-between;
-      padding: 0 18px 14px; background: #1c1c1e;
-    }
-    #lp-root .ctrl-l { display: flex; align-items: center; gap: 16px; }
-    #lp-root .ctrl-t { color: #888; font-size: 13px; font-weight: 600; }
-    #lp-root .ctrl-t.hi { color: #fff; }
-    #lp-root .spd {
-      background: var(--brand); color: #fff;
-      font-size: 11px; font-weight: 800;
-      padding: 3px 9px; border-radius: 5px;
-    }
-    #lp-root .ctrl-r { color: #555; font-size: 12px; }
     #lp-root .steps-panel { border-top: 1px solid #f0ede8; padding: 18px; }
     #lp-root .steps-label {
       font-size: 11px; font-weight: 700; color: #aaa;

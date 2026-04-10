@@ -19,4 +19,4 @@ Homepage hero demo video (not committed — too large for Git)
 4) Git
    public/hero-demo.mp4 is listed in .gitignore — do not commit the MP4.
 
-The homepage reads this URL in src/app/page.tsx (fallback /hero-demo.mp4 only if you add the file locally).
+The homepage default URL is set in src/app/page.tsx (Supabase marketing bucket). Override with NEXT_PUBLIC_LANDING_HERO_DEMO_MP4 if needed.
