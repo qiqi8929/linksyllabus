@@ -2,8 +2,12 @@ import { env } from "@/lib/env";
 
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
 
-/** YouTube watch URLs as video input (no upload). Per Gemini video docs — public videos only. */
-export const GEMINI_YOUTUBE_VIDEO_MODEL = "gemini-1.5-pro";
+/**
+ * YouTube watch URLs as video input (no upload). Must be a model that exists on the **v1** API and
+ * supports `file_data` with a public `youtube.com/watch` URI (see Gemini video docs).
+ * `gemini-1.5-pro` returns 404 on current API — keep in sync with {@link GEMINI_MODEL}.
+ */
+export const GEMINI_YOUTUBE_VIDEO_MODEL = GEMINI_MODEL;
 
 export type GeminiVideoDebugPayload = {
   responseJson: unknown;
@@ -95,7 +99,7 @@ export async function waitForGeminiFileReady(fileName: string): Promise<void> {
 
 /**
  * Analyze a **public** YouTube video by passing its watch URL as `file_data` (no captions / transcript).
- * Uses Gemini 1.5 Pro on the v1beta endpoint.
+ * Uses the stable **v1** `generateContent` endpoint (same model as uploaded-file video analysis).
  */
 export async function generateContentWithYouTubeWatchUrl(
   watchPageUrl: string,
@@ -108,7 +112,7 @@ export async function generateContentWithYouTubeWatchUrl(
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_YOUTUBE_VIDEO_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_YOUTUBE_VIDEO_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetch(url, {
     method: "POST",
