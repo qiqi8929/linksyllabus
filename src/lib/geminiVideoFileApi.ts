@@ -97,8 +97,8 @@ export async function waitForGeminiFileReady(fileName: string): Promise<void> {
 }
 
 /**
- * Analyze a **public** YouTube video by passing its watch URL as `file_data` (no captions / transcript).
- * Uses the stable **v1** `generateContent` endpoint (same model as uploaded-file video analysis).
+ * Analyze a **public** YouTube video by passing its watch URL as REST `file_data` (snake_case — not
+ * the JS SDK’s `fileData`). YouTube works on **v1beta** with `text` before the video part per API examples.
  */
 export async function generateContentWithYouTubeWatchUrl(
   watchPageUrl: string,
@@ -111,7 +111,7 @@ export async function generateContentWithYouTubeWatchUrl(
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_YOUTUBE_VIDEO_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_YOUTUBE_VIDEO_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetch(url, {
     method: "POST",
@@ -120,13 +120,13 @@ export async function generateContentWithYouTubeWatchUrl(
       contents: [
         {
           parts: [
+            { text: prompt },
             {
               file_data: {
                 mime_type: "video/mp4",
                 file_uri: watchPageUrl.trim()
               }
-            },
-            { text: prompt }
+            }
           ]
         }
       ],

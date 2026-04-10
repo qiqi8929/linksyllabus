@@ -9,7 +9,7 @@ import {
 } from "@/lib/geminiVideoFileApi";
 import { extractYouTubeVideoId } from "@/lib/video";
 
-/** Default model for REST `v1` `generateContent` (text, uploads, and YouTube via geminiVideoFileApi). */
+/** Default model for REST `generateContent` (`v1` text/uploads; YouTube uses `v1beta` in geminiVideoFileApi). */
 const GEMINI_MODEL = "gemini-2.0-flash";
 
 function youtubeWatchPageUrl(youtubeUrl: string): string {
