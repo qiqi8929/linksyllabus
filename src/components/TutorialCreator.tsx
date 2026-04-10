@@ -223,19 +223,44 @@ export function TutorialCreator() {
         setError("You must be logged in to upload.");
         return;
       }
-      const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
-      const { error: upErr } = await supabase.storage
+      const signed = await fetchJsonFromApi("/api/video/create-signed-upload", { ext });
+      const path = String(signed.path ?? "").trim();
+      const token = String(signed.token ?? "").trim();
+      if (!path || !token) {
+        throw new Error("Server did not return a signed upload token.");
+      }
+      const { data: upData, error: upErr } = await supabase.storage
         .from(TUTORIAL_VIDEO_BUCKET)
-        .upload(path, file, {
-          cacheControl: "3600",
-          contentType: file.type || mimeForExt(ext),
+        .uploadToSignedUrl(path, token, file, {
           upsert: false
         });
       if (upErr) {
+        console.error("[uploadChapterFile] supabase upload error", {
+          bucket: TUTORIAL_VIDEO_BUCKET,
+          path,
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+          error: upErr
+        });
         throw new Error(upErr.message);
       }
+      console.log("[uploadChapterFile] upload success", {
+        bucket: TUTORIAL_VIDEO_BUCKET,
+        path,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        response: upData
+      });
       setChapterVideoUrl(buildStorageVideoRef(path));
     } catch (e: unknown) {
+      console.error("[uploadChapterFile] unexpected upload exception", {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        error: e
+      });
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setUploading(false);
