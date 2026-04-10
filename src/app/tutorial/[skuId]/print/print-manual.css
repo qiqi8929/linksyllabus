@@ -264,6 +264,21 @@
   padding: 44px 52px;
 }
 
+#pm-root .pm-step-spread {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+#pm-root .pm-step-spread + .pm-step-spread {
+  margin-top: 28px;
+  padding-top: 28px;
+  border-top: 0.5px solid var(--border);
+}
+
+#pm-root .pm-steps-flow .pm-page-promo {
+  margin-top: 36px;
+}
+
 #pm-root .pm-materials-sheet {
   display: flex;
   flex-direction: column;
@@ -521,28 +536,39 @@
 
   #pm-root .pm-cover,
   #pm-root .pm-materials-sheet,
-  #pm-root .pm-page:not(.pm-materials-sheet) {
+  #pm-root .pm-steps-empty {
     page-break-after: always;
     break-after: page;
   }
 
-  /*
-   * Step spreads: fill the printable page and pin the footer to the bottom so whitespace
-   * sits between the steps and the footer (not a blank void below the footer line).
-   */
-  #pm-root .pm-page:not(.pm-materials-sheet) {
+  #pm-root .pm-steps-empty {
     display: flex;
     flex-direction: column;
     min-height: var(--pm-print-page-body);
   }
 
-  #pm-root .pm-page:not(.pm-materials-sheet) .pm-page-footer {
+  #pm-root .pm-steps-empty .pm-page-footer {
     margin-top: auto;
   }
 
-  #pm-root .pm-page:not(.pm-materials-sheet) .pm-page-promo {
-    margin-top: 12px;
-    flex-shrink: 0;
+  /* Step section: flows across pages; each two-column spread stays intact */
+  #pm-root .pm-steps-flow {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  #pm-root .pm-step-spread {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  #pm-root .pm-steps-flow .pm-page-footer {
+    margin-top: 28px;
+    padding-top: 16px;
+  }
+
+  #pm-root .pm-steps-flow .pm-page-promo {
+    margin-top: 24px;
   }
 
   #pm-root .pm-steps-pair {
@@ -595,7 +621,8 @@
     display: none !important;
   }
 
-  #pm-root .pm-page:last-child {
+  #pm-root .pm-steps-flow:last-child,
+  #pm-root .pm-page:not(.pm-materials-sheet):not(.pm-steps-flow):last-child {
     page-break-after: avoid;
     break-after: avoid;
   }

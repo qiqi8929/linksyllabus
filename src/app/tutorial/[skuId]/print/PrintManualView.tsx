@@ -88,7 +88,6 @@ export function PrintManualView({
   for (let i = 0; i < steps.length; i += 2) {
     pairs.push([steps[i], steps[i + 1] ?? null]);
   }
-  const totalContentPages = Math.max(1, pairs.length);
 
   const footerBrand = "linksyllabus.com";
 
@@ -171,7 +170,7 @@ export function PrintManualView({
       ) : null}
 
       {steps.length === 0 ? (
-        <div className="pm-page">
+        <div className="pm-page pm-steps-empty">
           <p className="pm-step-text">No steps to print yet.</p>
           <p className="pm-page-promo">
             Turn any YouTube tutorial into a printable QR guide in 3 minutes.
@@ -185,44 +184,41 @@ export function PrintManualView({
           </div>
         </div>
       ) : (
-        pairs.map((pair, idx) => {
-          const [left, right] = pair;
-          const pageNum = idx + 1;
-          const isLastPage = idx === pairs.length - 1;
-          return (
-            <div key={left.id} className="pm-page">
-              <div className="pm-steps-pair">
-                <StepBlock
-                  step={left}
-                  qrSrc={`/api/qr/${encodeURIComponent(left.id)}`}
-                />
-                {right ? (
+        <div className="pm-page pm-steps-flow">
+          {pairs.map((pair) => {
+            const [left, right] = pair;
+            return (
+              <div key={left.id} className="pm-step-spread">
+                <div className="pm-steps-pair">
                   <StepBlock
-                    step={right}
-                    qrSrc={`/api/qr/${encodeURIComponent(right.id)}`}
+                    step={left}
+                    qrSrc={`/api/qr/${encodeURIComponent(left.id)}`}
                   />
-                ) : (
-                  <div aria-hidden />
-                )}
+                  {right ? (
+                    <StepBlock
+                      step={right}
+                      qrSrc={`/api/qr/${encodeURIComponent(right.id)}`}
+                    />
+                  ) : (
+                    <div aria-hidden />
+                  )}
+                </div>
               </div>
-              {isLastPage ? (
-                <p className="pm-page-promo">
-                  Turn any YouTube tutorial into a printable QR guide in 3
-                  minutes.
-                  <br />
-                  Free at{" "}
-                  <span className="pm-page-promo-url">linksyllabus.com/try</span>
-                </p>
-              ) : null}
-              <div className="pm-page-footer">
-                <span className="pm-footer-creator">{footerBrand}</span>
-                <span className="pm-footer-page">
-                  Page {pageNum} of {totalContentPages}
-                </span>
-              </div>
-            </div>
-          );
-        })
+            );
+          })}
+          <p className="pm-page-promo">
+            Turn any YouTube tutorial into a printable QR guide in 3 minutes.
+            <br />
+            Free at{" "}
+            <span className="pm-page-promo-url">linksyllabus.com/try</span>
+          </p>
+          <div className="pm-page-footer">
+            <span className="pm-footer-creator">{footerBrand}</span>
+            <span className="pm-footer-page">
+              {steps.length} steps · QR guide
+            </span>
+          </div>
+        </div>
       )}
     </div>
   );
