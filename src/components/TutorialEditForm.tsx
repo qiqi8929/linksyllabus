@@ -193,7 +193,10 @@ export function TutorialEditForm({
             rows={4}
             value={materialsText}
             onChange={(e) => setMaterialsText(e.target.value)}
-            placeholder="e.g. Bulky weight yarn in grey and white, fiberfill stuffing, safety eyes 10mm"
+            placeholder={`List each material on a new line with specific details.
+Example:
+- Worsted weight yarn (100g, any color)
+- Size 4mm crochet hook`}
             className="w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
           />
         </div>
@@ -206,7 +209,11 @@ export function TutorialEditForm({
             rows={3}
             value={toolsText}
             onChange={(e) => setToolsText(e.target.value)}
-            placeholder="e.g. 5.0mm crochet hook, yarn needle, scissors"
+            placeholder={`List each tool on a new line.
+Example:
+- 4mm crochet hook
+- Scissors
+- Tapestry needle`}
             className="w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
           />
         </div>
