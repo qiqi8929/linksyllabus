@@ -22,6 +22,8 @@ export type SkuPrint = {
   display_creator_name: string;
   /** Resolved on server: DB level or "General" */
   display_level: string;
+  /** YouTube thumbnail or other cover art for print cover; omit section when null */
+  cover_hero_image_url: string | null;
 };
 
 function formatStepNum(n: number): string {
@@ -83,9 +85,9 @@ export function PrintManualView({
   steps: StepRow[];
 }) {
   const creatorName = sku.display_creator_name;
-  const creatorSite = sku.creator_site?.trim() || "";
   const level = sku.display_level;
   const subtitle = sku.description?.trim() || DEFAULT_COVER_BLURB;
+  const coverHeroSrc = sku.cover_hero_image_url?.trim() || "";
 
   const pairs: [StepRow, StepRow | null][] = [];
   for (let i = 0; i < steps.length; i += 2) {
@@ -93,8 +95,7 @@ export function PrintManualView({
   }
   const totalContentPages = Math.max(1, pairs.length);
 
-  const footerLeft =
-    creatorSite.length > 0 ? `${creatorName} · ${creatorSite}` : creatorName;
+  const footerBrand = "linksyllabus.com";
 
   const materialsBody = sku.materials_text?.trim() ?? "";
   const toolsBody = sku.tools_text?.trim() ?? "";
@@ -103,30 +104,57 @@ export function PrintManualView({
   return (
     <div className="pm-manual">
       <div className="pm-cover">
-        <div className="pm-cover-inner">
-          <div className="pm-creator-logo">
-            {sku.creator_logo?.trim() ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={sku.creator_logo.trim()} alt="" />
-            ) : (
-              <span className="pm-creator-logo-text">{creatorName}</span>
-            )}
+        <div className="pm-cover-layout">
+          <div className="pm-cover-main">
+            <div className="pm-creator-logo">
+              {sku.creator_logo?.trim() ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={sku.creator_logo.trim()} alt="" />
+              ) : (
+                <span className="pm-creator-logo-text">{creatorName}</span>
+              )}
+            </div>
+            <h1 className="pm-cover-title">{sku.name}</h1>
+            {coverHeroSrc ? (
+              <div className="pm-cover-hero">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={coverHeroSrc} alt="" />
+              </div>
+            ) : null}
+            <p className="pm-cover-desc">{subtitle}</p>
+            <div className="pm-cover-meta">
+              <div className="pm-meta-item">
+                <span className="pm-meta-label">Steps</span>
+                <span className="pm-meta-value">{steps.length}</span>
+              </div>
+              <div className="pm-meta-item">
+                <span
+                  className="pm-meta-label pm-meta-label--placeholder"
+                  aria-hidden="true"
+                >
+                  Steps
+                </span>
+                <span className="pm-meta-value">Made with LinkSyllabus</span>
+              </div>
+              <div className="pm-meta-item">
+                <span className="pm-meta-label">Level</span>
+                <span className="pm-meta-value">{level}</span>
+              </div>
+            </div>
           </div>
-          <h1 className="pm-cover-title">{sku.name}</h1>
-          <p className="pm-cover-desc">{subtitle}</p>
-          <div className="pm-cover-meta">
-            <div className="pm-meta-item">
-              <span className="pm-meta-label">Steps</span>
-              <span className="pm-meta-value">{steps.length}</span>
+          <div className="pm-cover-qr-aside">
+            <div className="pm-cover-qr-box">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/qr/tutorial/${encodeURIComponent(sku.id)}`}
+                alt=""
+                width={112}
+                height={112}
+              />
             </div>
-            <div className="pm-meta-item">
-              <span className="pm-meta-label">Creator</span>
-              <span className="pm-meta-value">{creatorName}</span>
-            </div>
-            <div className="pm-meta-item">
-              <span className="pm-meta-label">Level</span>
-              <span className="pm-meta-value">{level}</span>
-            </div>
+            <span className="pm-cover-qr-caption">
+              Scan to follow along on your phone
+            </span>
           </div>
         </div>
       </div>
@@ -152,7 +180,7 @@ export function PrintManualView({
             ) : null}
           </div>
           <div className="pm-page-footer">
-            <span className="pm-footer-creator">{footerLeft}</span>
+            <span className="pm-footer-creator">{footerBrand}</span>
             <span className="pm-footer-page">Before you start</span>
           </div>
         </div>
@@ -161,8 +189,14 @@ export function PrintManualView({
       {steps.length === 0 ? (
         <div className="pm-page">
           <p className="pm-step-text">No steps to print yet.</p>
+          <p className="pm-page-promo">
+            Turn any YouTube tutorial into a printable QR guide in 3 minutes.
+            <br />
+            Free at{" "}
+            <span className="pm-page-promo-url">linksyllabus.com/try</span>
+          </p>
           <div className="pm-page-footer">
-            <span className="pm-footer-creator">{footerLeft}</span>
+            <span className="pm-footer-creator">{footerBrand}</span>
             <span className="pm-footer-page">Page 1 of 1</span>
           </div>
         </div>
@@ -170,6 +204,7 @@ export function PrintManualView({
         pairs.map((pair, idx) => {
           const [left, right] = pair;
           const pageNum = idx + 1;
+          const isLastPage = idx === pairs.length - 1;
           return (
             <div key={left.id} className="pm-page">
               <div className="pm-steps-pair">
@@ -186,8 +221,17 @@ export function PrintManualView({
                   <div aria-hidden />
                 )}
               </div>
+              {isLastPage ? (
+                <p className="pm-page-promo">
+                  Turn any YouTube tutorial into a printable QR guide in 3
+                  minutes.
+                  <br />
+                  Free at{" "}
+                  <span className="pm-page-promo-url">linksyllabus.com/try</span>
+                </p>
+              ) : null}
               <div className="pm-page-footer">
-                <span className="pm-footer-creator">{footerLeft}</span>
+                <span className="pm-footer-creator">{footerBrand}</span>
                 <span className="pm-footer-page">
                   Page {pageNum} of {totalContentPages}
                 </span>

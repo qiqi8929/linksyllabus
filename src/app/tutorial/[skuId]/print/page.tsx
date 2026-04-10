@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { extractYouTubeVideoId } from "@/lib/video";
 import { fetchSkuVisibleToViewer, fetchTutorialSteps } from "../tutorialAccess";
 import { PrintBar } from "./PrintBar";
 import { PrintManualView, type SkuPrint } from "./PrintManualView";
@@ -29,6 +30,13 @@ type SkuRow = {
   materials_text?: string | null;
   tools_text?: string | null;
 };
+
+/** YouTube still frame for print cover when the first step uses a YouTube URL. */
+function coverHeroImageFromFirstStep(youtubeUrl: string | undefined): string | null {
+  if (!youtubeUrl?.trim()) return null;
+  const vid = extractYouTubeVideoId(youtubeUrl.trim());
+  return vid ? `https://img.youtube.com/vi/${vid}/hqdefault.jpg` : null;
+}
 
 export async function generateMetadata({
   params
@@ -76,6 +84,18 @@ export default async function TutorialPrintPage({
     level: row.level
   });
 
+  const record = row as Record<string, unknown>;
+  const customCover =
+    typeof record.cover_image_url === "string"
+      ? record.cover_image_url.trim()
+      : typeof record.coverImageUrl === "string"
+        ? record.coverImageUrl.trim()
+        : "";
+  const coverHeroImageUrl =
+    customCover ||
+    coverHeroImageFromFirstStep(steps[0]?.youtube_url) ||
+    null;
+
   const skuPrint: SkuPrint = {
     id: row.id,
     name: row.name,
@@ -87,7 +107,8 @@ export default async function TutorialPrintPage({
     materials_text: row.materials_text ?? null,
     tools_text: row.tools_text ?? null,
     display_creator_name: displayCreatorName,
-    display_level: displayLevel
+    display_level: displayLevel,
+    cover_hero_image_url: coverHeroImageUrl
   };
 
   return (

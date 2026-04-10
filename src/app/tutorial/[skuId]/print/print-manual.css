@@ -92,15 +92,73 @@
   box-sizing: border-box;
 }
 
-#pm-root .pm-cover-inner {
+#pm-root .pm-cover-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 28px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+#pm-root .pm-cover-main {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 22px;
+  flex: 1;
+  min-width: 0;
+}
+
+#pm-root .pm-cover-qr-aside {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+#pm-root .pm-cover-qr-box {
+  width: 112px;
+  height: 112px;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--white);
+  overflow: hidden;
+  padding: 8px;
+}
+
+#pm-root .pm-cover-qr-box img {
   width: 100%;
-  max-width: 520px;
-  margin: 0 auto;
+  height: 100%;
+  object-fit: contain;
+}
+
+#pm-root .pm-cover-qr-caption {
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--muted);
+  font-weight: 400;
+  text-align: center;
+  max-width: 120px;
+}
+
+@media (max-width: 600px) {
+  #pm-root .pm-cover-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #pm-root .pm-cover-qr-aside {
+    padding-top: 0;
+  }
 }
 
 #pm-root .pm-creator-logo {
@@ -135,6 +193,23 @@
   margin: 0;
 }
 
+#pm-root .pm-cover-hero {
+  width: 100%;
+  max-width: 440px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 0.5px solid var(--border);
+  line-height: 0;
+}
+
+#pm-root .pm-cover-hero img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  max-height: 220px;
+}
+
 #pm-root .pm-cover-desc {
   font-size: 14px;
   color: var(--muted);
@@ -166,6 +241,10 @@
   color: var(--light-muted);
   display: block;
   margin-bottom: 5px;
+}
+
+#pm-root .pm-meta-label--placeholder {
+  visibility: hidden;
 }
 
 #pm-root .pm-meta-value {
@@ -377,6 +456,19 @@
   letter-spacing: 0.5px;
 }
 
+#pm-root .pm-page-promo {
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--light-muted);
+  font-weight: 300;
+  text-align: center;
+  margin: 28px 0 0;
+}
+
+#pm-root .pm-page-promo-url {
+  color: var(--light-muted);
+}
+
 @media print {
   /*
    * @page margin sets the content box. URL and print time in the margin are drawn by the
@@ -428,8 +520,12 @@
     padding: 0;
   }
 
-  #pm-root .pm-cover-inner {
-    gap: 20px;
+  #pm-root .pm-cover-layout {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    max-width: 100%;
   }
 
   #pm-root .pm-page:last-child {
