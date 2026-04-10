@@ -78,7 +78,7 @@ export default async function TutorialPrintPage({
   const steps = stepRows ?? [];
 
   const row = sku as SkuRow;
-  const { displayCreatorName, displayLevel } = resolvePrintBranding({
+  const { displayLevel } = resolvePrintBranding({
     creator_name: row.creator_name,
     author: row.author,
     level: row.level
@@ -100,20 +100,20 @@ export default async function TutorialPrintPage({
     id: row.id,
     name: row.name,
     description: row.description ?? "",
-    creator_name: row.creator_name ?? null,
-    creator_site: row.creator_site ?? null,
     creator_logo: row.creator_logo ?? null,
     level: row.level ?? null,
     materials_text: row.materials_text ?? null,
     tools_text: row.tools_text ?? null,
-    display_creator_name: displayCreatorName,
     display_level: displayLevel,
     cover_hero_image_url: coverHeroImageUrl
   };
 
   return (
     <div id="pm-root">
-      <PrintBar tutorialHref={`/tutorial/${encodeURIComponent(sku.id)}`} />
+      <PrintBar
+        tutorialHref={`/tutorial/${encodeURIComponent(sku.id)}`}
+        tutorialTitle={row.name}
+      />
       <PrintManualView sku={skuPrint} steps={steps} />
     </div>
   );

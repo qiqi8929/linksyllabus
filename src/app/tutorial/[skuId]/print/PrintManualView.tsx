@@ -12,14 +12,10 @@ export type SkuPrint = {
   id: string;
   name: string;
   description: string;
-  creator_name: string | null;
-  creator_site: string | null;
   creator_logo: string | null;
   level: string | null;
   materials_text: string | null;
   tools_text: string | null;
-  /** Resolved on server: skus.creator_name or skus.author only (never account username) */
-  display_creator_name: string;
   /** Resolved on server: DB level or "General" */
   display_level: string;
   /** YouTube thumbnail or other cover art for print cover; omit section when null */
@@ -84,7 +80,6 @@ export function PrintManualView({
   sku: SkuPrint;
   steps: StepRow[];
 }) {
-  const creatorName = sku.display_creator_name;
   const level = sku.display_level;
   const subtitle = sku.description?.trim() || DEFAULT_COVER_BLURB;
   const coverHeroSrc = sku.cover_hero_image_url?.trim() || "";
@@ -106,14 +101,12 @@ export function PrintManualView({
       <div className="pm-cover">
         <div className="pm-cover-layout">
           <div className="pm-cover-main">
-            <div className="pm-creator-logo">
-              {sku.creator_logo?.trim() ? (
-                // eslint-disable-next-line @next/next/no-img-element
+            {sku.creator_logo?.trim() ? (
+              <div className="pm-creator-logo">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={sku.creator_logo.trim()} alt="" />
-              ) : (
-                <span className="pm-creator-logo-text">{creatorName}</span>
-              )}
-            </div>
+              </div>
+            ) : null}
             <h1 className="pm-cover-title">{sku.name}</h1>
             {coverHeroSrc ? (
               <div className="pm-cover-hero">
@@ -126,15 +119,6 @@ export function PrintManualView({
               <div className="pm-meta-item">
                 <span className="pm-meta-label">Steps</span>
                 <span className="pm-meta-value">{steps.length}</span>
-              </div>
-              <div className="pm-meta-item">
-                <span
-                  className="pm-meta-label pm-meta-label--placeholder"
-                  aria-hidden="true"
-                >
-                  Steps
-                </span>
-                <span className="pm-meta-value">Made with LinkSyllabus</span>
               </div>
               <div className="pm-meta-item">
                 <span className="pm-meta-label">Level</span>

@@ -1,13 +1,67 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-export function PrintBar({ tutorialHref }: { tutorialHref: string }) {
+const SHARE_TEXT =
+  "Step-by-step guide with QR codes · Free at linksyllabus.com";
+
+export function PrintBar({
+  tutorialHref,
+  tutorialTitle
+}: {
+  tutorialHref: string;
+  tutorialTitle: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    },
+    []
+  );
+
+  const handleShare = useCallback(async () => {
+    const url = window.location.href;
+
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: tutorialTitle,
+          text: SHARE_TEXT,
+          url
+        });
+        return;
+      } catch (e) {
+        const name = e instanceof Error ? e.name : "";
+        if (name === "AbortError") return;
+        /* fall through — copy link */
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      setCopied(true);
+      copyTimerRef.current = setTimeout(() => {
+        setCopied(false);
+        copyTimerRef.current = null;
+      }, 2500);
+    } catch {
+      /* ignore */
+    }
+  }, [tutorialTitle]);
+
   return (
     <div className="pm-print-bar print:hidden">
       <Link className="pm-back-btn" href={tutorialHref}>
         ← Back to tutorial
       </Link>
+      <button type="button" className="pm-share-btn" onClick={handleShare}>
+        {copied ? "Link copied!" : "Share"}
+      </button>
       <button type="button" className="pm-print-btn" onClick={() => window.print()}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
           <polyline

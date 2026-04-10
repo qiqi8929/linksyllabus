@@ -58,9 +58,11 @@
   background: #a8501f;
 }
 
-#pm-root .pm-back-btn {
+#pm-root .pm-back-btn,
+#pm-root .pm-share-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 10px 20px;
   background: transparent;
@@ -74,7 +76,12 @@
   transition: border-color 0.2s, color 0.2s;
 }
 
-#pm-root .pm-back-btn:hover {
+#pm-root .pm-share-btn {
+  margin: 0;
+}
+
+#pm-root .pm-back-btn:hover,
+#pm-root .pm-share-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -83,11 +90,12 @@
   background: var(--cream);
   border: 0.5px solid var(--border);
   border-radius: 14px;
-  padding: 32px 40px;
+  padding: 22px 40px 32px;
   text-align: center;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   min-height: 100vh;
   box-sizing: border-box;
 }
@@ -108,7 +116,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 22px;
+  gap: 18px;
   flex: 1;
   min-width: 0;
 }
@@ -223,8 +231,8 @@
   display: flex;
   justify-content: center;
   gap: 40px;
-  padding-top: 24px;
-  margin-top: 8px;
+  padding-top: 18px;
+  margin-top: 4px;
   border-top: 0.5px solid var(--border);
   flex-wrap: wrap;
   width: 100%;
@@ -241,10 +249,6 @@
   color: var(--light-muted);
   display: block;
   margin-bottom: 5px;
-}
-
-#pm-root .pm-meta-label--placeholder {
-  visibility: hidden;
 }
 
 #pm-root .pm-meta-value {
@@ -480,7 +484,16 @@
     margin: 18mm 16mm;
   }
 
+  /* globals.css sets html/body height:100% — avoid odd print fragment sizing */
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
   #pm-root {
+    /* ~ A4 (297mm) minus @page top+bottom margins (18mm × 2) */
+    --pm-print-page-body: 261mm;
     background: #fff;
     padding: 0;
     -webkit-print-color-adjust: exact;
@@ -502,14 +515,43 @@
     border-radius: 0;
     padding: 0;
     box-shadow: none;
-    page-break-after: always;
-    break-after: page;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
+  #pm-root .pm-cover,
+  #pm-root .pm-materials-sheet,
+  #pm-root .pm-page:not(.pm-materials-sheet) {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  /*
+   * Step spreads: fill the printable page and pin the footer to the bottom so whitespace
+   * sits between the steps and the footer (not a blank void below the footer line).
+   */
+  #pm-root .pm-page:not(.pm-materials-sheet) {
+    display: flex;
+    flex-direction: column;
+    min-height: var(--pm-print-page-body);
+  }
+
+  #pm-root .pm-page:not(.pm-materials-sheet) .pm-page-footer {
+    margin-top: auto;
+  }
+
+  #pm-root .pm-page:not(.pm-materials-sheet) .pm-page-promo {
+    margin-top: 12px;
+    flex-shrink: 0;
+  }
+
+  #pm-root .pm-steps-pair {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   #pm-root .pm-materials-sheet {
-    min-height: 261mm;
+    min-height: var(--pm-print-page-body);
   }
 
   #pm-root .pm-cover {
@@ -517,15 +559,40 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+    align-items: center;
     padding: 0;
+    margin: 0;
   }
 
   #pm-root .pm-cover-layout {
     flex-direction: row;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 24px;
+    gap: 20px;
     max-width: 100%;
+    width: 100%;
+  }
+
+  #pm-root .pm-cover-main {
+    gap: 12px;
+  }
+
+  #pm-root .pm-cover-meta {
+    padding-top: 12px;
+    margin-top: 2px;
+  }
+
+  #pm-root .pm-cover-qr-aside {
+    padding-top: 0;
+  }
+
+  #pm-root .pm-creator-logo {
+    min-height: 0;
+  }
+
+  /* No text fallback in DOM; guard against stray creator label in PDF engines */
+  #pm-root .pm-creator-logo-text {
+    display: none !important;
   }
 
   #pm-root .pm-page:last-child {
