@@ -5,25 +5,11 @@ import {
   createInactiveSkuWithSteps,
   type TutorialStepInput
 } from "@/app/dashboard/serverActions";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import {
-  buildStorageVideoRef,
-  parseStorageVideoPath,
-  TUTORIAL_VIDEO_BUCKET
-} from "@/lib/storageVideoUrl";
 import { parseAiTutorialPaste } from "@/lib/parseAiTutorialPaste";
 import { extractYouTubeVideoId } from "@/lib/video";
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 const UPLOAD_ACCEPT = new Set(["mp4", "mov", "avi"]);
-
-function mimeForExt(ext: string): string {
-  const e = ext.toLowerCase();
-  if (e === "mp4") return "video/mp4";
-  if (e === "mov") return "video/quicktime";
-  if (e === "avi") return "video/x-msvideo";
-  return "video/mp4";
-}
 
 type StepRow = {
   id: string;
@@ -86,6 +72,30 @@ async function fetchJsonFromApi(
   return data;
 }
 
+async function fetchJsonFromApiWithVideo(
+  url: string,
+  file: File
+): Promise<Record<string, unknown>> {
+  const form = new FormData();
+  form.set("video", file, file.name);
+  const res = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+    body: form
+  });
+  const text = await res.text();
+  let data: Record<string, unknown>;
+  try {
+    data = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  } catch {
+    throw new Error(text.slice(0, 280) || `Server returned non-JSON (HTTP ${res.status}).`);
+  }
+  if (!res.ok) {
+    throw new Error(String(data.error ?? `Request failed (HTTP ${res.status}).`));
+  }
+  return data;
+}
+
 async function startCheckout(skuId: string) {
   const res = await fetch("/api/stripe/checkout", {
     method: "POST",
@@ -109,8 +119,8 @@ export function TutorialCreator() {
   const [payLoading, setPayLoading] = useState(false);
   const [videoSourceTab, setVideoSourceTab] = useState<"youtube" | "upload">("youtube");
   const [chapterVideoUrl, setChapterVideoUrl] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [descExtractLoading, setDescExtractLoading] = useState(false);
   const [materialsExtractLoading, setMaterialsExtractLoading] = useState(false);
@@ -123,25 +133,14 @@ export function TutorialCreator() {
   const [outlineEstimated, setOutlineEstimated] = useState(false);
 
   useEffect(() => {
-    const path = parseStorageVideoPath(chapterVideoUrl);
-    if (!path) {
+    if (!uploadFile) {
       setUploadPreviewUrl(null);
       return;
     }
-    let cancelled = false;
-    void (async () => {
-      const supabase = createSupabaseBrowserClient();
-      const { data } = await supabase.storage
-        .from(TUTORIAL_VIDEO_BUCKET)
-        .createSignedUrl(path, 3600);
-      if (!cancelled && data?.signedUrl) {
-        setUploadPreviewUrl(data.signedUrl);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [chapterVideoUrl]);
+    const objectUrl = URL.createObjectURL(uploadFile);
+    setUploadPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [uploadFile]);
 
   useEffect(() => {
     setOutlineEstimated(false);
@@ -183,7 +182,7 @@ export function TutorialCreator() {
     if (videoSourceTab === "youtube" && !extractYouTubeVideoId(chapter)) {
       return "Use a valid YouTube URL.";
     }
-    if (videoSourceTab === "upload" && !parseStorageVideoPath(chapter)) {
+    if (videoSourceTab === "upload" && !uploadFile) {
       return "Upload a video file (MP4, MOV, or AVI).";
     }
     for (let i = 0; i < steps.length; i++) {
@@ -200,7 +199,7 @@ export function TutorialCreator() {
       }
     }
     return null;
-  }, [tutorialName, steps, chapterVideoUrl, videoSourceTab]);
+  }, [tutorialName, steps, chapterVideoUrl, videoSourceTab, uploadFile]);
 
   const uploadChapterFile = async (file: File) => {
     setError(null);
@@ -213,47 +212,10 @@ export function TutorialCreator() {
       setError("Video must be 500MB or smaller.");
       return;
     }
-    setUploading(true);
     try {
-      const supabase = createSupabaseBrowserClient();
-      const {
-        data: { user }
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setError("You must be logged in to upload.");
-        return;
-      }
-      const signed = await fetchJsonFromApi("/api/video/create-signed-upload", { ext });
-      const path = String(signed.path ?? "").trim();
-      const token = String(signed.token ?? "").trim();
-      if (!path || !token) {
-        throw new Error("Server did not return a signed upload token.");
-      }
-      const { data: upData, error: upErr } = await supabase.storage
-        .from(TUTORIAL_VIDEO_BUCKET)
-        .uploadToSignedUrl(path, token, file, {
-          upsert: false
-        });
-      if (upErr) {
-        console.error("[uploadChapterFile] supabase upload error", {
-          bucket: TUTORIAL_VIDEO_BUCKET,
-          path,
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
-          error: upErr
-        });
-        throw new Error(upErr.message);
-      }
-      console.log("[uploadChapterFile] upload success", {
-        bucket: TUTORIAL_VIDEO_BUCKET,
-        path,
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        response: upData
-      });
-      setChapterVideoUrl(buildStorageVideoRef(path));
+      setUploadFile(file);
+      // Upload-tab AI extraction now sends local file directly to Gemini via server route.
+      setChapterVideoUrl("");
     } catch (e: unknown) {
       console.error("[uploadChapterFile] unexpected upload exception", {
         fileName: file.name,
@@ -263,13 +225,17 @@ export function TutorialCreator() {
       });
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
-      setUploading(false);
+      // no-op
     }
   };
 
   const extractTimestampsFromYouTubeVideo = async () => {
     const url = chapterVideoUrl.trim();
-    if (!url) {
+    if (videoSourceTab === "upload" && !uploadFile) {
+      setError("Upload a video file first.");
+      return;
+    }
+    if (videoSourceTab === "youtube" && !url) {
       setError(
         videoSourceTab === "youtube"
           ? "Paste a YouTube URL above to auto-extract timestamps."
@@ -281,21 +247,13 @@ export function TutorialCreator() {
       setError("Use a valid YouTube URL.");
       return;
     }
-    if (videoSourceTab === "upload") {
-      const p = parseStorageVideoPath(url);
-      if (!p) {
-        setError("Upload a video file first.");
-        return;
-      }
-    }
     setError(null);
     setDescExtractLoading(true);
     try {
-      const storagePath = parseStorageVideoPath(url);
-      const data = await fetchJsonFromApi(
-        "/api/gemini/extract-timestamps-from-description",
-        storagePath ? { storagePath } : { youtubeUrl: url }
-      );
+      const data =
+        videoSourceTab === "upload" && uploadFile
+          ? await fetchJsonFromApiWithVideo("/api/gemini/extract-timestamps-from-description", uploadFile)
+          : await fetchJsonFromApi("/api/gemini/extract-timestamps-from-description", { youtubeUrl: url });
       const rawSteps = data.steps;
       const list = Array.isArray(rawSteps) ? rawSteps : [];
       if (!list.length) {
@@ -337,7 +295,11 @@ export function TutorialCreator() {
   /** One click: structure from video, then materials/tools only if still empty. */
   const runFullAutoFromVideo = async () => {
     const url = chapterVideoUrl.trim();
-    if (!url) {
+    if (videoSourceTab === "upload" && !uploadFile) {
+      setError("Upload a video file first.");
+      return;
+    }
+    if (videoSourceTab === "youtube" && !url) {
       setError(
         videoSourceTab === "youtube"
           ? "Paste a YouTube URL above first."
@@ -349,21 +311,13 @@ export function TutorialCreator() {
       setError("Use a valid YouTube URL.");
       return;
     }
-    if (videoSourceTab === "upload") {
-      const p = parseStorageVideoPath(url);
-      if (!p) {
-        setError("Upload a video file first.");
-        return;
-      }
-    }
     setError(null);
     setFullAutoLoading(true);
     try {
-      const storagePath = parseStorageVideoPath(url);
-      const data = await fetchJsonFromApi(
-        "/api/gemini/extract-timestamps-from-description",
-        storagePath ? { storagePath } : { youtubeUrl: url }
-      );
+      const data =
+        videoSourceTab === "upload" && uploadFile
+          ? await fetchJsonFromApiWithVideo("/api/gemini/extract-timestamps-from-description", uploadFile)
+          : await fetchJsonFromApi("/api/gemini/extract-timestamps-from-description", { youtubeUrl: url });
       const rawSteps = data.steps;
       const list = Array.isArray(rawSteps) ? rawSteps : [];
       if (!list.length) {
@@ -398,10 +352,10 @@ export function TutorialCreator() {
 
       const needsMaterials = !mat && !tools;
       if (needsMaterials) {
-        const matData = await fetchJsonFromApi(
-          "/api/gemini/extract-materials",
-          storagePath ? { storagePath } : { youtubeUrl: url }
-        );
+        const matData =
+          videoSourceTab === "upload" && uploadFile
+            ? await fetchJsonFromApiWithVideo("/api/gemini/extract-materials", uploadFile)
+            : await fetchJsonFromApi("/api/gemini/extract-materials", { youtubeUrl: url });
         setMaterialsText(String(matData.materials ?? "").trim());
         setToolsText(String(matData.tools ?? "").trim());
       }
@@ -439,7 +393,11 @@ export function TutorialCreator() {
 
   const extractMaterialsFromTranscript = async () => {
     const url = chapterVideoUrl.trim();
-    if (!url) {
+    if (videoSourceTab === "upload" && !uploadFile) {
+      setError("Upload a video file first.");
+      return;
+    }
+    if (videoSourceTab === "youtube" && !url) {
       setError(
         videoSourceTab === "youtube"
           ? "Paste a YouTube URL above to extract materials & tools."
@@ -451,18 +409,13 @@ export function TutorialCreator() {
       setError("Use a valid YouTube URL.");
       return;
     }
-    if (videoSourceTab === "upload" && !parseStorageVideoPath(url)) {
-      setError("Upload a video file first.");
-      return;
-    }
     setError(null);
     setMaterialsExtractLoading(true);
     try {
-      const storagePath = parseStorageVideoPath(url);
-      const data = await fetchJsonFromApi(
-        "/api/gemini/extract-materials",
-        storagePath ? { storagePath } : { youtubeUrl: url }
-      );
+      const data =
+        videoSourceTab === "upload" && uploadFile
+          ? await fetchJsonFromApiWithVideo("/api/gemini/extract-materials", uploadFile)
+          : await fetchJsonFromApi("/api/gemini/extract-materials", { youtubeUrl: url });
       setMaterialsText(String(data.materials ?? "").trim());
       setToolsText(String(data.tools ?? "").trim());
     } catch (e: unknown) {
@@ -597,6 +550,7 @@ export function TutorialCreator() {
               onClick={() => {
                 setVideoSourceTab("youtube");
                 setChapterVideoUrl("");
+                setUploadFile(null);
               }}
             >
               YouTube Link
@@ -611,6 +565,7 @@ export function TutorialCreator() {
               onClick={() => {
                 setVideoSourceTab("upload");
                 setChapterVideoUrl("");
+                setUploadFile(null);
               }}
             >
               Upload Video
@@ -668,17 +623,17 @@ export function TutorialCreator() {
                 onClick={() => document.getElementById("chapter-file-input")?.click()}
               >
                 <p className="text-sm font-medium text-zinc-800">
-                  {uploading ? "Uploading…" : "Drag & drop your video here"}
+                  {uploadFile ? "Video selected" : "Drag & drop your video here"}
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">
-                  MP4, MOV, or AVI · max 500MB · stored securely (only you can access this file)
+                  MP4, MOV, or AVI · max 80MB for AI extraction · sent directly to Gemini
                 </p>
                 <input
                   id="chapter-file-input"
                   type="file"
                   accept=".mp4,.mov,.avi,video/mp4,video/quicktime,video/x-msvideo"
                   className="hidden"
-                  disabled={uploading}
+                  disabled={false}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f) void uploadChapterFile(f);
@@ -709,11 +664,9 @@ export function TutorialCreator() {
                   fullAutoLoading ||
                   descExtractLoading ||
                   materialsExtractLoading ||
-                  !chapterVideoUrl.trim() ||
-                  uploading ||
+                  (videoSourceTab === "youtube" ? !chapterVideoUrl.trim() : !uploadFile) ||
                   (videoSourceTab === "youtube" &&
-                    !extractYouTubeVideoId(chapterVideoUrl.trim())) ||
-                  (videoSourceTab === "upload" && !parseStorageVideoPath(chapterVideoUrl.trim()))
+                    !extractYouTubeVideoId(chapterVideoUrl.trim()))
                 }
                 onClick={() => void runFullAutoFromVideo()}
               >
@@ -726,11 +679,9 @@ export function TutorialCreator() {
                   fullAutoLoading ||
                   descExtractLoading ||
                   materialsExtractLoading ||
-                  !chapterVideoUrl.trim() ||
-                  uploading ||
+                  (videoSourceTab === "youtube" ? !chapterVideoUrl.trim() : !uploadFile) ||
                   (videoSourceTab === "youtube" &&
-                    !extractYouTubeVideoId(chapterVideoUrl.trim())) ||
-                  (videoSourceTab === "upload" && !parseStorageVideoPath(chapterVideoUrl.trim()))
+                    !extractYouTubeVideoId(chapterVideoUrl.trim()))
                 }
                 onClick={() => void extractTimestampsFromYouTubeVideo()}
               >
@@ -743,11 +694,9 @@ export function TutorialCreator() {
                   fullAutoLoading ||
                   descExtractLoading ||
                   materialsExtractLoading ||
-                  !chapterVideoUrl.trim() ||
-                  uploading ||
+                  (videoSourceTab === "youtube" ? !chapterVideoUrl.trim() : !uploadFile) ||
                   (videoSourceTab === "youtube" &&
-                    !extractYouTubeVideoId(chapterVideoUrl.trim())) ||
-                  (videoSourceTab === "upload" && !parseStorageVideoPath(chapterVideoUrl.trim()))
+                    !extractYouTubeVideoId(chapterVideoUrl.trim()))
                 }
                 onClick={() => void extractMaterialsFromTranscript()}
               >

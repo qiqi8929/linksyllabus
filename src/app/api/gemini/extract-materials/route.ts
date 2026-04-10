@@ -6,7 +6,6 @@ import {
   extractMaterialsAndToolsFromYouTube,
   MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS
 } from "@/lib/gemini";
-import { TUTORIAL_VIDEO_BUCKET } from "@/lib/storageVideoUrl";
 import { extractYouTubeVideoId } from "@/lib/video";
 
 export const runtime = "nodejs";
@@ -15,7 +14,6 @@ export const maxDuration = 300;
 
 type Body = {
   youtubeUrl?: string;
-  storagePath?: string;
 };
 
 function mimeFromPath(path: string): string {
@@ -42,25 +40,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = (await req.json()) as Body;
-  const youtubeUrl = String(body.youtubeUrl ?? "").trim();
-  const storagePath = String(body.storagePath ?? "").trim();
-
-  if (storagePath) {
-    if (!storagePath.startsWith(`${user.id}/`)) {
-      return NextResponse.json({ error: "Invalid storage path." }, { status: 403 });
-    }
+  const contentType = req.headers.get("content-type") ?? "";
+  if (contentType.includes("multipart/form-data")) {
     try {
-      const { data: blob, error: dlErr } = await supabase.storage
-        .from(TUTORIAL_VIDEO_BUCKET)
-        .download(storagePath);
-      if (dlErr || !blob) {
+      const form = await req.formData();
+      const video = form.get("video");
+      if (!(video instanceof File)) {
         return NextResponse.json(
-          { error: dlErr?.message ?? "Could not read uploaded video." },
+          { error: "Missing form-data file field `video`." },
           { status: 400 }
         );
       }
-      const ab = await blob.arrayBuffer();
+      const ab = await video.arrayBuffer();
       const buffer = Buffer.from(ab);
       if (buffer.length > MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS) {
         return NextResponse.json(
@@ -74,15 +65,18 @@ export async function POST(req: Request) {
       }
       const { materials, tools } = await extractMaterialsAndToolsFromVideoBuffer(
         buffer,
-        mimeFromPath(storagePath)
+        video.type || mimeFromPath(video.name)
       );
       return NextResponse.json({ materials, tools });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Extraction failed";
-      console.error("[extract-materials] storage", e);
+      console.error("[extract-materials] upload", e);
       return NextResponse.json({ error: message }, { status: 500 });
     }
   }
+
+  const body = (await req.json()) as Body;
+  const youtubeUrl = String(body.youtubeUrl ?? "").trim();
 
   if (!youtubeUrl) {
     return NextResponse.json(
