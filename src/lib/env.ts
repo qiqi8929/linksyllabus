@@ -1,3 +1,4 @@
+// deploy-bump: new commit triggers a fresh Vercel build; for cache-free redeploy, use Dashboard → Redeploy → uncheck build cache.
 export const env = {
   // 这些 NEXT_PUBLIC_* 变量会在构建时被 Next.js 内联到前端代码里，
   // 所以这里不要用动态的 process.env[name] 访问方式。
