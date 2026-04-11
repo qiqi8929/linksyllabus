@@ -14,6 +14,15 @@ const nextConfig = {
             value: "private, no-cache, no-store, max-age=0, must-revalidate"
           }
         ]
+      },
+      {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "Access-Control-Allow-Origin",
+            value: "*"
+          }
+        ]
       }
     ];
   }
