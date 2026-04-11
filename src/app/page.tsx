@@ -14,24 +14,6 @@ const getLandingMarkup = cache(() =>
   )
 );
 
-const LANDING_HERO_VIDEO_PLACEHOLDER = "%LANDING_HERO_DEMO_VIDEO%";
-
-function escapeHtmlAttr(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;");
-}
-
-function getLandingHtml(): string {
-  const videoSrc =
-    process.env.NEXT_PUBLIC_LANDING_HERO_DEMO_MP4 || "/hero-demo.mp4";
-  return getLandingMarkup().replaceAll(
-    LANDING_HERO_VIDEO_PLACEHOLDER,
-    escapeHtmlAttr(videoSrc)
-  );
-}
-
 export const metadata: Metadata = {
   title: "LinkSyllabus — Turn Your Tutorial Into a Step-by-Step Experience",
   description:
@@ -42,7 +24,7 @@ export default function HomePage() {
   return (
     <div
       id="lp-root"
-      dangerouslySetInnerHTML={{ __html: getLandingHtml() }}
+      dangerouslySetInnerHTML={{ __html: getLandingMarkup() }}
     />
   );
 }

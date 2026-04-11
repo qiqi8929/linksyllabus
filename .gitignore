@@ -8,6 +8,3 @@ out
 dist
 .vercel
 
-# Large marketing demo — host on Supabase Storage (see public/hero-demo.README.txt)
-public/hero-demo.mp4
-

@@ -157,7 +157,7 @@
     }
     .hero-note { font-size: 13px; color: var(--ink-3); margin-bottom: 3.5rem; }
 
-    /* ─── HERO DEMO VIDEO (MP4) — Next app uses env; static file uses /hero-demo.mp4 ─── */
+    /* ─── HERO YOUTUBE EMBED ─── */
     .player-wrap {
       max-width: 680px; margin: 0 auto;
       border: 1.5px solid var(--border);
@@ -171,12 +171,8 @@
       position: relative;
       overflow: hidden;
     }
-    .hero-demo-video {
-      width: 100%;
-      height: 100%;
+    .vid-area iframe {
       display: block;
-      object-fit: cover;
-      vertical-align: middle;
     }
     .steps-panel { border-top: 1px solid #f0ede8; padding: 18px; }
     .steps-label {
@@ -542,17 +538,12 @@
 
     <div class="player-wrap">
       <div class="vid-area">
-        <video
-          class="hero-demo-video"
-          src="/hero-demo.mp4"
-          autoplay
-          loop
-          muted
-          playsinline
-          controls
-          preload="auto"
-          aria-label="LinkSyllabus product demo"
-        ></video>
+        <iframe
+          src="https://www.youtube.com/embed/q9WEi19Py9o?autoplay=1&mute=1&loop=1&playlist=q9WEi19Py9o&controls=0&modestbranding=1&playsinline=1"
+          style="width:100%; aspect-ratio:16/9; border:none; border-radius:12px;"
+          allow="autoplay; fullscreen"
+          allowfullscreen
+        ></iframe>
       </div>
       <div class="steps-panel">
         <div class="steps-label">All steps</div>
