@@ -8,6 +8,7 @@ import {
   waitForGeminiFileReady
 } from "@/lib/geminiVideoFileApi";
 import { extractYouTubeVideoId } from "@/lib/video";
+import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
 
 function youtubeWatchPageUrl(youtubeUrl: string): string {
   const id = extractYouTubeVideoId(youtubeUrl.trim());
@@ -152,7 +153,7 @@ Time information belongs only in the 'start' and 'end' fields.
 第一步固定为Materials & Tools：
 {
   "name": "Materials & Tools",
-  "description": "列出视频中提到的所有材料和工具，每项单独一行，包含具体规格。例如：\\n- Yarn: Bulky weight (Level 5) in grey and white\\n- Hook: 5.0mm crochet hook\\n- Notions: Safety eyes 10mm, fiberfill stuffing, scissors, yarn needle",
+  "description": "List all materials and tools mentioned in the video. Put each item on its own line with specific specs when available. Example:\\n- Yarn: Bulky weight (Level 5) in grey and white\\n- Hook: 5.0mm crochet hook\\n- Notions: Safety eyes 10mm, fiberfill stuffing, scissors, yarn needle",
   "start": 0,
   "end": [第一个实际操作步骤开始的秒数]
 }
@@ -238,7 +239,7 @@ function splitMaterialsToolsFromDescription(description: string): {
   materialsText: string;
   toolsText: string;
 } {
-  const t = description.trim();
+  const t = stripLeadingMaterialsMetaLines(description);
   if (!t) {
     return { materialsText: "", toolsText: "" };
   }
@@ -760,8 +761,10 @@ function parseMaterialsToolsPayload(raw: string): { materials: string; tools: st
   const coerce = (chunk: string) => {
     const o = JSON.parse(chunk) as { materials?: unknown; tools?: unknown };
     return {
-      materials: normalizeMaterialsToolsField(o.materials),
-      tools: normalizeMaterialsToolsField(o.tools)
+      materials: stripLeadingMaterialsMetaLines(
+        normalizeMaterialsToolsField(o.materials)
+      ),
+      tools: stripLeadingMaterialsMetaLines(normalizeMaterialsToolsField(o.tools))
     };
   };
 

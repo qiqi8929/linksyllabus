@@ -6,7 +6,7 @@
 - Dashboard 创建 Tutorial SKU（name/youtube_url/start/end/description）
 - 每个 SKU 自动生成 QR（指向 `/play/[id]`），可下载 PNG
 - `/play/[id]`：YouTube IFrame 播放片段，到 end_time 自动暂停；结束后全屏“回到教材”提示（重播/暂停/完成）
-- Stripe Checkout：SKU 一次性 $19 激活；订阅 $19.9/月（用于记录用户订阅状态）
+- Stripe Checkout：SKU 一次性 $9.9 / Tutorial 激活；订阅 $19.9/月（用于记录用户订阅状态）
 - Supabase 数据库：`users`、`skus`、`subscriptions`
 
 ## 1) 本地启动
@@ -38,7 +38,7 @@ npm run dev
 
 在 Stripe Dashboard 创建：
 
-- 一个 **Product + Price（one-time）**：$19 USD（SKU 激活）
+- 一个 **Product + Price（one-time）**：$9.9（每个 Tutorial 激活）
 - 一个 **Product + Price（recurring monthly）**：$19.9/月（订阅）
 
 把 price id 填到 `src/lib/stripe/prices.ts`。

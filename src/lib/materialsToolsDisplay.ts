@@ -1,3 +1,5 @@
+import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
+
 /**
  * Tutorial UI: detect a step row that holds Materials & Tools (some flows store
  * lists only on `steps`, not `skus.materials_text` / `tools_text`).
@@ -24,7 +26,7 @@ export function splitDescriptionIntoMaterialsAndTools(description: string): {
   materialsText: string;
   toolsText: string;
 } {
-  const t = description.trim();
+  const t = stripLeadingMaterialsMetaLines(description);
   if (!t) {
     return { materialsText: "", toolsText: "" };
   }

@@ -1,4 +1,5 @@
 import { stripLeadingStepNumberFromTitle } from "@/lib/stepTitle";
+import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
 import "./print-manual.css";
 
 type StepRow = {
@@ -91,8 +92,12 @@ export function PrintManualView({
 
   const footerBrand = "linksyllabus.com";
 
-  const materialsBody = sku.materials_text?.trim() ?? "";
-  const toolsBody = sku.tools_text?.trim() ?? "";
+  const materialsBody = stripLeadingMaterialsMetaLines(
+    sku.materials_text?.trim() ?? ""
+  );
+  const toolsBody = stripLeadingMaterialsMetaLines(
+    sku.tools_text?.trim() ?? ""
+  );
   const showMaterialsSheet = materialsBody.length > 0 || toolsBody.length > 0;
 
   return (

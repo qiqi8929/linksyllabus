@@ -49,7 +49,7 @@ export function ActivateSkuButton({ skuId, disabled }: { skuId: string; disabled
         }
       }}
     >
-      {loading ? "跳转中..." : "激活 $19"}
+      {loading ? "跳转中..." : "激活 $9.9 / Tutorial"}
     </button>
   );
 }

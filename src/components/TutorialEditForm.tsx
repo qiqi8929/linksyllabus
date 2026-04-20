@@ -8,6 +8,7 @@ import {
   type TutorialStepUpdateInput
 } from "@/app/dashboard/serverActions";
 import { extractYouTubeVideoId } from "@/lib/video";
+import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
 
 type StepRow = {
   id: string;
@@ -39,8 +40,12 @@ export function TutorialEditForm({
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
-  const [materialsText, setMaterialsText] = useState(initialMaterials);
-  const [toolsText, setToolsText] = useState(initialTools);
+  const [materialsText, setMaterialsText] = useState(() =>
+    stripLeadingMaterialsMetaLines(initialMaterials)
+  );
+  const [toolsText, setToolsText] = useState(() =>
+    stripLeadingMaterialsMetaLines(initialTools)
+  );
   const [steps, setSteps] = useState<StepRow[]>(initialSteps);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -81,8 +86,12 @@ export function TutorialEditForm({
       if (!res.ok) {
         throw new Error(data.error || "Could not extract materials & tools.");
       }
-      setMaterialsText(String(data.materials ?? "").trim());
-      setToolsText(String(data.tools ?? "").trim());
+      setMaterialsText(
+        stripLeadingMaterialsMetaLines(String(data.materials ?? "").trim())
+      );
+      setToolsText(
+        stripLeadingMaterialsMetaLines(String(data.tools ?? "").trim())
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Materials extraction failed.");
     } finally {

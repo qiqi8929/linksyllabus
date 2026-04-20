@@ -7,6 +7,7 @@ import {
 } from "@/app/dashboard/serverActions";
 import { parseAiTutorialPaste } from "@/lib/parseAiTutorialPaste";
 import { extractYouTubeVideoId } from "@/lib/video";
+import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 const UPLOAD_ACCEPT = new Set(["mp4", "mov", "avi"]);
@@ -261,9 +262,15 @@ export function TutorialCreator() {
       }
       setOutlineEstimated(data.estimated === true);
       setMaterialsText(
-        String(data.materialsText ?? data.materials_text ?? "").trim()
+        stripLeadingMaterialsMetaLines(
+          String(data.materialsText ?? data.materials_text ?? "").trim()
+        )
       );
-      setToolsText(String(data.toolsText ?? data.tools_text ?? "").trim());
+      setToolsText(
+        stripLeadingMaterialsMetaLines(
+          String(data.toolsText ?? data.tools_text ?? "").trim()
+        )
+      );
       const mapped = list.map((item) => {
         const s = item as Record<string, unknown>;
         const stepName = String(s.stepName ?? s.step_name ?? "").trim();
@@ -324,8 +331,12 @@ export function TutorialCreator() {
         throw new Error("The model did not return any instructional steps.");
       }
       setOutlineEstimated(data.estimated === true);
-      const mat = String(data.materialsText ?? data.materials_text ?? "").trim();
-      const tools = String(data.toolsText ?? data.tools_text ?? "").trim();
+      const mat = stripLeadingMaterialsMetaLines(
+        String(data.materialsText ?? data.materials_text ?? "").trim()
+      );
+      const tools = stripLeadingMaterialsMetaLines(
+        String(data.toolsText ?? data.tools_text ?? "").trim()
+      );
       setMaterialsText(mat);
       setToolsText(tools);
       const mapped = list.map((item) => {
@@ -356,8 +367,12 @@ export function TutorialCreator() {
           videoSourceTab === "upload" && uploadFile
             ? await fetchJsonFromApiWithVideo("/api/gemini/extract-materials", uploadFile)
             : await fetchJsonFromApi("/api/gemini/extract-materials", { youtubeUrl: url });
-        setMaterialsText(String(matData.materials ?? "").trim());
-        setToolsText(String(matData.tools ?? "").trim());
+        setMaterialsText(
+          stripLeadingMaterialsMetaLines(String(matData.materials ?? "").trim())
+        );
+        setToolsText(
+          stripLeadingMaterialsMetaLines(String(matData.tools ?? "").trim())
+        );
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Auto-fill from video failed.");
@@ -377,8 +392,8 @@ export function TutorialCreator() {
       setTutorialName(result.tutorialName);
     }
     setOutlineEstimated(false);
-    setMaterialsText(result.materialsText);
-    setToolsText(result.toolsText);
+    setMaterialsText(stripLeadingMaterialsMetaLines(result.materialsText));
+    setToolsText(stripLeadingMaterialsMetaLines(result.toolsText));
     setSteps(
       result.steps.map((s) => ({
         id: makeId(),
@@ -416,8 +431,12 @@ export function TutorialCreator() {
         videoSourceTab === "upload" && uploadFile
           ? await fetchJsonFromApiWithVideo("/api/gemini/extract-materials", uploadFile)
           : await fetchJsonFromApi("/api/gemini/extract-materials", { youtubeUrl: url });
-      setMaterialsText(String(data.materials ?? "").trim());
-      setToolsText(String(data.tools ?? "").trim());
+      setMaterialsText(
+        stripLeadingMaterialsMetaLines(String(data.materials ?? "").trim())
+      );
+      setToolsText(
+        stripLeadingMaterialsMetaLines(String(data.tools ?? "").trim())
+      );
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Materials extraction failed.");
     } finally {
@@ -894,7 +913,7 @@ Example:
             disabled={payLoading}
             onClick={onPay}
           >
-            {payLoading ? "Redirecting…" : "Pay $19.90"}
+            {payLoading ? "Redirecting…" : "Pay $9.90 / Tutorial"}
           </button>
         </div>
       </section>

@@ -19,6 +19,7 @@ import {
   buildYouTubeWatchUrl
 } from "@/lib/youtubeUrls";
 import { detectVideoKind, extractYouTubeVideoId } from "@/lib/video";
+import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
 
 export type TutorialStepPayload = {
   id: string;
@@ -74,8 +75,10 @@ export function TutorialViewClient({
     const i = steps.findIndex((s) => s.step_number === initialStepNumber);
     return i >= 0 ? i : 0;
   });
-  const materialsBody = (materialsText ?? "").trim();
-  const toolsBody = (toolsText ?? "").trim();
+  const materialsBody = stripLeadingMaterialsMetaLines(
+    (materialsText ?? "").trim()
+  );
+  const toolsBody = stripLeadingMaterialsMetaLines((toolsText ?? "").trim());
   const hasMaterialsNav = materialsBody.length > 0 || toolsBody.length > 0;
   const [view, setView] = useState<"materials" | "step">("step");
   const [sidebarOpen, setSidebarOpen] = useState(true);

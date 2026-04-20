@@ -12,6 +12,58 @@ type Payload =
   | { type: "subscription" }
   | { type: "sku"; skuId: string };
 
+/** Test vs live Stripe keys use different customer namespaces; stale IDs in DB cause "No such customer". */
+function isStaleStripeCustomerError(err: unknown): boolean {
+  const e = err as { type?: string; code?: string; message?: string; param?: string };
+  if (e?.type !== "StripeInvalidRequestError") return false;
+  if (/no such customer/i.test(String(e?.message ?? ""))) return true;
+  return e?.code === "resource_missing" && e?.param === "customer";
+}
+
+type AdminClient = ReturnType<typeof createSupabaseAdminClient>;
+
+async function getOrCreateStripeCustomerId(
+  stripe: ReturnType<typeof getStripe>,
+  admin: AdminClient,
+  user: { id: string; email?: string | null }
+): Promise<string> {
+  const { data: row } = await admin
+    .from("subscriptions")
+    .select("stripe_customer_id,status")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const existing = row?.stripe_customer_id?.trim();
+  if (existing) {
+    try {
+      const found = await stripe.customers.retrieve(existing);
+      if (!("deleted" in found && found.deleted)) {
+        return existing;
+      }
+    } catch (e) {
+      if (!isStaleStripeCustomerError(e)) {
+        throw e;
+      }
+    }
+    // Existing id is stale (often test/live switch); clear it before recreation.
+    await admin
+      .from("subscriptions")
+      .update({ stripe_customer_id: null })
+      .eq("user_id", user.id);
+  }
+
+  const customer = await stripe.customers.create({
+    email: user.email ?? undefined,
+    metadata: { user_id: user.id }
+  });
+  await admin.from("subscriptions").upsert({
+    user_id: user.id,
+    stripe_customer_id: customer.id,
+    status: row?.status ?? "inactive"
+  });
+  return customer.id;
+}
+
 export async function POST(req: Request) {
   try {
     const supabase = createSupabaseRouteHandlerClient(req);
@@ -31,43 +83,38 @@ export async function POST(req: Request) {
 
     const stripe = getStripe();
 
-    // Ensure stripe customer for subscription tracking
-    const { data: subRow } = await admin
-      .from("subscriptions")
-      .select("stripe_customer_id,status")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    let customerId = subRow?.stripe_customer_id ?? null;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email ?? undefined,
-        metadata: { user_id: user.id }
-      });
-      customerId = customer.id;
-      await admin.from("subscriptions").upsert({
-        user_id: user.id,
-        stripe_customer_id: customerId,
-        status: subRow?.status ?? "inactive"
-      });
-    }
-
     if (payload.type === "subscription") {
       const success_url = `${appUrl}/dashboard?checkout=success`;
-      const session = await stripe.checkout.sessions.create({
-        mode: "subscription",
-        customer: customerId,
-        line_items: [
-          { price: STRIPE_PRICES.subscriptionMonthlyUsd199, quantity: 1 }
-        ],
-        success_url,
-        cancel_url,
-        metadata: {
-          type: "subscription",
-          user_id: user.id
-        }
-      });
-      return NextResponse.json({ url: session.url });
+      let customerId = await getOrCreateStripeCustomerId(stripe, admin, user);
+      const createSubSession = () =>
+        stripe.checkout.sessions.create({
+          mode: "subscription",
+          customer: customerId,
+          allow_promotion_codes: true,
+          line_items: [
+            { price: STRIPE_PRICES.subscriptionMonthlyUsd199, quantity: 1 }
+          ],
+          success_url,
+          cancel_url,
+          metadata: {
+            type: "subscription",
+            user_id: user.id
+          }
+        });
+
+      try {
+        const session = await createSubSession();
+        return NextResponse.json({ url: session.url });
+      } catch (e) {
+        if (!isStaleStripeCustomerError(e)) throw e;
+        await admin
+          .from("subscriptions")
+          .update({ stripe_customer_id: null })
+          .eq("user_id", user.id);
+        customerId = await getOrCreateStripeCustomerId(stripe, admin, user);
+        const session = await createSubSession();
+        return NextResponse.json({ url: session.url });
+      }
     }
 
     const skuId = payload.skuId;
@@ -87,20 +134,36 @@ export async function POST(req: Request) {
     )}&session_id={CHECKOUT_SESSION_ID}`;
     if (sku.is_active) return NextResponse.json({ url: successSkuUrl });
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      customer: customerId,
-      line_items: [{ price: STRIPE_PRICES.skuActivationOneTimeUsd19, quantity: 1 }],
-      success_url: successSkuUrl,
-      cancel_url,
-      metadata: {
-        type: "sku",
-        user_id: user.id,
-        sku_id: skuId
-      }
-    });
+    let customerId = await getOrCreateStripeCustomerId(stripe, admin, user);
 
-    return NextResponse.json({ url: session.url });
+    const createSkuSession = () =>
+      stripe.checkout.sessions.create({
+        mode: "payment",
+        customer: customerId,
+        allow_promotion_codes: true,
+        line_items: [{ price: STRIPE_PRICES.skuActivationOneTimeUsd99, quantity: 1 }],
+        success_url: successSkuUrl,
+        cancel_url,
+        metadata: {
+          type: "sku",
+          user_id: user.id,
+          sku_id: skuId
+        }
+      });
+
+    try {
+      const session = await createSkuSession();
+      return NextResponse.json({ url: session.url });
+    } catch (e) {
+      if (!isStaleStripeCustomerError(e)) throw e;
+      await admin
+        .from("subscriptions")
+        .update({ stripe_customer_id: null })
+        .eq("user_id", user.id);
+      customerId = await getOrCreateStripeCustomerId(stripe, admin, user);
+      const session = await createSkuSession();
+      return NextResponse.json({ url: session.url });
+    }
   } catch (error: unknown) {
     const e = error as any;
     console.error("[stripe checkout] POST failed", {
