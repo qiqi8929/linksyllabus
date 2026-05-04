@@ -2,27 +2,20 @@ import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import {
-  extractTutorialStructureFromUploadedVideoBuffer,
-  extractTutorialStructureFromYouTubeVideo,
-  MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS
+  extractTutorialStructureFromPublicVideoUrl,
+  extractTutorialStructureFromYouTubeVideo
 } from "@/lib/gemini";
+import { buildCloudflareDownloadUrl } from "@/lib/cloudflareStream";
 import { extractYouTubeVideoId } from "@/lib/video";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 type Body = {
   youtubeUrl?: string;
+  streamVideoId?: string;
 };
-
-function mimeFromPath(path: string): string {
-  const lower = path.toLowerCase();
-  if (lower.endsWith(".mp4")) return "video/mp4";
-  if (lower.endsWith(".mov")) return "video/quicktime";
-  if (lower.endsWith(".avi")) return "video/x-msvideo";
-  return "video/mp4";
-}
 
 export async function POST(req: Request) {
   if (!env.geminiApiKey()) {
@@ -40,41 +33,36 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const contentType = req.headers.get("content-type") ?? "";
-  if (contentType.includes("multipart/form-data")) {
+  const rawBody = await req.text();
+  const bodyBytes = Buffer.byteLength(rawBody, "utf8");
+  console.log("[extract-timestamps-from-description] request body bytes:", bodyBytes);
+  console.log("[extract-timestamps-from-description] request body raw:", rawBody);
+
+  let body: Body;
+  try {
+    body = (rawBody ? JSON.parse(rawBody) : {}) as Body;
+  } catch (error) {
+    console.error("[extract-timestamps-from-description] invalid JSON body:", error);
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+  const youtubeUrl = String(body.youtubeUrl ?? "").trim();
+  const streamVideoId = String(body.streamVideoId ?? "").trim();
+  console.log(
+    "[extract-timestamps-from-description] parsed body keys:",
+    Object.keys(body as Record<string, unknown>)
+  );
+
+  if (streamVideoId) {
     try {
-      const form = await req.formData();
-      const video = form.get("video");
-      if (!(video instanceof File)) {
+      const customerSubdomain = env.cloudflareStream.customerSubdomain()?.trim();
+      if (!customerSubdomain) {
         return NextResponse.json(
-          { error: "Missing form-data file field `video`." },
-          { status: 400 }
+          { error: "Cloudflare Stream is not configured." },
+          { status: 500 }
         );
       }
-      const ab = await video.arrayBuffer();
-      const buffer = Buffer.from(ab);
-      if (buffer.length > MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS) {
-        return NextResponse.json(
-          {
-            error: `Auto-extract works on videos up to ${Math.floor(
-              MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS / (1024 * 1024)
-            )} MB. Trim or compress the file, or add steps manually.`
-          },
-          { status: 413 }
-        );
-      }
-      const result = await extractTutorialStructureFromUploadedVideoBuffer(
-        buffer,
-        video.type || mimeFromPath(video.name)
-      );
-      console.log(
-        "[extract-timestamps-from-description] upload",
-        JSON.stringify({
-          stepCount: result.steps.length,
-          estimated: result.estimated,
-          hasMaterials: result.materialsText.length > 0 || result.toolsText.length > 0
-        })
-      );
+      const publicVideoUrl = buildCloudflareDownloadUrl(customerSubdomain, streamVideoId);
+      const result = await extractTutorialStructureFromPublicVideoUrl(publicVideoUrl, "video/mp4");
       return NextResponse.json({
         steps: result.steps.map((s) => ({
           stepName: s.stepName,
@@ -88,17 +76,14 @@ export async function POST(req: Request) {
       });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Extraction failed";
-      console.error("[extract-timestamps-from-description] upload ERROR:", e);
+      console.error("[extract-timestamps-from-description] stream ERROR:", e);
       return NextResponse.json({ error: message }, { status: 500 });
     }
   }
 
-  const body = (await req.json()) as Body;
-  const youtubeUrl = String(body.youtubeUrl ?? "").trim();
-
   if (!youtubeUrl) {
     return NextResponse.json(
-      { error: "Provide a YouTube URL or upload a video first." },
+      { error: "Provide a YouTube URL or Cloudflare Stream video id first." },
       { status: 400 }
     );
   }

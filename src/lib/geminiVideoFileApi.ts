@@ -144,6 +144,61 @@ export async function generateContentWithYouTubeWatchUrl(
   return text;
 }
 
+/** Analyze a public video URL by passing it as fileData.fileUri. */
+export async function generateContentWithPublicVideoUrl(
+  videoUrl: string,
+  mimeType: string,
+  prompt: string,
+  temperature: number,
+  onGemini?: (payload: GeminiVideoDebugPayload) => void
+): Promise<string> {
+  const apiKey = env.geminiApiKey();
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured");
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.geminiModel()}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              fileData: {
+                mimeType,
+                fileUri: videoUrl.trim()
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature
+      }
+    })
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini public video request failed: ${res.status} ${errText}`);
+  }
+
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error("Empty response from Gemini (public video URL)");
+  }
+  onGemini?.({ responseJson: data, modelText: text });
+  return text;
+}
+
 export async function generateContentWithVideoFile(
   fileUri: string,
   mimeType: string,

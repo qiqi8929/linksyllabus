@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import {
-  extractMaterialsAndToolsFromVideoBuffer,
+  extractMaterialsAndToolsFromPublicVideoUrl,
   extractMaterialsAndToolsFromYouTube,
-  MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS
 } from "@/lib/gemini";
+import { buildCloudflareDownloadUrl } from "@/lib/cloudflareStream";
 import { extractYouTubeVideoId } from "@/lib/video";
 
 export const runtime = "nodejs";
@@ -14,15 +14,8 @@ export const maxDuration = 300;
 
 type Body = {
   youtubeUrl?: string;
+  streamVideoId?: string;
 };
-
-function mimeFromPath(path: string): string {
-  const lower = path.toLowerCase();
-  if (lower.endsWith(".mp4")) return "video/mp4";
-  if (lower.endsWith(".mov")) return "video/quicktime";
-  if (lower.endsWith(".avi")) return "video/x-msvideo";
-  return "video/mp4";
-}
 
 export async function POST(req: Request) {
   if (!env.geminiApiKey()) {
@@ -40,47 +33,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const contentType = req.headers.get("content-type") ?? "";
-  if (contentType.includes("multipart/form-data")) {
+  const body = (await req.json()) as Body;
+  const youtubeUrl = String(body.youtubeUrl ?? "").trim();
+  const streamVideoId = String(body.streamVideoId ?? "").trim();
+
+  if (streamVideoId) {
     try {
-      const form = await req.formData();
-      const video = form.get("video");
-      if (!(video instanceof File)) {
+      const customerSubdomain = env.cloudflareStream.customerSubdomain()?.trim();
+      if (!customerSubdomain) {
         return NextResponse.json(
-          { error: "Missing form-data file field `video`." },
-          { status: 400 }
+          { error: "Cloudflare Stream is not configured." },
+          { status: 500 }
         );
       }
-      const ab = await video.arrayBuffer();
-      const buffer = Buffer.from(ab);
-      if (buffer.length > MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS) {
-        return NextResponse.json(
-          {
-            error: `Auto-extract works on videos up to ${Math.floor(
-              MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS / (1024 * 1024)
-            )} MB. Trim or compress the file, or enter materials manually.`
-          },
-          { status: 413 }
-        );
-      }
-      const { materials, tools } = await extractMaterialsAndToolsFromVideoBuffer(
-        buffer,
-        video.type || mimeFromPath(video.name)
+      const publicVideoUrl = buildCloudflareDownloadUrl(customerSubdomain, streamVideoId);
+      const { materials, tools } = await extractMaterialsAndToolsFromPublicVideoUrl(
+        publicVideoUrl,
+        "video/mp4"
       );
       return NextResponse.json({ materials, tools });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Extraction failed";
-      console.error("[extract-materials] upload", e);
+      console.error("[extract-materials] stream", e);
       return NextResponse.json({ error: message }, { status: 500 });
     }
   }
 
-  const body = (await req.json()) as Body;
-  const youtubeUrl = String(body.youtubeUrl ?? "").trim();
-
   if (!youtubeUrl) {
     return NextResponse.json(
-      { error: "Provide a YouTube URL or upload a video first." },
+      { error: "Provide a YouTube URL or Cloudflare Stream video id first." },
       { status: 400 }
     );
   }

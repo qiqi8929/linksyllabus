@@ -6,6 +6,7 @@ import {
   extractYouTubeVideoId
 } from "@/lib/video";
 import {
+  CloudflareStreamClipPlayer,
   StorageVideoClipPlayer,
   VimeoPlayerClient,
   YouTubePlayerClient
@@ -63,6 +64,7 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
   const showYoutube = kind === "youtube" && Boolean(youtubeId);
   const showVimeo = kind === "vimeo" && Boolean(vimeoId);
   const showStorage = kind === "storage";
+  const showStream = kind === "stream";
 
   return (
     <main className="container-page py-6 md:py-10">
@@ -117,7 +119,13 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
           </div>
         ) : null}
 
-        {!showYoutube && !showVimeo && !showStorage ? (
+        {showStream ? (
+          <div className="card aspect-video overflow-hidden rounded-xl border border-zinc-200 bg-black p-0">
+            <CloudflareStreamClipPlayer stepId={step.id} />
+          </div>
+        ) : null}
+
+        {!showYoutube && !showVimeo && !showStorage && !showStream ? (
           <div className="card p-6">
             <div className="text-sm font-medium">Unsupported or invalid video URL</div>
             <div className="mt-1 text-sm text-zinc-600">

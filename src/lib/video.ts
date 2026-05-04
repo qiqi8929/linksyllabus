@@ -1,6 +1,7 @@
 import { isStorageVideoUrl } from "@/lib/storageVideoUrl";
+import { isCloudflareStreamVideoId } from "@/lib/cloudflareStream";
 
-export type VideoKind = "youtube" | "vimeo" | "storage" | "unknown";
+export type VideoKind = "youtube" | "vimeo" | "storage" | "stream" | "unknown";
 
 export function extractYouTubeVideoId(url: string): string | null {
   try {
@@ -51,6 +52,7 @@ export function extractVimeoVideoId(url: string): string | null {
 
 export function detectVideoKind(url: string): VideoKind {
   if (isStorageVideoUrl(url)) return "storage";
+  if (isCloudflareStreamVideoId(url)) return "stream";
   if (extractYouTubeVideoId(url)) return "youtube";
   if (extractVimeoVideoId(url)) return "vimeo";
   return "unknown";

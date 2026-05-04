@@ -17,7 +17,7 @@ export async function signOutAction() {
 export type TutorialStepInput = {
   step_name: string;
   description: string;
-  /** Stored in `steps.youtube_url`; may be YouTube or Vimeo. */
+  /** Stored in `steps.youtube_url`; may be YouTube/Vimeo URL, legacy ls-storage ref, or Stream video id. */
   youtube_url: string;
   start_time: number;
   end_time: number;

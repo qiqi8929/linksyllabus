@@ -2,13 +2,17 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { parseStorageVideoPath, TUTORIAL_VIDEO_BUCKET } from "@/lib/storageVideoUrl";
+import { buildCloudflareIframeUrl, isCloudflareStreamVideoId } from "@/lib/cloudflareStream";
+import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Redirects to a short-lived signed URL for a step whose `youtube_url` points at
- * `ls-storage://tutorial-videos/...`. Allowed when the parent SKU is active or the viewer is the owner.
+ * Resolves a playable URL for a step video.
+ * - Legacy Supabase Storage refs (`ls-storage://...`) => short-lived signed URL redirect.
+ * - Cloudflare Stream video id => redirect to Stream iframe player URL.
+ * Allowed when the parent SKU is active or the viewer is the owner.
  */
 export async function GET(req: Request) {
   const stepId = new URL(req.url).searchParams.get("stepId");
@@ -30,8 +34,11 @@ export async function GET(req: Request) {
   }
 
   const objectPath = parseStorageVideoPath(stepRow.youtube_url);
-  if (!objectPath) {
-    return NextResponse.json({ error: "This step does not use an uploaded video." }, { status: 400 });
+  const streamId = isCloudflareStreamVideoId(stepRow.youtube_url)
+    ? stepRow.youtube_url.trim()
+    : null;
+  if (!objectPath && !streamId) {
+    return NextResponse.json({ error: "This step does not use a managed upload video." }, { status: 400 });
   }
 
   const { data: sku, error: skuErr } = await admin
@@ -53,16 +60,25 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Forbidden." }, { status: 403 });
   }
 
-  const { data: signed, error: signErr } = await admin.storage
-    .from(TUTORIAL_VIDEO_BUCKET)
-    .createSignedUrl(objectPath, 3600);
+  if (objectPath) {
+    const { data: signed, error: signErr } = await admin.storage
+      .from(TUTORIAL_VIDEO_BUCKET)
+      .createSignedUrl(objectPath, 3600);
 
-  if (signErr || !signed?.signedUrl) {
-    return NextResponse.json(
-      { error: "Could not create a playback URL." },
-      { status: 500 }
-    );
+    if (signErr || !signed?.signedUrl) {
+      return NextResponse.json(
+        { error: "Could not create a playback URL." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.redirect(signed.signedUrl);
   }
 
-  return NextResponse.redirect(signed.signedUrl);
+  const customerSubdomain = env.cloudflareStream.customerSubdomain()?.trim();
+  if (!customerSubdomain || !streamId) {
+    return NextResponse.json({ error: "Cloudflare Stream is not configured." }, { status: 500 });
+  }
+  const iframeUrl = buildCloudflareIframeUrl(customerSubdomain, streamId);
+  return NextResponse.redirect(iframeUrl);
 }

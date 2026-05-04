@@ -2,6 +2,7 @@ import { env } from "@/lib/env";
 import { fetchYouTubeOEmbedTitle } from "@/lib/transcript";
 import {
   deleteGeminiFileByName,
+  generateContentWithPublicVideoUrl,
   generateContentWithVideoFile,
   generateContentWithYouTubeWatchUrl,
   uploadVideoToGemini,
@@ -440,6 +441,70 @@ Output **only** the JSON array specified in the system prompt, no markdown fence
   };
 }
 
+/** Same as YouTube extraction, but for any public direct video URL (e.g. Cloudflare Stream download URL). */
+export async function extractTutorialStructureFromPublicVideoUrl(
+  videoUrl: string,
+  mimeType: string,
+  options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
+): Promise<ExtractTutorialStructureResult> {
+  const source = videoUrl.trim();
+  if (!source) {
+    throw new Error("A public video URL is required.");
+  }
+  const prompt = `${TUTORIAL_ANALYST_SYSTEM_PROMPT}
+
+---
+
+You are given the full video (watch it — visuals and audio). Do **not** rely on captions; segment the tutorial from what you see and hear.
+
+Rules:
+- start、end：整数秒，从 0 秒起算；name/description 中不要写秒数。
+- Reminder: each "name" must be a short English title only — no "Time Segment" or time wording in names.
+- 除 Materials & Tools 外每一步 end > start；步骤按时间顺序推进。
+
+Output **only** the JSON array specified in the system prompt, no markdown fences.`;
+
+  const text = await generateContentWithPublicVideoUrl(
+    source,
+    mimeType,
+    prompt,
+    0.2,
+    options?.onGemini
+  );
+  const rows = parseTutorialStructureJsonArray(text);
+
+  if (rows.length === 0) {
+    throw new Error("The model did not return any steps. Try again or use a shorter public video.");
+  }
+
+  const peeled = peelLeadingMaterialsRow(rows);
+  const materialsDescription = peeled.materialsDescription;
+  const work = peeled.work;
+
+  if (work.length === 0) {
+    throw new Error(
+      "The model returned only a Materials & Tools block. Try again or add instructional steps manually."
+    );
+  }
+
+  const mapped: TutorialStructureStep[] = work.map((r) => ({
+    stepName: sanitizeTutorialStepName(r.name),
+    description: r.description,
+    start_time: r.start,
+    end_time: r.end
+  }));
+
+  const steps = normalizeContiguousSteps(mapped);
+  const { materialsText, toolsText } = splitMaterialsToolsFromDescription(materialsDescription);
+
+  return {
+    materialsText,
+    toolsText,
+    steps,
+    estimated: false
+  };
+}
+
 function parseVideoStepTimestampsArray(raw: string): StepTimestampFromVideo[] {
   let s = raw.trim();
   s = s.replace(/^```(?:json)?\s*\r?\n?/i, "");
@@ -809,6 +874,39 @@ Respond only with valid JSON, no markdown, no backticks. Exact shape:
 Use empty string "" if a category truly has nothing relevant.`;
 
   const text = await generateContentWithYouTubeWatchUrl(watch, prompt, 0.35, options?.onGemini);
+  return parseMaterialsToolsPayload(text);
+}
+
+export async function extractMaterialsAndToolsFromPublicVideoUrl(
+  videoUrl: string,
+  mimeType: string,
+  options?: { onGemini?: (payload: GeminiTimestampsDebugPayload) => void }
+): Promise<{ materials: string; tools: string }> {
+  const source = videoUrl.trim();
+  if (!source) {
+    throw new Error("A public video URL is required.");
+  }
+  const prompt = `Watch this tutorial video (visuals and what people say on screen / in audio).
+
+Extract two plain-text lists for the viewer:
+
+1) "materials" — supplies, yarn, fabric, quantities, colors, etc. Use short lines or comma-separated.
+
+2) "tools" — hooks, needles, scissors, etc.
+
+Base lists on what is **shown or stated** in the video. If something is unclear, infer cautiously from context.
+
+Respond only with valid JSON, no markdown, no backticks. Exact shape:
+{"materials":"...","tools":"..."}
+Use empty string "" if a category truly has nothing relevant.`;
+
+  const text = await generateContentWithPublicVideoUrl(
+    source,
+    mimeType,
+    prompt,
+    0.35,
+    options?.onGemini
+  );
   return parseMaterialsToolsPayload(text);
 }
 

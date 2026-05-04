@@ -256,7 +256,9 @@ Example:
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-zinc-600">Video URL (YouTube or Vimeo)</label>
+              <label className="text-xs text-zinc-600">
+                Video source (YouTube/Vimeo URL, `ls-storage://...`, or Cloudflare Stream video ID)
+              </label>
               <input
                 value={s.youtube_url}
                 onChange={(e) =>

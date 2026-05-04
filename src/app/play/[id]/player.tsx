@@ -421,6 +421,20 @@ export function StorageVideoClipPlayer({
   );
 }
 
+/** Clip player for Cloudflare Stream-backed steps via `/api/video/playback` redirect. */
+export function CloudflareStreamClipPlayer({ stepId }: { stepId: string }) {
+  const src = `/api/video/playback?stepId=${encodeURIComponent(stepId)}`;
+  return (
+    <iframe
+      src={src}
+      className="h-full w-full"
+      allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+      allowFullScreen
+      title="Tutorial video clip"
+    />
+  );
+}
+
 export function loadYouTubeIframeApi(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (window.YT?.Player) return Promise.resolve();

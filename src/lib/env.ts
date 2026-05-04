@@ -47,5 +47,13 @@ export const env = {
    * Downloading caption files via `captions.download` still requires OAuth; we do not use it here.
    */
   youtubeDataApiKey: () => process.env.YOUTUBE_API_KEY as string | undefined
+  ,
+
+  cloudflareStream: {
+    accountId: () => process.env.CLOUDFLARE_ACCOUNT_ID as string | undefined,
+    apiToken: () => process.env.CLOUDFLARE_STREAM_API_TOKEN as string | undefined,
+    customerSubdomain: () =>
+      process.env.CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN as string | undefined
+  }
 };
 

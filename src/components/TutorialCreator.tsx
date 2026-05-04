@@ -8,6 +8,7 @@ import {
 import { parseAiTutorialPaste } from "@/lib/parseAiTutorialPaste";
 import { extractYouTubeVideoId } from "@/lib/video";
 import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
+import { Upload } from "tus-js-client";
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 const UPLOAD_ACCEPT = new Set(["mp4", "mov", "avi"]);
@@ -35,6 +36,43 @@ function emptyStep(): StepRow {
     end_time: 60,
     description: ""
   };
+}
+
+/** DevTools: confirm Gemini routes only get ids/URLs, never File/blob/base64. */
+function logFillFromVideoRequest(
+  phase: "extract-timestamps-from-description" | "extract-materials",
+  url: string,
+  body: Record<string, string>,
+  ctx: {
+    videoSourceTab: "youtube" | "upload";
+    chapterVideoUrl: string;
+    hasUploadFile: boolean;
+    uploadFileName?: string;
+    uploadFileSize?: number;
+  }
+) {
+  const json = JSON.stringify(body);
+  const bytes = new TextEncoder().encode(json).length;
+  console.log(`[TutorialCreator] Fill from video → ${phase}`, {
+    url,
+    requestBodyUtf8Bytes: bytes,
+    keys: Object.keys(body),
+    body,
+    note: "This object is passed to fetchJsonFromApi as JSON.stringify(body) — no File is appended.",
+    context: {
+      videoSourceTab: ctx.videoSourceTab,
+      hasUploadFile: ctx.hasUploadFile,
+      uploadFileName: ctx.uploadFileName,
+      uploadFileSize: ctx.uploadFileSize,
+      chapterVideoUrlLength: ctx.chapterVideoUrl.length,
+      chapterVideoUrl: ctx.chapterVideoUrl || "(empty)"
+    }
+  });
+  if (bytes > 4096) {
+    console.warn(
+      `[TutorialCreator] ${phase}: JSON body is large (${bytes} bytes). If you see 413, inspect keys above for accidental huge strings.`
+    );
+  }
 }
 
 /** POST /api/* with session cookie; surfaces non-JSON errors (e.g. Vercel timeout HTML). */
@@ -73,28 +111,48 @@ async function fetchJsonFromApi(
   return data;
 }
 
-async function fetchJsonFromApiWithVideo(
-  url: string,
-  file: File
-): Promise<Record<string, unknown>> {
-  const form = new FormData();
-  form.set("video", file, file.name);
-  const res = await fetch(url, {
-    method: "POST",
-    credentials: "include",
-    body: form
+async function createCloudflareDirectUpload(file: File): Promise<{
+  videoId: string;
+  uploadUrl: string;
+}> {
+  const data = await fetchJsonFromApi("/api/video/direct-upload", {
+    fileName: file.name,
+    fileSize: file.size,
+    contentType: file.type
   });
-  const text = await res.text();
-  let data: Record<string, unknown>;
-  try {
-    data = text ? (JSON.parse(text) as Record<string, unknown>) : {};
-  } catch {
-    throw new Error(text.slice(0, 280) || `Server returned non-JSON (HTTP ${res.status}).`);
+  const videoId = String(data.videoId ?? "").trim();
+  const uploadUrl = String(data.uploadUrl ?? "").trim();
+  if (!videoId || !uploadUrl) {
+    throw new Error("Could not initialize Cloudflare upload.");
   }
-  if (!res.ok) {
-    throw new Error(String(data.error ?? `Request failed (HTTP ${res.status}).`));
-  }
-  return data;
+  return { videoId, uploadUrl };
+}
+
+function uploadFileToCloudflareTus(opts: {
+  file: File;
+  uploadUrl: string;
+  onProgress: (pct: number) => void;
+}): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const upload = new Upload(opts.file, {
+      endpoint: opts.uploadUrl,
+      uploadUrl: opts.uploadUrl,
+      retryDelays: [0, 1500, 3500, 6000],
+      removeFingerprintOnSuccess: true,
+      metadata: {
+        filename: opts.file.name,
+        filetype: opts.file.type || "video/mp4"
+      },
+      onError: (err) => reject(err),
+      onProgress: (uploaded, total) => {
+        if (!total) return;
+        const pct = Math.max(0, Math.min(100, Math.round((uploaded / total) * 100)));
+        opts.onProgress(pct);
+      },
+      onSuccess: () => resolve()
+    });
+    upload.start();
+  });
 }
 
 async function startCheckout(skuId: string) {
@@ -123,6 +181,8 @@ export function TutorialCreator() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [descExtractLoading, setDescExtractLoading] = useState(false);
   const [materialsExtractLoading, setMaterialsExtractLoading] = useState(false);
   const [materialsText, setMaterialsText] = useState("");
@@ -215,8 +275,17 @@ export function TutorialCreator() {
     }
     try {
       setUploadFile(file);
-      // Upload-tab AI extraction now sends local file directly to Gemini via server route.
+      setUploadingVideo(true);
+      setUploadProgress(0);
       setChapterVideoUrl("");
+      const { videoId, uploadUrl } = await createCloudflareDirectUpload(file);
+      await uploadFileToCloudflareTus({
+        file,
+        uploadUrl,
+        onProgress: (pct) => setUploadProgress(pct)
+      });
+      setChapterVideoUrl(videoId);
+      setUploadProgress(100);
     } catch (e: unknown) {
       console.error("[uploadChapterFile] unexpected upload exception", {
         fileName: file.name,
@@ -226,7 +295,7 @@ export function TutorialCreator() {
       });
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
-      // no-op
+      setUploadingVideo(false);
     }
   };
 
@@ -234,6 +303,10 @@ export function TutorialCreator() {
     const url = chapterVideoUrl.trim();
     if (videoSourceTab === "upload" && !uploadFile) {
       setError("Upload a video file first.");
+      return;
+    }
+    if (videoSourceTab === "upload" && !chapterVideoUrl.trim()) {
+      setError("Wait for Cloudflare upload to finish first.");
       return;
     }
     if (videoSourceTab === "youtube" && !url) {
@@ -253,7 +326,9 @@ export function TutorialCreator() {
     try {
       const data =
         videoSourceTab === "upload" && uploadFile
-          ? await fetchJsonFromApiWithVideo("/api/gemini/extract-timestamps-from-description", uploadFile)
+          ? await fetchJsonFromApi("/api/gemini/extract-timestamps-from-description", {
+              streamVideoId: chapterVideoUrl.trim()
+            })
           : await fetchJsonFromApi("/api/gemini/extract-timestamps-from-description", { youtubeUrl: url });
       const rawSteps = data.steps;
       const list = Array.isArray(rawSteps) ? rawSteps : [];
@@ -306,6 +381,10 @@ export function TutorialCreator() {
       setError("Upload a video file first.");
       return;
     }
+    if (videoSourceTab === "upload" && !chapterVideoUrl.trim()) {
+      setError("Wait for Cloudflare upload to finish first.");
+      return;
+    }
     if (videoSourceTab === "youtube" && !url) {
       setError(
         videoSourceTab === "youtube"
@@ -321,10 +400,26 @@ export function TutorialCreator() {
     setError(null);
     setFullAutoLoading(true);
     try {
-      const data =
+      const timestampsBody: Record<string, string> =
         videoSourceTab === "upload" && uploadFile
-          ? await fetchJsonFromApiWithVideo("/api/gemini/extract-timestamps-from-description", uploadFile)
-          : await fetchJsonFromApi("/api/gemini/extract-timestamps-from-description", { youtubeUrl: url });
+          ? { streamVideoId: chapterVideoUrl.trim() }
+          : { youtubeUrl: url };
+      logFillFromVideoRequest(
+        "extract-timestamps-from-description",
+        "/api/gemini/extract-timestamps-from-description",
+        timestampsBody,
+        {
+          videoSourceTab,
+          chapterVideoUrl: chapterVideoUrl.trim(),
+          hasUploadFile: !!uploadFile,
+          uploadFileName: uploadFile?.name,
+          uploadFileSize: uploadFile?.size
+        }
+      );
+      const data = await fetchJsonFromApi(
+        "/api/gemini/extract-timestamps-from-description",
+        timestampsBody
+      );
       const rawSteps = data.steps;
       const list = Array.isArray(rawSteps) ? rawSteps : [];
       if (!list.length) {
@@ -363,10 +458,23 @@ export function TutorialCreator() {
 
       const needsMaterials = !mat && !tools;
       if (needsMaterials) {
-        const matData =
+        const materialsBody: Record<string, string> =
           videoSourceTab === "upload" && uploadFile
-            ? await fetchJsonFromApiWithVideo("/api/gemini/extract-materials", uploadFile)
-            : await fetchJsonFromApi("/api/gemini/extract-materials", { youtubeUrl: url });
+            ? { streamVideoId: chapterVideoUrl.trim() }
+            : { youtubeUrl: url };
+        logFillFromVideoRequest(
+          "extract-materials",
+          "/api/gemini/extract-materials",
+          materialsBody,
+          {
+            videoSourceTab,
+            chapterVideoUrl: chapterVideoUrl.trim(),
+            hasUploadFile: !!uploadFile,
+            uploadFileName: uploadFile?.name,
+            uploadFileSize: uploadFile?.size
+          }
+        );
+        const matData = await fetchJsonFromApi("/api/gemini/extract-materials", materialsBody);
         setMaterialsText(
           stripLeadingMaterialsMetaLines(String(matData.materials ?? "").trim())
         );
@@ -412,6 +520,10 @@ export function TutorialCreator() {
       setError("Upload a video file first.");
       return;
     }
+    if (videoSourceTab === "upload" && !chapterVideoUrl.trim()) {
+      setError("Wait for Cloudflare upload to finish first.");
+      return;
+    }
     if (videoSourceTab === "youtube" && !url) {
       setError(
         videoSourceTab === "youtube"
@@ -429,7 +541,9 @@ export function TutorialCreator() {
     try {
       const data =
         videoSourceTab === "upload" && uploadFile
-          ? await fetchJsonFromApiWithVideo("/api/gemini/extract-materials", uploadFile)
+          ? await fetchJsonFromApi("/api/gemini/extract-materials", {
+              streamVideoId: chapterVideoUrl.trim()
+            })
           : await fetchJsonFromApi("/api/gemini/extract-materials", { youtubeUrl: url });
       setMaterialsText(
         stripLeadingMaterialsMetaLines(String(data.materials ?? "").trim())
@@ -645,7 +759,7 @@ export function TutorialCreator() {
                   {uploadFile ? "Video selected" : "Drag & drop your video here"}
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">
-                  MP4, MOV, or AVI · max 80MB for AI extraction · sent directly to Gemini
+                  MP4, MOV, or AVI · max 500MB · direct upload to Cloudflare Stream (tus)
                 </p>
                 <input
                   id="chapter-file-input"
@@ -669,6 +783,24 @@ export function TutorialCreator() {
                     playsInline
                     preload="metadata"
                   />
+                </div>
+              ) : null}
+              {uploadingVideo || chapterVideoUrl ? (
+                <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                  <div className="flex items-center justify-between text-xs text-zinc-600">
+                    <span>
+                      {uploadingVideo
+                        ? "Uploading to Cloudflare Stream..."
+                        : "Uploaded to Cloudflare Stream"}
+                    </span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="mt-2 h-2 rounded bg-zinc-100">
+                    <div
+                      className="h-2 rounded bg-orange-500 transition-all"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -730,7 +862,7 @@ export function TutorialCreator() {
               run also fills materials if they were still empty.{" "}
               <span className="font-medium text-zinc-600">Split buttons:</span> run one pass at a time.{" "}
               {videoSourceTab === "upload"
-                ? "Uploads: analyze file directly; ~80MB server limit."
+                ? "Uploads: analyze via Cloudflare Stream URL (no Vercel file payload)."
                 : ""}
             </p>
           </div>
