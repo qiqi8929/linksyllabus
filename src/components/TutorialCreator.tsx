@@ -13,6 +13,8 @@ import { Upload } from "tus-js-client";
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 /** Cloudflare Stream tus: min 5 MiB per chunk (except final), max 200 MiB; must be a multiple of 256 KiB. */
 const CLOUDFLARE_TUS_CHUNK_SIZE = 50 * 1024 * 1024;
+/** Fallback creation endpoint when HEAD on `uploadUrl` fails (e.g. 400). */
+const CLOUDFLARE_TUS_ENDPOINT = "https://upload.cloudflarestream.com/tus";
 const UPLOAD_ACCEPT = new Set(["mp4", "mov", "avi"]);
 
 type StepRow = {
@@ -137,6 +139,7 @@ function uploadFileToCloudflareTus(opts: {
 }): Promise<void> {
   return new Promise((resolve, reject) => {
     const upload = new Upload(opts.file, {
+      endpoint: CLOUDFLARE_TUS_ENDPOINT,
       uploadUrl: opts.uploadUrl,
       chunkSize: CLOUDFLARE_TUS_CHUNK_SIZE,
       retryDelays: [0, 1500, 3500, 6000],
