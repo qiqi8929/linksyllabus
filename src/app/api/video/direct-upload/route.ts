@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   }
 
   const accountId = env.cloudflareStream.accountId()?.trim();
-  const apiToken = process.env.CLOUDFLARE_STREAM_API_TOKEN?.trim() ?? "";
+  const apiToken = env.cloudflareStream.apiToken()?.trim() ?? "";
   if (!accountId || !apiToken) {
     return NextResponse.json({ error: "Cloudflare Stream is not configured." }, { status: 500 });
   }
@@ -69,8 +69,10 @@ export async function POST(req: Request) {
   );
   streamTusUrl.searchParams.set("direct_user", "true");
 
+  /** Omit tus key `requiresignedurls` — if present, Cloudflare treats it as requiring signed URLs. */
   const uploadMetadata = encodeTusUploadMetadata({
-    name: fileName
+    name: fileName,
+    maxDurationSeconds: String(60 * 60 * 4)
   });
 
   const upstream = await fetch(streamTusUrl.href, {
@@ -119,6 +121,24 @@ export async function POST(req: Request) {
       { error: "Cloudflare did not return stream-media-id; cannot track this upload." },
       { status: 502 }
     );
+  }
+
+  const patchUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/stream/${encodeURIComponent(videoId)}`;
+  const patchRes = await fetch(patchUrl, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ requireSignedURLs: false })
+  });
+  const patchText = await patchRes.text();
+  if (!patchRes.ok) {
+    console.error("[direct-upload] PATCH requireSignedURLs:false failed", {
+      videoId,
+      status: patchRes.status,
+      body: patchText.slice(0, 800)
+    });
   }
 
   return NextResponse.json({

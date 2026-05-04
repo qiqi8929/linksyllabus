@@ -348,7 +348,6 @@ export function TutorialCreator() {
         uploadUrl,
         onProgress: (pct) => setUploadProgress(pct)
       });
-      await fetchJsonFromApi("/api/video/stream-enable-download", { videoId });
       setChapterVideoUrl(videoId);
       setUploadProgress(100);
     } catch (e: unknown) {

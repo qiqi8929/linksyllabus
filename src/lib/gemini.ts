@@ -851,6 +851,28 @@ function parseMaterialsToolsPayload(raw: string): { materials: string; tools: st
 }
 
 /**
+ * Shared instructions for materials vs tools extraction (YouTube URL, public MP4 URL, or upload).
+ * Emphasizes evidence-only lists to reduce hallucinated supplies.
+ */
+function buildMaterialsToolsWatchPrompt(leadSentence: string): string {
+  return `${leadSentence}
+
+Your job is to output **only** items you can justify from **direct evidence** in the video: clearly visible on camera, or **explicitly named** in speech or in on-screen text, labels, or packaging the viewer can see. If you are not sure an item appears or is named for this project, **omit it**.
+
+Hard rules:
+- **No guessing** — do not add "typical" workshop extras, implied staples, or alternatives the host never uses in this video.
+- **No filler** — do not pad the list with generic items you did not observe.
+- **materials** — **consumables / ingredients** that get used up, mixed, melted, or chemically transformed (e.g. wax, fragrance or essential oils, dyes, soap base, resin parts, flour, sugar, wicks). Note quantity, color, or grade **only** when clearly shown or stated.
+- **tools** — **reusable equipment or apparatus** (e.g. molds, thermometer, scale, pouring pitcher, double boiler, heat gun, stick blender, crochet hook, knitting needles, safety gear shown as equipment). Do not list consumable ingredients here.
+
+Formatting: use newline-separated lines inside each JSON string (one item per line when reasonable); short comma grouping is fine for closely related items.
+
+Respond only with valid JSON, no markdown, no code fences. Exact shape:
+{"materials":"...","tools":"..."}
+Use an empty string "" for a key only when that category has **no** qualifying items under these rules.`;
+}
+
+/**
  * Lists materials vs tools by **watching** the YouTube video (no transcript).
  */
 export async function extractMaterialsAndToolsFromYouTube(
@@ -859,21 +881,11 @@ export async function extractMaterialsAndToolsFromYouTube(
 ): Promise<{ materials: string; tools: string }> {
   const watch = youtubeWatchPageUrl(youtubeUrl);
 
-  const prompt = `Watch this tutorial video (visuals and what people say on screen / in audio).
+  const prompt = buildMaterialsToolsWatchPrompt(
+    "Watch this tutorial via the linked YouTube page (listen to the audio and watch every shot)."
+  );
 
-Extract two plain-text lists for the viewer:
-
-1) "materials" — supplies, yarn, fabric, quantities, colors, etc. Use short lines or comma-separated.
-
-2) "tools" — hooks, needles, scissors, etc.
-
-Base lists on what is **shown or stated** in the video. If something is unclear, infer cautiously from context.
-
-Respond only with valid JSON, no markdown, no backticks. Exact shape:
-{"materials":"...","tools":"..."}
-Use empty string "" if a category truly has nothing relevant.`;
-
-  const text = await generateContentWithYouTubeWatchUrl(watch, prompt, 0.35, options?.onGemini);
+  const text = await generateContentWithYouTubeWatchUrl(watch, prompt, 0.22, options?.onGemini);
   return parseMaterialsToolsPayload(text);
 }
 
@@ -886,25 +898,15 @@ export async function extractMaterialsAndToolsFromPublicVideoUrl(
   if (!source) {
     throw new Error("A public video URL is required.");
   }
-  const prompt = `Watch this tutorial video (visuals and what people say on screen / in audio).
-
-Extract two plain-text lists for the viewer:
-
-1) "materials" — supplies, yarn, fabric, quantities, colors, etc. Use short lines or comma-separated.
-
-2) "tools" — hooks, needles, scissors, etc.
-
-Base lists on what is **shown or stated** in the video. If something is unclear, infer cautiously from context.
-
-Respond only with valid JSON, no markdown, no backticks. Exact shape:
-{"materials":"...","tools":"..."}
-Use empty string "" if a category truly has nothing relevant.`;
+  const prompt = buildMaterialsToolsWatchPrompt(
+    "Watch this tutorial from the given public direct video URL (listen to the audio and watch every shot)."
+  );
 
   const text = await generateContentWithPublicVideoUrl(
     source,
     mimeType,
     prompt,
-    0.35,
+    0.22,
     options?.onGemini
   );
   return parseMaterialsToolsPayload(text);
@@ -1005,23 +1007,15 @@ export async function extractMaterialsAndToolsFromVideoBuffer(
     fileName = uploaded.name;
     await waitForGeminiFileReady(uploaded.name);
 
-    const prompt = `You are helping with DIY / craft / tutorial videos. Watch the uploaded video.
-
-Extract two plain-text lists:
-
-1) "materials" — yarns, fabric, stuffing, glue, quantities, colors, etc. Use short lines separated by newlines, or comma-separated if compact. Do not invent items not clearly shown or said.
-
-2) "tools" — hooks, needles, scissors, looms, etc. Same formatting. If something could be either, prefer "materials" unless it is clearly a tool.
-
-Respond only with valid JSON, no markdown, no backticks. Exact shape:
-{"materials":"...","tools":"..."}
-Use empty string "" if a category has nothing in the video.`;
+    const prompt = buildMaterialsToolsWatchPrompt(
+      "Watch the uploaded tutorial video file (listen to the audio and watch every shot)."
+    );
 
     const text = await generateContentWithVideoFile(
       uploaded.uri,
       mimeType,
       prompt,
-      0.35,
+      0.22,
       options?.onGemini
         ? (p) =>
             options.onGemini?.({
