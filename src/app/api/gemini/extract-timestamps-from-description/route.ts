@@ -5,12 +5,15 @@ import {
   extractTutorialStructureFromPublicVideoUrl,
   extractTutorialStructureFromYouTubeVideo
 } from "@/lib/gemini";
-import { buildCloudflareDownloadUrl } from "@/lib/cloudflareStream";
+import {
+  buildCloudflareDownloadUrl,
+  setCloudflareStreamVideoDownloadable
+} from "@/lib/cloudflareStream";
 import { extractYouTubeVideoId } from "@/lib/video";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 type Body = {
   youtubeUrl?: string;
@@ -54,13 +57,16 @@ export async function POST(req: Request) {
 
   if (streamVideoId) {
     try {
+      const accountId = env.cloudflareStream.accountId()?.trim();
+      const apiToken = env.cloudflareStream.apiToken()?.trim();
       const customerSubdomain = env.cloudflareStream.customerSubdomain()?.trim();
-      if (!customerSubdomain) {
+      if (!accountId || !apiToken || !customerSubdomain) {
         return NextResponse.json(
           { error: "Cloudflare Stream is not configured." },
           { status: 500 }
         );
       }
+      await setCloudflareStreamVideoDownloadable({ accountId, apiToken, videoId: streamVideoId });
       const publicVideoUrl = buildCloudflareDownloadUrl(customerSubdomain, streamVideoId);
       const result = await extractTutorialStructureFromPublicVideoUrl(publicVideoUrl, "video/mp4");
       return NextResponse.json({
