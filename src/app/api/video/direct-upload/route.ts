@@ -21,7 +21,8 @@ export async function POST(req: Request) {
   }
 
   const accountId = env.cloudflareStream.accountId()?.trim();
-  const apiToken = env.cloudflareStream.apiToken()?.trim();
+  const apiToken = process.env.CLOUDFLARE_STREAM_API_TOKEN?.trim() ?? "";
+  console.log("CF token prefix:", process.env.CLOUDFLARE_STREAM_API_TOKEN?.slice(0, 10));
   if (!accountId || !apiToken) {
     return NextResponse.json({ error: "Cloudflare Stream is not configured." }, { status: 500 });
   }
@@ -42,25 +43,30 @@ export async function POST(req: Request) {
       ? body.contentType.trim()
       : "video/mp4";
 
-  const upstream = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/stream/direct_upload`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiToken}`,
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({
-        maxDurationSeconds: 60 * 60 * 4,
-        requireSignedURLs: false,
-        metadata: {
-          userId: user.id,
-          fileName,
-          contentType
-        }
-      })
-    }
-  );
+  const cfDirectUploadUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/stream/direct_upload`;
+  const cfRequestHeaders: Record<string, string> = {
+    Authorization: `Bearer ${apiToken}`,
+    "content-type": "application/json"
+  };
+  console.log("CF direct_upload request URL:", cfDirectUploadUrl);
+  console.log("CF direct_upload request headers:", {
+    Authorization: `Bearer ${apiToken.slice(0, 10)}…(total ${apiToken.length} chars; full value not logged)`,
+    "content-type": cfRequestHeaders["content-type"]
+  });
+
+  const upstream = await fetch(cfDirectUploadUrl, {
+    method: "POST",
+    headers: cfRequestHeaders,
+    body: JSON.stringify({
+      maxDurationSeconds: 60 * 60 * 4,
+      requireSignedURLs: false,
+      metadata: {
+        userId: user.id,
+        fileName,
+        contentType
+      }
+    })
+  });
 
   const data = (await upstream.json()) as {
     success?: boolean;

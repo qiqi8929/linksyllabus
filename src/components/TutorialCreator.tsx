@@ -11,6 +11,8 @@ import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
 import { Upload } from "tus-js-client";
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
+/** Cloudflare Stream tus: min 5 MiB per chunk (except final), max 200 MiB; must be a multiple of 256 KiB. */
+const CLOUDFLARE_TUS_CHUNK_SIZE = 50 * 1024 * 1024;
 const UPLOAD_ACCEPT = new Set(["mp4", "mov", "avi"]);
 
 type StepRow = {
@@ -135,12 +137,12 @@ function uploadFileToCloudflareTus(opts: {
 }): Promise<void> {
   return new Promise((resolve, reject) => {
     const upload = new Upload(opts.file, {
-      endpoint: opts.uploadUrl,
       uploadUrl: opts.uploadUrl,
+      chunkSize: CLOUDFLARE_TUS_CHUNK_SIZE,
       retryDelays: [0, 1500, 3500, 6000],
       removeFingerprintOnSuccess: true,
       metadata: {
-        filename: opts.file.name,
+        name: opts.file.name,
         filetype: opts.file.type || "video/mp4"
       },
       onError: (err) => reject(err),
