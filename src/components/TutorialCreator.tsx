@@ -8,14 +8,73 @@ import {
 import { parseAiTutorialPaste } from "@/lib/parseAiTutorialPaste";
 import { extractYouTubeVideoId } from "@/lib/video";
 import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
-import { Upload } from "tus-js-client";
+import { DefaultHttpStack, Upload } from "tus-js-client";
+import type { HttpRequest, HttpResponse, HttpStack } from "tus-js-client";
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 /** Cloudflare Stream tus: min 5 MiB per chunk (except final), max 200 MiB; must be a multiple of 256 KiB. */
 const CLOUDFLARE_TUS_CHUNK_SIZE = 50 * 1024 * 1024;
-/** Fallback creation endpoint when HEAD on `uploadUrl` fails (e.g. 400). */
-const CLOUDFLARE_TUS_ENDPOINT = "https://upload.cloudflarestream.com/tus";
 const UPLOAD_ACCEPT = new Set(["mp4", "mov", "avi"]);
+
+/**
+ * Cloudflare direct_upload `uploadURL` may respond 400 to tus HEAD; tus-js-client would then
+ * try POST `endpoint` to create a new upload. Official flow is uploadUrl-only — we treat HEAD 400
+ * as "no bytes accepted yet" and continue with PATCH from offset 0 (no POST / no resume probe).
+ */
+function cloudflareDirectUploadHttpStack(uploadUrl: string, uploadLength: number): HttpStack {
+  const inner = new DefaultHttpStack({});
+  return {
+    getName: () => "CloudflareDirectUploadHttpStack",
+    createRequest(method: string, url: string): HttpRequest {
+      const req = inner.createRequest(method, url);
+      const send = req.send.bind(req);
+      return {
+        getMethod: () => req.getMethod(),
+        getURL: () => req.getURL(),
+        setHeader: (h, v) => req.setHeader(h, v),
+        getHeader: (h) => req.getHeader(h),
+        setProgressHandler: (h) => req.setProgressHandler(h),
+        getUnderlyingObject: () => req.getUnderlyingObject(),
+        abort: () => req.abort(),
+        send(body) {
+          return send(body).then((res) => {
+            if (
+              method === "HEAD" &&
+              url === uploadUrl &&
+              res.getStatus() === 400
+            ) {
+              return new SyntheticTusHeadResponse(uploadLength);
+            }
+            return res;
+          });
+        }
+      };
+    }
+  };
+}
+
+class SyntheticTusHeadResponse implements HttpResponse {
+  constructor(private readonly uploadLength: number) {}
+
+  getStatus(): number {
+    return 200;
+  }
+
+  getHeader(header: string): string | undefined {
+    const h = header.toLowerCase();
+    if (h === "upload-offset") return "0";
+    if (h === "upload-length") return String(this.uploadLength);
+    return undefined;
+  }
+
+  getBody(): string {
+    return "";
+  }
+
+  getUnderlyingObject(): null {
+    return null;
+  }
+}
 
 type StepRow = {
   id: string;
@@ -139,8 +198,8 @@ function uploadFileToCloudflareTus(opts: {
 }): Promise<void> {
   return new Promise((resolve, reject) => {
     const upload = new Upload(opts.file, {
-      endpoint: CLOUDFLARE_TUS_ENDPOINT,
       uploadUrl: opts.uploadUrl,
+      httpStack: cloudflareDirectUploadHttpStack(opts.uploadUrl, opts.file.size),
       chunkSize: CLOUDFLARE_TUS_CHUNK_SIZE,
       retryDelays: [0, 1500, 3500, 6000],
       removeFingerprintOnSuccess: true,
