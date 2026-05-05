@@ -7,7 +7,6 @@ import {
 } from "@/lib/gemini";
 import {
   buildCloudflareDownloadUrl,
-  setCloudflareStreamVideoDownloadable
 } from "@/lib/cloudflareStream";
 import { extractYouTubeVideoId } from "@/lib/video";
 
@@ -66,7 +65,6 @@ export async function POST(req: Request) {
           { status: 500 }
         );
       }
-      await setCloudflareStreamVideoDownloadable({ accountId, apiToken, videoId: streamVideoId });
       const publicVideoUrl = buildCloudflareDownloadUrl(customerSubdomain, streamVideoId);
       const result = await extractTutorialStructureFromPublicVideoUrl(publicVideoUrl, "video/mp4");
       return NextResponse.json({
