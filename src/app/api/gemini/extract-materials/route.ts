@@ -2,13 +2,11 @@ import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import {
-  extractMaterialsAndToolsFromPublicVideoUrl,
+  extractMaterialsAndToolsFromVideoBuffer,
   extractMaterialsAndToolsFromYouTube,
+  MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS
 } from "@/lib/gemini";
-import {
-  buildCloudflareDownloadUrl,
-  setCloudflareStreamVideoDownloadable
-} from "@/lib/cloudflareStream";
+import { fetchCloudflareStreamDefaultMp4Buffer } from "@/lib/cloudflareStream";
 import { extractYouTubeVideoId } from "@/lib/video";
 
 export const runtime = "nodejs";
@@ -51,12 +49,14 @@ export async function POST(req: Request) {
           { status: 500 }
         );
       }
-      await setCloudflareStreamVideoDownloadable({ accountId, apiToken, videoId: streamVideoId });
-      const publicVideoUrl = buildCloudflareDownloadUrl(customerSubdomain, streamVideoId);
-      const { materials, tools } = await extractMaterialsAndToolsFromPublicVideoUrl(
-        publicVideoUrl,
-        "video/mp4"
-      );
+      const buffer = await fetchCloudflareStreamDefaultMp4Buffer({
+        accountId,
+        apiToken,
+        customerSubdomain,
+        videoId: streamVideoId,
+        maxBytes: MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS
+      });
+      const { materials, tools } = await extractMaterialsAndToolsFromVideoBuffer(buffer, "video/mp4");
       return NextResponse.json({ materials, tools });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Extraction failed";
