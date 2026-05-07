@@ -5,6 +5,7 @@ create extension if not exists "uuid-ossp";
 create table if not exists public.users (
   id uuid primary key,
   email text unique,
+  guide_count int not null default 0,
   created_at timestamptz not null default now()
 );
 

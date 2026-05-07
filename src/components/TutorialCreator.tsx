@@ -5,6 +5,7 @@ import {
   createInactiveSkuWithSteps,
   type TutorialStepInput
 } from "@/app/dashboard/serverActions";
+import { FREE_GUIDE_LIMIT, FREE_TIER_UPGRADE_MESSAGE } from "@/lib/freeTier";
 import { parseAiTutorialPaste } from "@/lib/parseAiTutorialPaste";
 import { extractYouTubeVideoId } from "@/lib/video";
 import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
@@ -235,7 +236,23 @@ async function startCheckout(skuId: string) {
   window.location.href = data.url;
 }
 
-export function TutorialCreator() {
+async function startSubscriptionCheckout() {
+  const res = await fetch("/api/stripe/checkout", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ type: "subscription" })
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(t || "Subscription checkout failed");
+  }
+  const data = (await res.json()) as { url?: string };
+  if (!data?.url) throw new Error("Missing checkout URL");
+  window.location.href = data.url;
+}
+
+export function TutorialCreator({ guideCount }: { guideCount: number }) {
   const [tutorialName, setTutorialName] = useState("");
   const [steps, setSteps] = useState<StepRow[]>(() => [emptyStep()]);
   const [aiLoading, setAiLoading] = useState(false);
@@ -254,8 +271,12 @@ export function TutorialCreator() {
   const [error, setError] = useState<string | null>(null);
   const [fullAutoLoading, setFullAutoLoading] = useState(false);
   const [pasteImportText, setPasteImportText] = useState("");
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
   /** True when the server fell back to title-based time estimates (rare). */
   const [outlineEstimated, setOutlineEstimated] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(
+    guideCount >= FREE_GUIDE_LIMIT
+  );
 
   useEffect(() => {
     if (!uploadFile) {
@@ -664,6 +685,7 @@ export function TutorialCreator() {
 
   const onPay = async () => {
     setError(null);
+    setShowUpgradePrompt(false);
     const v = validateSteps();
     if (v) {
       setError(v);
@@ -683,11 +705,31 @@ export function TutorialCreator() {
       if (!skuId) {
         throw new Error("Could not create tutorial (missing id). Please try again.");
       }
-      await startCheckout(skuId);
+      if (result.checkoutRequired) {
+        await startCheckout(skuId);
+        return;
+      }
+      window.location.href = `/tutorial/${skuId}`;
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Could not start checkout.");
+      const msg = e instanceof Error ? e.message : "Could not create tutorial.";
+      setError(msg);
+      if (msg.includes(FREE_TIER_UPGRADE_MESSAGE)) {
+        setShowUpgradePrompt(true);
+      }
     } finally {
       setPayLoading(false);
+    }
+  };
+
+  const onUpgrade = async () => {
+    setError(null);
+    setUpgradeLoading(true);
+    try {
+      await startSubscriptionCheckout();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Could not start upgrade checkout.");
+    } finally {
+      setUpgradeLoading(false);
     }
   };
 
@@ -718,6 +760,23 @@ export function TutorialCreator() {
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <span className="font-medium">Estimated outline:</span> Step times were inferred without a
           full video parse (e.g. title-only fallback). Review and edit before publishing.
+        </div>
+      ) : null}
+
+      {showUpgradePrompt ? (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">Free tier limit reached</p>
+          <p className="mt-1">
+            Your free plan includes 1 tutorial guide. Upgrade to create additional guides.
+          </p>
+          <button
+            type="button"
+            className="btn-primary mt-3"
+            disabled={upgradeLoading}
+            onClick={() => void onUpgrade()}
+          >
+            {upgradeLoading ? "Redirecting…" : "Upgrade plan"}
+          </button>
         </div>
       ) : null}
 
@@ -1106,10 +1165,14 @@ Example:
           <button
             type="button"
             className="btn-primary"
-            disabled={payLoading}
+            disabled={payLoading || guideCount >= FREE_GUIDE_LIMIT}
             onClick={onPay}
           >
-            {payLoading ? "Redirecting…" : "Pay $9.90 / Tutorial"}
+            {payLoading
+              ? "Creating…"
+              : guideCount < FREE_GUIDE_LIMIT
+                ? "Create free tutorial"
+                : "Free guide already used"}
           </button>
         </div>
       </section>

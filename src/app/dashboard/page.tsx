@@ -28,6 +28,7 @@ export default async function DashboardPage() {
   }
 
   let skus: SkuRow[] = [];
+  let guideCount = 0;
   try {
     const { data: rawSkus, error } = await supabase
       .from("skus")
@@ -42,9 +43,20 @@ export default async function DashboardPage() {
     skus = [];
   }
 
+  try {
+    const { data: userRow } = await supabase
+      .from("users")
+      .select("guide_count")
+      .eq("id", user.id)
+      .maybeSingle();
+    guideCount = Math.max(0, Number(userRow?.guide_count ?? skus.length));
+  } catch {
+    guideCount = skus.length;
+  }
+
   return (
     <div className="space-y-12">
-      <TutorialCreator />
+      <TutorialCreator guideCount={guideCount} />
 
       <section className="space-y-4">
         <div>

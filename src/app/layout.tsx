@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { DM_Sans, Fraunces } from "next/font/google";
+import Script from "next/script";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -30,6 +31,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${dmSans.variable} ${fraunces.variable}`}
     >
       <body className={`${dmSans.className} min-h-screen antialiased`}>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-8THXFQ4PWF"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-8THXFQ4PWF');
+          `}
+        </Script>
         <div className="min-h-screen">{children}</div>
       </body>
     </html>

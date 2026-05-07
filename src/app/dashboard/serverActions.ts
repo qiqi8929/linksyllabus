@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { activateSkuFromCheckoutSession } from "@/lib/stripe/skuActivation";
 import { getStripe } from "@/lib/stripe/server";
 import { env } from "@/lib/env";
+import { FREE_GUIDE_LIMIT, FREE_TIER_UPGRADE_MESSAGE } from "@/lib/freeTier";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -34,7 +35,7 @@ export async function createInactiveSkuWithSteps(payload: {
   defaultYoutubeUrl?: string;
   materialsText?: string;
   toolsText?: string;
-}): Promise<{ skuId: string }> {
+}): Promise<{ skuId: string; checkoutRequired: boolean }> {
   const supabase = createSupabaseServerClient();
   const {
     data: { user }
@@ -91,7 +92,18 @@ export async function createInactiveSkuWithSteps(payload: {
     };
   });
 
-  await supabase.from("users").upsert({ id: user.id, email: user.email ?? null });
+  const { data: userRow, error: userRowError } = await supabase
+    .from("users")
+    .upsert({ id: user.id, email: user.email ?? null }, { onConflict: "id" })
+    .select("guide_count")
+    .single();
+  if (userRowError) {
+    throw userRowError;
+  }
+  const guideCount = Math.max(0, Number(userRow?.guide_count ?? 0));
+  if (guideCount >= FREE_GUIDE_LIMIT) {
+    throw new Error(FREE_TIER_UPGRADE_MESSAGE);
+  }
 
   const materialsText = String(payload.materialsText ?? "").trim();
   const toolsText = String(payload.toolsText ?? "").trim();
@@ -106,7 +118,7 @@ export async function createInactiveSkuWithSteps(payload: {
       start_time: 0,
       end_time: 0,
       scan_count: 0,
-      is_active: false,
+      is_active: true,
       materials_text: materialsText || null,
       tools_text: toolsText || null
     })
@@ -115,6 +127,14 @@ export async function createInactiveSkuWithSteps(payload: {
 
   if (skuErr || !sku) {
     throw skuErr ?? new Error("Failed to create tutorial.");
+  }
+
+  const { error: bumpGuideCountError } = await supabase
+    .from("users")
+    .update({ guide_count: guideCount + 1 })
+    .eq("id", user.id);
+  if (bumpGuideCountError) {
+    throw bumpGuideCountError;
   }
 
   const rows = normalized.map((r) => ({
@@ -132,7 +152,7 @@ export async function createInactiveSkuWithSteps(payload: {
     throw stepErr;
   }
 
-  return { skuId: sku.id };
+  return { skuId: sku.id, checkoutRequired: false };
 }
 
 export async function deleteSkuAction(skuId: string) {
@@ -155,6 +175,20 @@ export async function deleteSkuAction(skuId: string) {
     throw new Error(
       "Delete failed: no rows removed. In Supabase → SQL Editor, run the policy from supabase/migration_skus_delete_policy.sql (skus deletable by owner), then try again."
     );
+  }
+
+  const { data: userRow } = await supabase
+    .from("users")
+    .select("guide_count")
+    .eq("id", user.id)
+    .maybeSingle();
+  const currentGuideCount = Math.max(0, Number(userRow?.guide_count ?? 0));
+  const { error: guideCountError } = await supabase
+    .from("users")
+    .update({ guide_count: Math.max(0, currentGuideCount - 1) })
+    .eq("id", user.id);
+  if (guideCountError) {
+    throw new Error(guideCountError.message);
   }
 
   revalidatePath("/dashboard");
