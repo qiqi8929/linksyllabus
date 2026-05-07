@@ -252,7 +252,11 @@ async function startSubscriptionCheckout() {
   window.location.href = data.url;
 }
 
-export function TutorialCreator({ guideCount }: { guideCount: number }) {
+export function TutorialCreator({ guideCount }: { guideCount?: number }) {
+  const safeGuideCount =
+    typeof guideCount === "number" && Number.isFinite(guideCount) && guideCount >= 0
+      ? guideCount
+      : 0;
   const [tutorialName, setTutorialName] = useState("");
   const [steps, setSteps] = useState<StepRow[]>(() => [emptyStep()]);
   const [aiLoading, setAiLoading] = useState(false);
@@ -275,7 +279,7 @@ export function TutorialCreator({ guideCount }: { guideCount: number }) {
   /** True when the server fell back to title-based time estimates (rare). */
   const [outlineEstimated, setOutlineEstimated] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(
-    guideCount >= FREE_GUIDE_LIMIT
+    safeGuideCount >= FREE_GUIDE_LIMIT
   );
 
   useEffect(() => {
@@ -1165,12 +1169,12 @@ Example:
           <button
             type="button"
             className="btn-primary"
-            disabled={payLoading || guideCount >= FREE_GUIDE_LIMIT}
+            disabled={payLoading || safeGuideCount >= FREE_GUIDE_LIMIT}
             onClick={onPay}
           >
             {payLoading
               ? "Creating…"
-              : guideCount < FREE_GUIDE_LIMIT
+              : safeGuideCount < FREE_GUIDE_LIMIT
                 ? "Create free tutorial"
                 : "Free guide already used"}
           </button>

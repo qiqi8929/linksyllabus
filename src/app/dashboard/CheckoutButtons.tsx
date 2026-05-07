@@ -29,7 +29,7 @@ export function SubscribeButton({ disabled }: { disabled?: boolean }) {
         }
       }}
     >
-      {loading ? "跳转中..." : "开通订阅 $19.9/月"}
+      {loading ? "Redirecting..." : "Start subscription $19.9/month"}
     </button>
   );
 }
@@ -49,7 +49,7 @@ export function ActivateSkuButton({ skuId, disabled }: { skuId: string; disabled
         }
       }}
     >
-      {loading ? "跳转中..." : "激活 $9.9 / Tutorial"}
+      {loading ? "Redirecting..." : "Activate $9.9 / Tutorial"}
     </button>
   );
 }

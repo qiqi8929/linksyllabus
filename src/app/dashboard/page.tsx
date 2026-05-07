@@ -43,13 +43,26 @@ export default async function DashboardPage() {
     skus = [];
   }
 
+  // Fallback to actual tutorial rows so dashboard can still render
+  // when `guide_count` is missing or temporarily out of sync.
+  guideCount = skus.length;
   try {
-    const { data: userRow } = await supabase
+    const { data: userRow, error: guideCountError } = await supabase
       .from("users")
       .select("guide_count")
       .eq("id", user.id)
       .maybeSingle();
-    guideCount = Math.max(0, Number(userRow?.guide_count ?? skus.length));
+    if (!guideCountError) {
+      const parsed = Number(userRow?.guide_count);
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        guideCount = parsed;
+      }
+    } else {
+      console.warn("[dashboard] guide_count read failed; using skus length fallback", {
+        code: guideCountError.code,
+        message: guideCountError.message
+      });
+    }
   } catch {
     guideCount = skus.length;
   }

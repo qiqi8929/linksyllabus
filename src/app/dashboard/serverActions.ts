@@ -9,6 +9,15 @@ import { FREE_GUIDE_LIMIT, FREE_TIER_UPGRADE_MESSAGE } from "@/lib/freeTier";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+function isGuideCountColumnMissing(error: unknown): boolean {
+  const e = error as { code?: string; message?: string } | null;
+  if (!e) return false;
+  return (
+    e.code === "42703" ||
+    /guide_count/i.test(String(e.message ?? ""))
+  );
+}
+
 export async function signOutAction() {
   const supabase = createSupabaseServerClient();
   await supabase.auth.signOut();
@@ -92,15 +101,40 @@ export async function createInactiveSkuWithSteps(payload: {
     };
   });
 
+  // Ensure user row exists first; avoid selecting migration-sensitive columns here.
+  const { error: upsertUserError } = await supabase
+    .from("users")
+    .upsert({ id: user.id, email: user.email ?? null }, { onConflict: "id" });
+  if (upsertUserError) {
+    throw new Error("Could not prepare user profile.");
+  }
+
+  // Primary source: `users.guide_count`; fallback: count tutorials directly.
+  let guideCount = 0;
   const { data: userRow, error: userRowError } = await supabase
     .from("users")
-    .upsert({ id: user.id, email: user.email ?? null }, { onConflict: "id" })
     .select("guide_count")
-    .single();
-  if (userRowError) {
-    throw userRowError;
+    .eq("id", user.id)
+    .maybeSingle();
+  if (userRowError && !isGuideCountColumnMissing(userRowError)) {
+    throw new Error("Could not check free-tier usage.");
   }
-  const guideCount = Math.max(0, Number(userRow?.guide_count ?? 0));
+  if (!userRowError) {
+    const parsed = Number(userRow?.guide_count);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      guideCount = parsed;
+    }
+  } else {
+    const { count: skuCount, error: skuCountError } = await supabase
+      .from("skus")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+    if (skuCountError) {
+      throw new Error("Could not check free-tier usage.");
+    }
+    guideCount = Math.max(0, Number(skuCount ?? 0));
+  }
+
   if (guideCount >= FREE_GUIDE_LIMIT) {
     throw new Error(FREE_TIER_UPGRADE_MESSAGE);
   }
@@ -133,7 +167,7 @@ export async function createInactiveSkuWithSteps(payload: {
     .from("users")
     .update({ guide_count: guideCount + 1 })
     .eq("id", user.id);
-  if (bumpGuideCountError) {
+  if (bumpGuideCountError && !isGuideCountColumnMissing(bumpGuideCountError)) {
     throw bumpGuideCountError;
   }
 
@@ -187,7 +221,7 @@ export async function deleteSkuAction(skuId: string) {
     .from("users")
     .update({ guide_count: Math.max(0, currentGuideCount - 1) })
     .eq("id", user.id);
-  if (guideCountError) {
+  if (guideCountError && !isGuideCountColumnMissing(guideCountError)) {
     throw new Error(guideCountError.message);
   }
 

@@ -32,7 +32,7 @@ export default function LoginPage() {
       router.replace(nextPath);
       router.refresh();
     } catch (err: any) {
-      setError(err?.message ?? "登录失败");
+      setError(err?.message ?? "Login failed");
     } finally {
       setLoading(false);
     }
@@ -40,16 +40,16 @@ export default function LoginPage() {
 
   return (
     <div className="card p-6">
-      <h1 className="text-lg font-semibold">登录</h1>
-      <p className="mt-1 text-sm text-zinc-600">使用邮箱 + 密码登录后进入 dashboard。</p>
+      <h1 className="text-lg font-semibold">Log in</h1>
+      <p className="mt-1 text-sm text-zinc-600">Log in with your email and password to open the dashboard.</p>
 
       <form className="mt-6 space-y-3" onSubmit={onSubmit}>
         <div className="space-y-1">
-          <div className="text-sm font-medium">邮箱</div>
+          <div className="text-sm font-medium">Email</div>
           <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
         </div>
         <div className="space-y-1">
-          <div className="text-sm font-medium">密码</div>
+          <div className="text-sm font-medium">Password</div>
           <input
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -62,14 +62,14 @@ export default function LoginPage() {
         <FormError message={error} />
 
         <button className="btn-primary w-full" disabled={loading} type="submit">
-          {loading ? "登录中..." : "登录"}
+          {loading ? "Signing in..." : "Log in"}
         </button>
       </form>
 
       <div className="mt-4 text-sm text-zinc-600">
-        没有账号？{" "}
+        Don't have an account?{" "}
         <Link className="font-medium text-brand hover:underline" href="/signup">
-          去注册
+          Sign up
         </Link>
       </div>
     </div>

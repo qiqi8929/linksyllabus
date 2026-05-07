@@ -70,6 +70,12 @@ create policy "users can insert self"
 on public.users for insert
 with check (auth.uid() = id);
 
+-- Own-row updates (e.g. guide_count). Server actions use anon + JWT, not service role — RLS must allow this.
+create policy "users can update own row"
+on public.users for update
+using (auth.uid() = id)
+with check (auth.uid() = id);
+
 -- skus
 create policy "skus are readable by owner"
 on public.skus for select
