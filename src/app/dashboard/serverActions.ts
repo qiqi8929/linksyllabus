@@ -5,17 +5,19 @@ import { redirect } from "next/navigation";
 import { activateSkuFromCheckoutSession } from "@/lib/stripe/skuActivation";
 import { getStripe } from "@/lib/stripe/server";
 import { env } from "@/lib/env";
-import { FREE_GUIDE_LIMIT, FREE_TIER_UPGRADE_MESSAGE } from "@/lib/freeTier";
+import {
+  FREE_GUIDE_LIMIT,
+  FREE_TIER_UPGRADE_MESSAGE,
+  maxAllowedGuides
+} from "@/lib/freeTier";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-function isGuideCountColumnMissing(error: unknown): boolean {
+function isUsersUsageColumnMissing(error: unknown): boolean {
   const e = error as { code?: string; message?: string } | null;
   if (!e) return false;
-  return (
-    e.code === "42703" ||
-    /guide_count/i.test(String(e.message ?? ""))
-  );
+  if (e.code === "42703") return true;
+  return /guide_count|paid_guide_slots/i.test(String(e.message ?? ""));
 }
 
 export async function signOutAction() {
@@ -109,33 +111,37 @@ export async function createInactiveSkuWithSteps(payload: {
     throw new Error("Could not prepare user profile.");
   }
 
-  // Primary source: `users.guide_count`; fallback: count tutorials directly.
+  // Usage: guide_count + paid_guide_slots (fallback: count skus if columns missing).
   let guideCount = 0;
+  let paidSlots = 0;
   const { data: userRow, error: userRowError } = await supabase
     .from("users")
-    .select("guide_count")
+    .select("guide_count,paid_guide_slots")
     .eq("id", user.id)
     .maybeSingle();
-  if (userRowError && !isGuideCountColumnMissing(userRowError)) {
-    throw new Error("Could not check free-tier usage.");
+  if (userRowError && !isUsersUsageColumnMissing(userRowError)) {
+    throw new Error("Could not check tutorial usage.");
   }
-  if (!userRowError) {
-    const parsed = Number(userRow?.guide_count);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      guideCount = parsed;
-    }
-  } else {
+  if (!userRowError && userRow) {
+    const gc = Number(userRow.guide_count);
+    const ps = Number(userRow.paid_guide_slots);
+    if (Number.isFinite(gc) && gc >= 0) guideCount = gc;
+    if (Number.isFinite(ps) && ps >= 0) paidSlots = ps;
+  }
+  if (userRowError || !userRow) {
     const { count: skuCount, error: skuCountError } = await supabase
       .from("skus")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id);
     if (skuCountError) {
-      throw new Error("Could not check free-tier usage.");
+      throw new Error("Could not check tutorial usage.");
     }
     guideCount = Math.max(0, Number(skuCount ?? 0));
+    paidSlots = 0;
   }
 
-  if (guideCount >= FREE_GUIDE_LIMIT) {
+  const maxGuides = maxAllowedGuides(paidSlots);
+  if (guideCount >= maxGuides) {
     throw new Error(FREE_TIER_UPGRADE_MESSAGE);
   }
 
@@ -167,7 +173,7 @@ export async function createInactiveSkuWithSteps(payload: {
     .from("users")
     .update({ guide_count: guideCount + 1 })
     .eq("id", user.id);
-  if (bumpGuideCountError && !isGuideCountColumnMissing(bumpGuideCountError)) {
+  if (bumpGuideCountError && !isUsersUsageColumnMissing(bumpGuideCountError)) {
     throw bumpGuideCountError;
   }
 
@@ -221,7 +227,7 @@ export async function deleteSkuAction(skuId: string) {
     .from("users")
     .update({ guide_count: Math.max(0, currentGuideCount - 1) })
     .eq("id", user.id);
-  if (guideCountError && !isGuideCountColumnMissing(guideCountError)) {
+  if (guideCountError && !isUsersUsageColumnMissing(guideCountError)) {
     throw new Error(guideCountError.message);
   }
 

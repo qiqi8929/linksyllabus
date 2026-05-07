@@ -24,9 +24,12 @@ export const env = {
     secretKey: () => process.env.STRIPE_SECRET_KEY as string | undefined,
     webhookSecret: () => process.env.STRIPE_WEBHOOK_SECRET as string | undefined,
     publishableKey: () => process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY as string | undefined,
-    /** One-time SKU activation (~$9.90); overrides default in `stripe/prices.ts` when set. */
+    /** One-time SKU activation / publish (~$9.99); overrides default in `stripe/prices.ts` when set. */
     priceIdSkuActivation: () =>
-      process.env.STRIPE_PRICE_ID_SKU_ACTIVATION as string | undefined
+      process.env.STRIPE_PRICE_ID_SKU_ACTIVATION as string | undefined,
+    /** One-time payment per additional tutorial guide after free tier ($9.99). */
+    priceIdGuideUnlock: () =>
+      process.env.STRIPE_PRICE_ID_GUIDE_UNLOCK as string | undefined
   },
 
   /** Server-only. Step description generation via Gemini; omit in env to disable AI. */

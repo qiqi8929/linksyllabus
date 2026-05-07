@@ -5,7 +5,10 @@ import {
   createInactiveSkuWithSteps,
   type TutorialStepInput
 } from "@/app/dashboard/serverActions";
-import { FREE_GUIDE_LIMIT, FREE_TIER_UPGRADE_MESSAGE } from "@/lib/freeTier";
+import {
+  FREE_TIER_UPGRADE_MESSAGE,
+  maxAllowedGuides
+} from "@/lib/freeTier";
 import { parseAiTutorialPaste } from "@/lib/parseAiTutorialPaste";
 import { extractYouTubeVideoId } from "@/lib/video";
 import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
@@ -236,27 +239,38 @@ async function startCheckout(skuId: string) {
   window.location.href = data.url;
 }
 
-async function startSubscriptionCheckout() {
+async function startGuideUnlockCheckout() {
   const res = await fetch("/api/stripe/checkout", {
     method: "POST",
     headers: { "content-type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ type: "subscription" })
+    body: JSON.stringify({ type: "guide_unlock" })
   });
   if (!res.ok) {
     const t = await res.text();
-    throw new Error(t || "Subscription checkout failed");
+    throw new Error(t || "Checkout failed");
   }
   const data = (await res.json()) as { url?: string };
   if (!data?.url) throw new Error("Missing checkout URL");
   window.location.href = data.url;
 }
 
-export function TutorialCreator({ guideCount }: { guideCount?: number }) {
+export function TutorialCreator({
+  guideCount,
+  paidGuideSlots
+}: {
+  guideCount?: number;
+  paidGuideSlots?: number;
+}) {
   const safeGuideCount =
     typeof guideCount === "number" && Number.isFinite(guideCount) && guideCount >= 0
       ? guideCount
       : 0;
+  const safePaidSlots =
+    typeof paidGuideSlots === "number" && Number.isFinite(paidGuideSlots) && paidGuideSlots >= 0
+      ? paidGuideSlots
+      : 0;
+  const maxGuides = maxAllowedGuides(safePaidSlots);
   const [tutorialName, setTutorialName] = useState("");
   const [steps, setSteps] = useState<StepRow[]>(() => [emptyStep()]);
   const [aiLoading, setAiLoading] = useState(false);
@@ -279,7 +293,7 @@ export function TutorialCreator({ guideCount }: { guideCount?: number }) {
   /** True when the server fell back to title-based time estimates (rare). */
   const [outlineEstimated, setOutlineEstimated] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(
-    safeGuideCount >= FREE_GUIDE_LIMIT
+    safeGuideCount >= maxGuides
   );
 
   useEffect(() => {
@@ -295,6 +309,10 @@ export function TutorialCreator({ guideCount }: { guideCount?: number }) {
   useEffect(() => {
     setOutlineEstimated(false);
   }, [chapterVideoUrl, videoSourceTab]);
+
+  useEffect(() => {
+    setShowUpgradePrompt(safeGuideCount >= maxGuides);
+  }, [safeGuideCount, maxGuides]);
 
   const updateStep = useCallback((id: string, patch: Partial<StepRow>) => {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -729,9 +747,9 @@ export function TutorialCreator({ guideCount }: { guideCount?: number }) {
     setError(null);
     setUpgradeLoading(true);
     try {
-      await startSubscriptionCheckout();
+      await startGuideUnlockCheckout();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Could not start upgrade checkout.");
+      setError(e instanceof Error ? e.message : "Could not start checkout.");
     } finally {
       setUpgradeLoading(false);
     }
@@ -743,8 +761,8 @@ export function TutorialCreator({ guideCount }: { guideCount?: number }) {
         <h1 className="text-xl font-semibold tracking-tight">Create tutorial</h1>
         <p className="mt-1 text-sm text-zinc-600">
           Link your video and click <span className="font-medium text-zinc-700">Fill from video</span>
-          — Gemini analyzes the video directly (YouTube URL or your upload). Then pay to publish and get
-          QR codes.
+          — Gemini analyzes the video directly (YouTube URL or your upload). Your first tutorial is free;
+          each additional guide is a one-time $9.99 payment.
         </p>
       </div>
 
@@ -769,9 +787,10 @@ export function TutorialCreator({ guideCount }: { guideCount?: number }) {
 
       {showUpgradePrompt ? (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-medium">Free tier limit reached</p>
+          <p className="font-medium">Tutorial guide limit reached</p>
           <p className="mt-1">
-            Your free plan includes 1 tutorial guide. Upgrade to create additional guides.
+            Pay $9.99 once to unlock another guide slot. You can purchase additional slots whenever you
+            need more tutorials.
           </p>
           <button
             type="button"
@@ -779,7 +798,7 @@ export function TutorialCreator({ guideCount }: { guideCount?: number }) {
             disabled={upgradeLoading}
             onClick={() => void onUpgrade()}
           >
-            {upgradeLoading ? "Redirecting…" : "Upgrade plan"}
+            {upgradeLoading ? "Redirecting…" : "Add guide slot ($9.99)"}
           </button>
         </div>
       ) : null}
@@ -1169,14 +1188,16 @@ Example:
           <button
             type="button"
             className="btn-primary"
-            disabled={payLoading || safeGuideCount >= FREE_GUIDE_LIMIT}
+            disabled={payLoading || safeGuideCount >= maxGuides}
             onClick={onPay}
           >
             {payLoading
               ? "Creating…"
-              : safeGuideCount < FREE_GUIDE_LIMIT
-                ? "Create free tutorial"
-                : "Free guide already used"}
+              : safeGuideCount < maxGuides
+                ? safeGuideCount < 1
+                  ? "Create free tutorial"
+                  : "Create tutorial"
+                : "Guide limit reached"}
           </button>
         </div>
       </section>

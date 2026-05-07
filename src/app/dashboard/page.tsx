@@ -29,6 +29,7 @@ export default async function DashboardPage() {
 
   let skus: SkuRow[] = [];
   let guideCount = 0;
+  let paidGuideSlots = 0;
   try {
     const { data: rawSkus, error } = await supabase
       .from("skus")
@@ -49,13 +50,17 @@ export default async function DashboardPage() {
   try {
     const { data: userRow, error: guideCountError } = await supabase
       .from("users")
-      .select("guide_count")
+      .select("guide_count,paid_guide_slots")
       .eq("id", user.id)
       .maybeSingle();
     if (!guideCountError) {
       const parsed = Number(userRow?.guide_count);
       if (Number.isFinite(parsed) && parsed >= 0) {
         guideCount = parsed;
+      }
+      const paid = Number(userRow?.paid_guide_slots);
+      if (Number.isFinite(paid) && paid >= 0) {
+        paidGuideSlots = paid;
       }
     } else {
       console.warn("[dashboard] guide_count read failed; using skus length fallback", {
@@ -69,7 +74,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-12">
-      <TutorialCreator guideCount={guideCount} />
+      <TutorialCreator guideCount={guideCount} paidGuideSlots={paidGuideSlots} />
 
       <section className="space-y-4">
         <div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-async function startCheckout(payload: any) {
+async function startCheckout(payload: { type: "sku"; skuId: string }) {
   const res = await fetch("/api/stripe/checkout", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -12,26 +12,6 @@ async function startCheckout(payload: any) {
   const data = await res.json();
   if (!data?.url) throw new Error("Missing checkout url");
   window.location.href = data.url;
-}
-
-export function SubscribeButton({ disabled }: { disabled?: boolean }) {
-  const [loading, setLoading] = useState(false);
-  return (
-    <button
-      className="btn-primary"
-      disabled={disabled || loading}
-      onClick={async () => {
-        setLoading(true);
-        try {
-          await startCheckout({ type: "subscription" });
-        } finally {
-          setLoading(false);
-        }
-      }}
-    >
-      {loading ? "Redirecting..." : "Start subscription $19.9/month"}
-    </button>
-  );
 }
 
 export function ActivateSkuButton({ skuId, disabled }: { skuId: string; disabled?: boolean }) {
@@ -49,8 +29,7 @@ export function ActivateSkuButton({ skuId, disabled }: { skuId: string; disabled
         }
       }}
     >
-      {loading ? "Redirecting..." : "Activate $9.9 / Tutorial"}
+      {loading ? "Redirecting..." : "Activate $9.99 / Tutorial"}
     </button>
   );
 }
-

@@ -46,19 +46,28 @@ export async function POST(req: Request) {
       }
     }
 
-    if (type === "subscription") {
-      if (userId) {
-        let status = "active";
-        if (session.subscription) {
-          const sub = await stripe.subscriptions.retrieve(String(session.subscription));
-          status = sub.status;
+    if (type === "guide_unlock" && userId) {
+      const paid =
+        session.payment_status === "paid" ||
+        event.type === "checkout.session.async_payment_succeeded";
+      if (paid) {
+        try {
+          const { data: row } = await admin
+            .from("users")
+            .select("paid_guide_slots")
+            .eq("id", userId)
+            .maybeSingle();
+          const current = Math.max(0, Number(row?.paid_guide_slots ?? 0));
+          const { error: upErr } = await admin
+            .from("users")
+            .update({ paid_guide_slots: current + 1 })
+            .eq("id", userId);
+          if (upErr) {
+            console.error("[stripe webhook] guide_unlock increment failed", upErr);
+          }
+        } catch (e) {
+          console.error("[stripe webhook] guide_unlock handler error", e);
         }
-        const stripeCustomerId = session.customer ? String(session.customer) : null;
-        await admin.from("subscriptions").upsert({
-          user_id: userId,
-          stripe_customer_id: stripeCustomerId ?? undefined,
-          status
-        });
       }
     }
   }

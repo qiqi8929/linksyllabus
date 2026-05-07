@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Payload =
-  | { type: "subscription" }
+  | { type: "guide_unlock" }
   | { type: "sku"; skuId: string };
 
 /** Test vs live Stripe keys use different customer namespaces; stale IDs in DB cause "No such customer". */
@@ -45,7 +45,6 @@ async function getOrCreateStripeCustomerId(
         throw e;
       }
     }
-    // Existing id is stale (often test/live switch); clear it before recreation.
     await admin
       .from("subscriptions")
       .update({ stripe_customer_id: null })
@@ -83,27 +82,26 @@ export async function POST(req: Request) {
 
     const stripe = getStripe();
 
-    if (payload.type === "subscription") {
-      const success_url = `${appUrl}/dashboard?checkout=success`;
+    if (payload.type === "guide_unlock") {
+      const success_url = `${appUrl}/dashboard?checkout=guide_unlock_success`;
       let customerId = await getOrCreateStripeCustomerId(stripe, admin, user);
-      const createSubSession = () =>
+
+      const createUnlockSession = () =>
         stripe.checkout.sessions.create({
-          mode: "subscription",
+          mode: "payment",
           customer: customerId,
           allow_promotion_codes: true,
-          line_items: [
-            { price: STRIPE_PRICES.subscriptionMonthlyUsd199, quantity: 1 }
-          ],
+          line_items: [{ price: STRIPE_PRICES.guideUnlockOneTimeUsd999, quantity: 1 }],
           success_url,
           cancel_url,
           metadata: {
-            type: "subscription",
+            type: "guide_unlock",
             user_id: user.id
           }
         });
 
       try {
-        const session = await createSubSession();
+        const session = await createUnlockSession();
         return NextResponse.json({ url: session.url });
       } catch (e) {
         if (!isStaleStripeCustomerError(e)) throw e;
@@ -112,7 +110,7 @@ export async function POST(req: Request) {
           .update({ stripe_customer_id: null })
           .eq("user_id", user.id);
         customerId = await getOrCreateStripeCustomerId(stripe, admin, user);
-        const session = await createSubSession();
+        const session = await createUnlockSession();
         return NextResponse.json({ url: session.url });
       }
     }
@@ -141,7 +139,7 @@ export async function POST(req: Request) {
         mode: "payment",
         customer: customerId,
         allow_promotion_codes: true,
-        line_items: [{ price: STRIPE_PRICES.skuActivationOneTimeUsd99, quantity: 1 }],
+        line_items: [{ price: STRIPE_PRICES.skuActivationOneTimeUsd999, quantity: 1 }],
         success_url: successSkuUrl,
         cancel_url,
         metadata: {
@@ -172,15 +170,12 @@ export async function POST(req: Request) {
       name: e?.name,
       code: e?.code,
       statusCode: e?.statusCode,
-      // Helpful when Stripe returns a structured error object.
       raw: e
     });
 
-    // Always return a safe response to the client; real details are in server logs.
     return NextResponse.json(
       { error: "Stripe checkout failed", type: e?.type, message: e?.message },
       { status: 500 }
     );
   }
 }
-
