@@ -161,13 +161,27 @@ export async function setCloudflareStreamVideoDownloadable(params: {
 }
 
 /**
- * Downloads the default MP4 from the public Stream URL for server-side Gemini analysis.
- * Uses `GET https://{customerSubdomain}/{videoId}/downloads/default.mp4` only — no Stream API POST.
+ * Ensures the default MP4 exists (POST + poll Stream API), then downloads from the public URL
+ * for server-side Gemini analysis.
  */
 export async function fetchCloudflareStreamDefaultMp4Buffer(params: {
+  accountId: string;
+  apiToken: string;
   customerSubdomain: string;
   videoId: string;
 }): Promise<Buffer> {
+  await requestCloudflareStreamDefaultMp4Download({
+    accountId: params.accountId,
+    apiToken: params.apiToken,
+    videoId: params.videoId
+  });
+  await waitForCloudflareStreamDefaultMp4Ready({
+    accountId: params.accountId,
+    apiToken: params.apiToken,
+    videoId: params.videoId,
+    maxWaitMs: 180_000
+  });
+
   const url = buildCloudflareDownloadUrl(params.customerSubdomain, params.videoId);
   const res = await fetch(url, { redirect: "follow" });
   if (!res.ok) {

@@ -54,14 +54,18 @@ export async function POST(req: Request) {
 
   if (streamVideoId) {
     try {
+      const accountId = env.cloudflareStream.accountId()?.trim();
+      const apiToken = env.cloudflareStream.apiToken()?.trim();
       const customerSubdomain = env.cloudflareStream.customerSubdomain()?.trim();
-      if (!customerSubdomain) {
+      if (!accountId || !apiToken || !customerSubdomain) {
         return NextResponse.json(
-          { error: "Cloudflare Stream customer subdomain is not configured (CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN)." },
+          { error: "Cloudflare Stream is not configured (account, token, customer subdomain)." },
           { status: 500 }
         );
       }
       const buffer = await fetchCloudflareStreamDefaultMp4Buffer({
+        accountId,
+        apiToken,
         customerSubdomain,
         videoId: streamVideoId
       });
