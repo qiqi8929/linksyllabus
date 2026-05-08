@@ -184,9 +184,17 @@ async function fetchJsonFromApi(
   }
   if (!res.ok) {
     let msg = String(data.error ?? `Request failed (HTTP ${res.status}).`);
-    if (/^Bad Request: The request was invalid\./i.test(msg)) {
-      msg =
-        "We couldn't save your tutorial due to a temporary data sync issue. Please refresh this page and try again.";
+    if (/^Bad Request: The request was invalid\.|^Bad Request$/i.test(msg.trim())) {
+      if (url.includes("/api/gemini/")) {
+        msg =
+          "Video analysis couldn't finish (server rejected the request). Refresh the page and try again.";
+      } else if (url.includes("/api/video/direct-upload")) {
+        msg =
+          "Couldn't start the video upload. Refresh the page and try again.";
+      } else {
+        msg =
+          "Something went wrong talking to the server. Refresh the page and try again.";
+      }
     }
     const dbg = data.debug;
     if (dbg !== undefined && dbg !== null) {

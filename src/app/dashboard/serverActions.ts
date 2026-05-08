@@ -173,8 +173,20 @@ export async function createInactiveSkuWithSteps(payload: {
       label: "paid_guide_slots",
       userId: user.id,
       err: paidErr,
-      fallback: "paidSlots=0"
+      fallback: "retry admin read paid_guide_slots"
     });
+    const admin = createSupabaseAdminClient();
+    const { data: adminPaid, error: adminPaidErr } = await admin
+      .from("users")
+      .select("paid_guide_slots")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (!adminPaidErr && adminPaid) {
+      const ps = Number(adminPaid.paid_guide_slots);
+      if (Number.isFinite(ps) && ps >= 0) paidSlots = ps;
+    } else if (adminPaidErr) {
+      logSupabaseOpError("users.paid_guide_slots admin fallback", user.id, adminPaidErr);
+    }
   }
 
   let createdGuides = 0;
