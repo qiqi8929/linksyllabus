@@ -45,6 +45,25 @@ export default async function DashboardPage({
   if (checkout === "guide_unlock_success") {
     try {
       const admin = createSupabaseAdminClient();
+      const { error: ensureErr } = await admin
+        .from("users")
+        .upsert(
+          {
+            id: user.id,
+            email: user.email ?? null
+          },
+          { onConflict: "id" }
+        );
+      if (ensureErr) {
+        console.error("[dashboard] guide_unlock_success ensure user row failed", {
+          userId: user.id,
+          code: ensureErr.code,
+          message: ensureErr.message,
+          details: (ensureErr as any).details,
+          hint: (ensureErr as any).hint
+        });
+      }
+
       const { data: row, error: readErr } = await admin
         .from("users")
         .select("paid_guide_slots")
@@ -60,10 +79,12 @@ export default async function DashboardPage({
         });
       } else {
         const current = Math.max(0, Number(row?.paid_guide_slots ?? 0));
-        const { error: upErr } = await admin
+        const { data: updatedRow, error: upErr } = await admin
           .from("users")
           .update({ paid_guide_slots: current + 1 })
-          .eq("id", user.id);
+          .eq("id", user.id)
+          .select("id,paid_guide_slots")
+          .maybeSingle();
         if (upErr) {
           console.error("[dashboard] guide_unlock_success increment paid_guide_slots failed", {
             userId: user.id,
@@ -71,6 +92,17 @@ export default async function DashboardPage({
             message: upErr.message,
             details: (upErr as any).details,
             hint: (upErr as any).hint
+          });
+        } else if (!updatedRow) {
+          console.error("[dashboard] guide_unlock_success increment updated zero rows", {
+            userId: user.id,
+            previousPaidGuideSlots: current
+          });
+        } else {
+          console.log("[dashboard] guide_unlock_success incremented paid_guide_slots", {
+            userId: user.id,
+            previousPaidGuideSlots: current,
+            newPaidGuideSlots: updatedRow.paid_guide_slots
           });
         }
       }
