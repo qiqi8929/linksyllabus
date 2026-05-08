@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   createInactiveSkuWithSteps,
   type TutorialStepInput
@@ -316,6 +317,7 @@ export function TutorialCreator({
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(
     safeGuideCount >= maxGuides
   );
+  const router = useRouter();
 
   const persistDraftToLocalStorage = useCallback(() => {
     try {
@@ -358,16 +360,41 @@ export function TutorialCreator({
   }, [safeGuideCount, maxGuides]);
 
   useEffect(() => {
+    let refreshTimers: number[] = [];
     try {
       const params = new URLSearchParams(window.location.search);
       const checkout = params.get("checkout");
-      const shouldRestore = checkout === "cancel" || checkout === "success";
+      const shouldRestore =
+        checkout === "guide_unlock_success" ||
+        checkout === "cancel" ||
+        checkout === "success";
       if (!shouldRestore) return;
 
+      if (checkout === "guide_unlock_success") {
+        setShowUpgradePrompt(false);
+        const delays = [0, 900, 2000, 4000, 7000];
+        refreshTimers = delays.map((ms) =>
+          window.setTimeout(() => {
+            router.refresh();
+          }, ms)
+        );
+        try {
+          const clean = new URL(window.location.href);
+          clean.searchParams.delete("checkout");
+          window.history.replaceState({}, "", clean.pathname + clean.search + clean.hash);
+        } catch {
+          /* ignore */
+        }
+      }
+
       const raw = localStorage.getItem(TUTORIAL_CREATOR_DRAFT_KEY);
-      if (!raw) return;
+      if (!raw) {
+        return () => refreshTimers.forEach((id) => window.clearTimeout(id));
+      }
       const parsed = JSON.parse(raw) as Partial<TutorialDraft>;
-      if (!parsed || typeof parsed !== "object") return;
+      if (!parsed || typeof parsed !== "object") {
+        return () => refreshTimers.forEach((id) => window.clearTimeout(id));
+      }
 
       if (typeof parsed.tutorialName === "string") {
         setTutorialName(parsed.tutorialName);
@@ -402,7 +429,8 @@ export function TutorialCreator({
     } catch {
       // Ignore invalid or inaccessible localStorage entries.
     }
-  }, []);
+    return () => refreshTimers.forEach((id) => window.clearTimeout(id));
+  }, [router]);
 
   const updateStep = useCallback((id: string, patch: Partial<StepRow>) => {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
