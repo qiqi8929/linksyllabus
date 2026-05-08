@@ -11,6 +11,14 @@ import {
 } from "@/lib/freeTier";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  logUsersQueryAfter,
+  logUsersQueryBefore,
+  logUsersUpdateAfter,
+  logUsersUpdateBefore,
+  logUsersUpsertAfter,
+  logUsersUpsertBefore
+} from "@/lib/supabaseUsersQueryLog";
 
 function isUsersUsageColumnMissing(error: unknown): boolean {
   const e = error as { code?: string; message?: string; details?: string; hint?: string } | null;
@@ -147,9 +155,20 @@ export async function createInactiveSkuWithSteps(payload: {
   });
 
   // Ensure user row exists first; avoid selecting migration-sensitive columns here.
+  logUsersUpsertBefore({
+    context: "createInactiveSkuWithSteps.users.upsert",
+    userId: user.id,
+    fields: ["id", "email"]
+  });
   const { error: upsertUserError } = await supabase
     .from("users")
     .upsert({ id: user.id, email: user.email ?? null }, { onConflict: "id" });
+  logUsersUpsertAfter({
+    context: "createInactiveSkuWithSteps.users.upsert",
+    userId: user.id,
+    ok: !upsertUserError,
+    error: upsertUserError
+  });
   if (upsertUserError) {
     logSupabaseOpError("users.upsert", user.id, upsertUserError);
   }
@@ -160,11 +179,24 @@ export async function createInactiveSkuWithSteps(payload: {
   // guide_count is display-only and should not gate creation.
   let paidSlots = 0;
 
+  logUsersQueryBefore({
+    context: "createInactiveSkuWithSteps.paid_guide_slots",
+    userId: user.id,
+    columns: "paid_guide_slots"
+  });
   const { data: paidRow, error: paidErr } = await supabase
     .from("users")
     .select("paid_guide_slots")
     .eq("id", user.id)
     .maybeSingle();
+  logUsersQueryAfter({
+    context: "createInactiveSkuWithSteps.paid_guide_slots",
+    userId: user.id,
+    columns: "paid_guide_slots",
+    ok: !paidErr,
+    error: paidErr,
+    rowReturned: paidRow != null
+  });
   if (!paidErr && paidRow) {
     const ps = Number(paidRow.paid_guide_slots);
     if (Number.isFinite(ps) && ps >= 0) paidSlots = ps;
@@ -176,11 +208,24 @@ export async function createInactiveSkuWithSteps(payload: {
       fallback: "retry admin read paid_guide_slots"
     });
     const admin = createSupabaseAdminClient();
+    logUsersQueryBefore({
+      context: "createInactiveSkuWithSteps.paid_guide_slots.admin",
+      userId: user.id,
+      columns: "paid_guide_slots"
+    });
     const { data: adminPaid, error: adminPaidErr } = await admin
       .from("users")
       .select("paid_guide_slots")
       .eq("id", user.id)
       .maybeSingle();
+    logUsersQueryAfter({
+      context: "createInactiveSkuWithSteps.paid_guide_slots.admin",
+      userId: user.id,
+      columns: "paid_guide_slots",
+      ok: !adminPaidErr,
+      error: adminPaidErr,
+      rowReturned: adminPaid != null
+    });
     if (!adminPaidErr && adminPaid) {
       const ps = Number(adminPaid.paid_guide_slots);
       if (Number.isFinite(ps) && ps >= 0) paidSlots = ps;
@@ -278,10 +323,21 @@ export async function createInactiveSkuWithSteps(payload: {
     throw new Error("Failed to create tutorial (missing sku id after insert).");
   }
 
+  logUsersUpdateBefore({
+    context: "createInactiveSkuWithSteps.guide_count_bump",
+    userId: user.id,
+    patch: { guide_count: createdGuides + 1 }
+  });
   const { error: bumpGuideCountError } = await supabase
     .from("users")
     .update({ guide_count: createdGuides + 1 })
     .eq("id", user.id);
+  logUsersUpdateAfter({
+    context: "createInactiveSkuWithSteps.guide_count_bump",
+    userId: user.id,
+    ok: !bumpGuideCountError,
+    error: bumpGuideCountError
+  });
   if (bumpGuideCountError) {
     // Tutorial is already created; avoid hard failure on usage-counter write issues.
     logSupabaseOpError("users.update_guide_count", user.id, bumpGuideCountError);
@@ -332,16 +388,41 @@ export async function deleteSkuAction(skuId: string) {
     );
   }
 
-  const { data: userRow } = await supabase
+  logUsersQueryBefore({
+    context: "deleteSkuAction.guide_count_read",
+    userId: user.id,
+    columns: "guide_count"
+  });
+  const { data: userRow, error: guideReadErr } = await supabase
     .from("users")
     .select("guide_count")
     .eq("id", user.id)
     .maybeSingle();
+  logUsersQueryAfter({
+    context: "deleteSkuAction.guide_count_read",
+    userId: user.id,
+    columns: "guide_count",
+    ok: !guideReadErr,
+    error: guideReadErr,
+    rowReturned: userRow != null
+  });
   const currentGuideCount = Math.max(0, Number(userRow?.guide_count ?? 0));
+  const nextGuideCount = Math.max(0, currentGuideCount - 1);
+  logUsersUpdateBefore({
+    context: "deleteSkuAction.guide_count_decrement",
+    userId: user.id,
+    patch: { guide_count: nextGuideCount }
+  });
   const { error: guideCountError } = await supabase
     .from("users")
-    .update({ guide_count: Math.max(0, currentGuideCount - 1) })
+    .update({ guide_count: nextGuideCount })
     .eq("id", user.id);
+  logUsersUpdateAfter({
+    context: "deleteSkuAction.guide_count_decrement",
+    userId: user.id,
+    ok: !guideCountError,
+    error: guideCountError
+  });
   if (guideCountError && !isUsersUsageColumnMissing(guideCountError)) {
     throw new Error(guideCountError.message);
   }

@@ -1,4 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  logUsersQueryAfter,
+  logUsersQueryBefore
+} from "@/lib/supabaseUsersQueryLog";
 
 export type DashboardStepRow = {
   id: string;
@@ -91,11 +95,24 @@ export async function loadDashboardBootstrapData(
   let guideCount = 0;
   let paidGuideSlots = 0;
   try {
+    logUsersQueryBefore({
+      context: "loadDashboardBootstrapData.guide_count",
+      userId,
+      columns: "guide_count"
+    });
     const { data: guideRow, error: guideCountError } = await supabase
       .from("users")
       .select("guide_count")
       .eq("id", userId)
       .maybeSingle();
+    logUsersQueryAfter({
+      context: "loadDashboardBootstrapData.guide_count",
+      userId,
+      columns: "guide_count",
+      ok: !guideCountError,
+      error: guideCountError,
+      rowReturned: guideRow != null
+    });
     if (!guideCountError) {
       const parsed = Number(guideRow?.guide_count);
       if (Number.isFinite(parsed) && parsed >= 0) {
@@ -113,11 +130,24 @@ export async function loadDashboardBootstrapData(
   }
 
   try {
+    logUsersQueryBefore({
+      context: "loadDashboardBootstrapData.paid_guide_slots",
+      userId,
+      columns: "paid_guide_slots"
+    });
     const { data: paidRow, error: paidSlotsError } = await supabase
       .from("users")
       .select("paid_guide_slots")
       .eq("id", userId)
       .maybeSingle();
+    logUsersQueryAfter({
+      context: "loadDashboardBootstrapData.paid_guide_slots",
+      userId,
+      columns: "paid_guide_slots",
+      ok: !paidSlotsError,
+      error: paidSlotsError,
+      rowReturned: paidRow != null
+    });
     if (!paidSlotsError) {
       const paid = Number(paidRow?.paid_guide_slots);
       if (Number.isFinite(paid) && paid >= 0) {
