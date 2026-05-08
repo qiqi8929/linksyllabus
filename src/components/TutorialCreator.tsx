@@ -10,6 +10,7 @@ import {
   FREE_TIER_UPGRADE_MESSAGE,
   maxAllowedGuides
 } from "@/lib/freeTier";
+import { DASHBOARD_BOOTSTRAP_REFETCH_EVENT } from "@/lib/dashboardEvents";
 import { parseAiTutorialPaste } from "@/lib/parseAiTutorialPaste";
 import { extractYouTubeVideoId } from "@/lib/video";
 import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
@@ -375,6 +376,7 @@ export function TutorialCreator({
         const delays = [0, 900, 2000, 4000, 7000];
         refreshTimers = delays.map((ms) =>
           window.setTimeout(() => {
+            window.dispatchEvent(new Event(DASHBOARD_BOOTSTRAP_REFETCH_EVENT));
             router.refresh();
           }, ms)
         );
