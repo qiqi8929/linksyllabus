@@ -14,10 +14,11 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function isUsersUsageColumnMissing(error: unknown): boolean {
-  const e = error as { code?: string; message?: string } | null;
+  const e = error as { code?: string; message?: string; details?: string; hint?: string } | null;
   if (!e) return false;
-  if (e.code === "42703") return true;
-  return /guide_count|paid_guide_slots/i.test(String(e.message ?? ""));
+  if (e.code === "42703" || e.code === "PGRST204") return true;
+  const merged = `${String(e.message ?? "")}\n${String(e.details ?? "")}\n${String(e.hint ?? "")}`;
+  return /guide_count|paid_guide_slots/i.test(merged);
 }
 
 export async function signOutAction() {
@@ -111,24 +112,23 @@ export async function createInactiveSkuWithSteps(payload: {
     throw new Error("Could not prepare user profile.");
   }
 
-  // Usage: guide_count + paid_guide_slots (fallback: count skus if columns missing).
+  // Usage: guide_count + paid_guide_slots. Query separately so one missing column
+  // does not turn the whole request into a 400.
   let guideCount = 0;
   let paidSlots = 0;
-  const { data: userRow, error: userRowError } = await supabase
+
+  const { data: guideRow, error: guideErr } = await supabase
     .from("users")
-    .select("guide_count,paid_guide_slots")
+    .select("guide_count")
     .eq("id", user.id)
     .maybeSingle();
-  if (userRowError && !isUsersUsageColumnMissing(userRowError)) {
+  if (guideErr && !isUsersUsageColumnMissing(guideErr)) {
     throw new Error("Could not check tutorial usage.");
   }
-  if (!userRowError && userRow) {
-    const gc = Number(userRow.guide_count);
-    const ps = Number(userRow.paid_guide_slots);
+  if (!guideErr && guideRow) {
+    const gc = Number(guideRow.guide_count);
     if (Number.isFinite(gc) && gc >= 0) guideCount = gc;
-    if (Number.isFinite(ps) && ps >= 0) paidSlots = ps;
-  }
-  if (userRowError || !userRow) {
+  } else {
     const { count: skuCount, error: skuCountError } = await supabase
       .from("skus")
       .select("id", { count: "exact", head: true })
@@ -137,7 +137,19 @@ export async function createInactiveSkuWithSteps(payload: {
       throw new Error("Could not check tutorial usage.");
     }
     guideCount = Math.max(0, Number(skuCount ?? 0));
-    paidSlots = 0;
+  }
+
+  const { data: paidRow, error: paidErr } = await supabase
+    .from("users")
+    .select("paid_guide_slots")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (paidErr && !isUsersUsageColumnMissing(paidErr)) {
+    throw new Error("Could not check tutorial usage.");
+  }
+  if (!paidErr && paidRow) {
+    const ps = Number(paidRow.paid_guide_slots);
+    if (Number.isFinite(ps) && ps >= 0) paidSlots = ps;
   }
 
   const maxGuides = maxAllowedGuides(paidSlots);

@@ -48,24 +48,37 @@ export default async function DashboardPage() {
   // when `guide_count` is missing or temporarily out of sync.
   guideCount = skus.length;
   try {
-    const { data: userRow, error: guideCountError } = await supabase
+    const { data: guideRow, error: guideCountError } = await supabase
       .from("users")
-      .select("guide_count,paid_guide_slots")
+      .select("guide_count")
       .eq("id", user.id)
       .maybeSingle();
     if (!guideCountError) {
-      const parsed = Number(userRow?.guide_count);
+      const parsed = Number(guideRow?.guide_count);
       if (Number.isFinite(parsed) && parsed >= 0) {
         guideCount = parsed;
-      }
-      const paid = Number(userRow?.paid_guide_slots);
-      if (Number.isFinite(paid) && paid >= 0) {
-        paidGuideSlots = paid;
       }
     } else {
       console.warn("[dashboard] guide_count read failed; using skus length fallback", {
         code: guideCountError.code,
         message: guideCountError.message
+      });
+    }
+
+    const { data: paidRow, error: paidSlotsError } = await supabase
+      .from("users")
+      .select("paid_guide_slots")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (!paidSlotsError) {
+      const paid = Number(paidRow?.paid_guide_slots);
+      if (Number.isFinite(paid) && paid >= 0) {
+        paidGuideSlots = paid;
+      }
+    } else {
+      console.warn("[dashboard] paid_guide_slots read failed; defaulting to 0", {
+        code: paidSlotsError.code,
+        message: paidSlotsError.message
       });
     }
   } catch {
