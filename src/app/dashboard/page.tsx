@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { shouldRethrowFromRscCatch } from "@/lib/rscRethrow";
 import { DashboardTutorialActions } from "@/components/DashboardTutorialActions";
-import { TutorialCreator } from "@/components/TutorialCreator";
+import { DashboardTutorialCreatorClient } from "@/components/DashboardTutorialCreatorClient";
 
 export const dynamic = "force-dynamic";
 
@@ -177,7 +177,10 @@ export default async function DashboardPage({
 
     return (
       <div className="space-y-12">
-        <TutorialCreator guideCount={guideCount} paidGuideSlots={paidGuideSlots} />
+        <DashboardTutorialCreatorClient
+          guideCount={guideCount}
+          paidGuideSlots={paidGuideSlots}
+        />
 
         <section className="space-y-4">
           <div>
