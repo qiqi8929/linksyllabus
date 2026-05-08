@@ -52,6 +52,35 @@ export async function POST(req: Request) {
         event.type === "checkout.session.async_payment_succeeded";
       if (paid) {
         try {
+          if (!session.id) {
+            console.error("[stripe webhook] guide_unlock missing session.id, skip increment", {
+              userId,
+              eventId: event.id
+            });
+            return NextResponse.json({ received: true });
+          }
+
+          const { error: idempotencyErr } = await admin
+            .from("stripe_guide_unlock_events")
+            .insert({
+              session_id: session.id,
+              user_id: userId,
+              stripe_event_id: event.id
+            });
+
+          if (idempotencyErr) {
+            // Duplicate session: already processed, do not increment again.
+            if ((idempotencyErr as any).code === "23505") {
+              console.log("[stripe webhook] guide_unlock already processed; skip increment", {
+                userId,
+                sessionId: session.id
+              });
+              return NextResponse.json({ received: true, duplicate: true });
+            }
+            console.error("[stripe webhook] guide_unlock idempotency insert failed", idempotencyErr);
+            return NextResponse.json({ received: true });
+          }
+
           const { data: row } = await admin
             .from("users")
             .select("paid_guide_slots")

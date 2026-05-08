@@ -6,7 +6,6 @@ import { activateSkuFromCheckoutSession } from "@/lib/stripe/skuActivation";
 import { getStripe } from "@/lib/stripe/server";
 import { env } from "@/lib/env";
 import {
-  FREE_GUIDE_LIMIT,
   FREE_TIER_UPGRADE_MESSAGE,
   maxAllowedGuides
 } from "@/lib/freeTier";
@@ -155,39 +154,11 @@ export async function createInactiveSkuWithSteps(payload: {
     logSupabaseOpError("users.upsert", user.id, upsertUserError);
   }
 
-  // Usage: guide_count + paid_guide_slots. Query separately so one missing column
-  // does not turn the whole request into a 400.
-  let guideCount = 0;
+  // Usage source-of-truth for unlocks:
+  // - paid_guide_slots controls purchased capacity
+  // - actual created tutorials come from skus count
+  // guide_count is display-only and should not gate creation.
   let paidSlots = 0;
-
-  const { data: guideRow, error: guideErr } = await supabase
-    .from("users")
-    .select("guide_count")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!guideErr && guideRow) {
-    const gc = Number(guideRow.guide_count);
-    if (Number.isFinite(gc) && gc >= 0) guideCount = gc;
-  } else {
-    if (guideErr) {
-      logUsersUsageSelectError({
-        label: "guide_count",
-        userId: user.id,
-        err: guideErr,
-        fallback: "count skus as guideCount"
-      });
-    }
-    const { count: skuCount, error: skuCountError } = await supabase
-      .from("skus")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id);
-    if (skuCountError) {
-      logSupabaseOpError("skus.count_for_guide_count", user.id, skuCountError);
-      guideCount = 0;
-    } else {
-      guideCount = Math.max(0, Number(skuCount ?? 0));
-    }
-  }
 
   const { data: paidRow, error: paidErr } = await supabase
     .from("users")
@@ -206,8 +177,19 @@ export async function createInactiveSkuWithSteps(payload: {
     });
   }
 
+  let createdGuides = 0;
+  const { count: skuCount, error: skuCountError } = await supabase
+    .from("skus")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
+  if (skuCountError) {
+    logSupabaseOpError("skus.count_for_guide_limit", user.id, skuCountError);
+  } else {
+    createdGuides = Math.max(0, Number(skuCount ?? 0));
+  }
+
   const maxGuides = maxAllowedGuides(paidSlots);
-  if (guideCount >= maxGuides) {
+  if (createdGuides >= maxGuides) {
     throw new Error(FREE_TIER_UPGRADE_MESSAGE);
   }
 
@@ -286,7 +268,7 @@ export async function createInactiveSkuWithSteps(payload: {
 
   const { error: bumpGuideCountError } = await supabase
     .from("users")
-    .update({ guide_count: guideCount + 1 })
+    .update({ guide_count: createdGuides + 1 })
     .eq("id", user.id);
   if (bumpGuideCountError) {
     // Tutorial is already created; avoid hard failure on usage-counter write issues.
