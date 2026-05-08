@@ -6,7 +6,14 @@ export const GEMINI_MODEL_ID = "gemini-2.5-flash";
 export const env = {
   // 这些 NEXT_PUBLIC_* 变量会在构建时被 Next.js 内联到前端代码里，
   // 所以这里不要用动态的 process.env[name] 访问方式。
-  appUrl: () => process.env.NEXT_PUBLIC_APP_URL as string,
+  /** Public site URL; falls back to VERCEL_URL on Vercel when NEXT_PUBLIC_APP_URL is unset. */
+  appUrl: (): string => {
+    const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
+    if (explicit) return explicit;
+    const vercel = process.env.VERCEL_URL?.trim();
+    if (vercel) return vercel.startsWith("http") ? vercel : `https://${vercel}`;
+    return "";
+  },
 
   supabase: {
     url: () => process.env.NEXT_PUBLIC_SUPABASE_URL as string,

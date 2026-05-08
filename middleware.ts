@@ -10,9 +10,22 @@ type CookieToSet = {
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  if (!supabaseUrl || !supabaseAnon) {
+    console.error("[middleware] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    if (req.nextUrl.pathname.startsWith("/dashboard")) {
+      const dest = req.nextUrl.clone();
+      dest.pathname = "/login";
+      dest.searchParams.set("error", "server_config");
+      return NextResponse.redirect(dest);
+    }
+    return NextResponse.next();
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnon,
     {
       cookies: {
         getAll() {
