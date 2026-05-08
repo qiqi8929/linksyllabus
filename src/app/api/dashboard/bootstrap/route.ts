@@ -19,7 +19,11 @@ export async function GET(req: Request) {
     }
 
     const payload = await loadDashboardBootstrapData(supabase, user.id);
-    return NextResponse.json(payload);
+    return NextResponse.json(payload, {
+      headers: {
+        "Cache-Control": "private, no-store, max-age=0, must-revalidate"
+      }
+    });
   } catch (e) {
     console.error("[api/dashboard/bootstrap] fatal", e);
     return NextResponse.json(

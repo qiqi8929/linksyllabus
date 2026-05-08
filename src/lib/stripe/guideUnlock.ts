@@ -7,6 +7,17 @@ export type GuideUnlockApplyResult =
   | { ok: true; duplicate: boolean }
   | { ok: false; reason: string };
 
+function isIdempotencyTableMissing(err: unknown): boolean {
+  const e = err as { code?: string; message?: string; details?: string } | null;
+  if (!e) return false;
+  const blob = `${e.code ?? ""}\n${e.message ?? ""}\n${e.details ?? ""}`.toLowerCase();
+  if (e.code === "42P01" || e.code === "PGRST205") return true;
+  if (blob.includes("stripe_guide_unlock_events") && /does not exist|could not find|undefined table/i.test(blob)) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Idempotently increment `users.paid_guide_slots` for a paid guide-unlock Checkout session.
  * Shared by the Stripe webhook and the return-URL sync when webhooks are delayed or misconfigured.
@@ -39,6 +50,10 @@ export async function applyGuideUnlockFromPaidCheckoutSession(
   if (idempotencyErr) {
     if ((idempotencyErr as { code?: string }).code === "23505") {
       return { ok: true, duplicate: true };
+    }
+    if (isIdempotencyTableMissing(idempotencyErr)) {
+      console.error("[guideUnlock] stripe_guide_unlock_events table missing", idempotencyErr);
+      return { ok: false, reason: "idempotency_table_missing" };
     }
     console.error("[guideUnlock] idempotency insert failed", idempotencyErr);
     return { ok: false, reason: "idempotency_insert_failed" };

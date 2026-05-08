@@ -387,14 +387,50 @@ export function TutorialCreator({
           params.get("session_id")?.trim() ||
           params.get("stripe_session_id")?.trim() ||
           "";
+        const unlockSyncMessage = (reason: string | undefined): string => {
+          switch (reason) {
+            case "idempotency_table_missing":
+              return (
+                "Payment succeeded, but the database is missing table stripe_guide_unlock_events. " +
+                "In Supabase → SQL Editor, run the file supabase/migration_stripe_guide_unlock_idempotency.sql from this project, then refresh this page."
+              );
+            case "missing_session":
+              return (
+                "Payment succeeded, but the return URL had no Stripe session id (older deploy or bookmark). " +
+                "Deploy the latest app (success URL must include session_id), or wait for the Stripe webhook; then refresh. " +
+                "If it persists, check Vercel Stripe webhook URL and STRIPE_WEBHOOK_SECRET."
+              );
+            case "stripe_not_configured":
+              return "Server is missing STRIPE_SECRET_KEY; unlock cannot be verified.";
+            case "user_mismatch":
+              return "This Stripe session belongs to a different account. Sign in with the same user you used at checkout.";
+            case "not_guide_unlock":
+              return "This checkout was not a guide-slot unlock. Use “Add guide slot ($9.99)” from the dashboard.";
+            case "idempotency_insert_failed":
+            case "update_failed":
+              return (
+                "Could not record your guide slot in the database. Check Supabase logs and that paid_guide_slots exists on public.users."
+              );
+            default:
+              return reason
+                ? `Could not apply guide unlock (${reason}). Try refreshing; if it repeats, contact support.`
+                : "Could not apply guide unlock. Try refreshing.";
+          }
+        };
         if (sessionId.length > 0) {
           void syncGuideUnlockFromStripeSession(sessionId).then((syncRes) => {
-            if (!syncRes.ok && syncRes.reason && syncRes.reason !== "not_paid") {
+            if (!syncRes.ok) {
               console.warn("[TutorialCreator] guide unlock session sync", syncRes);
+              if (syncRes.reason !== "not_paid") {
+                setError(unlockSyncMessage(syncRes.reason));
+              }
             }
             window.dispatchEvent(new Event(DASHBOARD_BOOTSTRAP_REFETCH_EVENT));
             router.refresh();
           });
+        } else {
+          setError(unlockSyncMessage("missing_session"));
+          window.dispatchEvent(new Event(DASHBOARD_BOOTSTRAP_REFETCH_EVENT));
         }
         const delays = [0, 900, 2000, 4000, 7000];
         refreshTimers = delays.map((ms) =>

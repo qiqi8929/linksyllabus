@@ -88,14 +88,15 @@ export function DashboardPageContent() {
     );
   }
 
-  const guideCount = data?.guideCount ?? 0;
   const paidGuideSlots = data?.paidGuideSlots ?? 0;
   const safeSkus = data?.skus ?? [];
+  /** Match server limit checks (SKU count), not users.guide_count — avoids stuck “pay again” if DB counters drift. */
+  const tutorialsCreatedCount = safeSkus.length;
 
   return (
     <div className="space-y-12">
       <DashboardTutorialCreatorClient
-        guideCount={guideCount}
+        guideCount={tutorialsCreatedCount}
         paidGuideSlots={paidGuideSlots}
       />
 
