@@ -52,6 +52,18 @@ function logSupabaseOpError(label: string, userId: string, err: unknown): void {
   });
 }
 
+function formatSupabaseError(err: unknown): string {
+  const e = err as { code?: string; message?: string; details?: string; hint?: string } | null;
+  if (!e) return "Unknown Supabase error";
+  const parts = [
+    e.code ? `code=${e.code}` : null,
+    e.message ? `message=${e.message}` : null,
+    e.details ? `details=${e.details}` : null,
+    e.hint ? `hint=${e.hint}` : null
+  ].filter(Boolean);
+  return parts.join(" | ") || "Unknown Supabase error";
+}
+
 export async function signOutAction() {
   const supabase = createSupabaseServerClient();
   await supabase.auth.signOut();
@@ -202,25 +214,74 @@ export async function createInactiveSkuWithSteps(payload: {
   const materialsText = String(payload.materialsText ?? "").trim();
   const toolsText = String(payload.toolsText ?? "").trim();
 
-  const { data: sku, error: skuErr } = await supabase
-    .from("skus")
-    .insert({
-      user_id: user.id,
-      name,
-      description: "",
-      youtube_url: "",
-      start_time: 0,
-      end_time: 0,
-      scan_count: 0,
-      is_active: true,
-      materials_text: materialsText || null,
-      tools_text: toolsText || null
-    })
-    .select("id")
-    .single();
+  const skuInsertFull = {
+    user_id: user.id,
+    name,
+    description: "",
+    youtube_url: "",
+    start_time: 0,
+    end_time: 0,
+    scan_count: 0,
+    is_active: true,
+    materials_text: materialsText || null,
+    tools_text: toolsText || null
+  };
+  const skuInsertFallback = {
+    user_id: user.id,
+    name,
+    description: "",
+    scan_count: 0,
+    is_active: true
+  };
 
-  if (skuErr || !sku) {
-    throw skuErr ?? new Error("Failed to create tutorial.");
+  let sku: { id: string } | null = null;
+  {
+    const { data: firstSku, error: firstErr } = await supabase
+      .from("skus")
+      .insert(skuInsertFull)
+      .select("id")
+      .single();
+    if (!firstErr && firstSku) {
+      sku = firstSku;
+    } else if (firstErr) {
+      logSupabaseOpError("skus.insert_full", user.id, firstErr);
+      const merged = `${String((firstErr as any).message ?? "")}\n${String(
+        (firstErr as any).details ?? ""
+      )}`.toLowerCase();
+      const canRetryWithFallback =
+        merged.includes("materials_text") ||
+        merged.includes("tools_text") ||
+        merged.includes("youtube_url") ||
+        merged.includes("start_time") ||
+        merged.includes("end_time");
+      if (canRetryWithFallback) {
+        const { data: fallbackSku, error: fallbackErr } = await supabase
+          .from("skus")
+          .insert(skuInsertFallback)
+          .select("id")
+          .single();
+        if (!fallbackErr && fallbackSku) {
+          sku = fallbackSku;
+        } else {
+          logSupabaseOpError("skus.insert_fallback", user.id, fallbackErr);
+          throw new Error(
+            `[createInactiveSkuWithSteps] Failed to create tutorial row (fallback): ${formatSupabaseError(
+              fallbackErr
+            )}`
+          );
+        }
+      } else {
+        throw new Error(
+          `[createInactiveSkuWithSteps] Failed to create tutorial row: ${formatSupabaseError(
+            firstErr
+          )}`
+        );
+      }
+    }
+  }
+
+  if (!sku) {
+    throw new Error("Failed to create tutorial (missing sku id after insert).");
   }
 
   const { error: bumpGuideCountError } = await supabase
@@ -244,7 +305,12 @@ export async function createInactiveSkuWithSteps(payload: {
 
   const { error: stepErr } = await supabase.from("steps").insert(rows);
   if (stepErr) {
-    throw stepErr;
+    logSupabaseOpError("steps.insert", user.id, stepErr);
+    throw new Error(
+      `[createInactiveSkuWithSteps] Failed to create tutorial steps: ${formatSupabaseError(
+        stepErr
+      )}`
+    );
   }
 
   return { skuId: sku.id, checkoutRequired: false };
