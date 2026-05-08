@@ -44,9 +44,9 @@ export default async function DashboardPage() {
     skus = [];
   }
 
-  // Fallback to actual tutorial rows so dashboard can still render
-  // when `guide_count` is missing or temporarily out of sync.
-  guideCount = skus.length;
+  // Read usage defensively: never let users-table issues break dashboard rendering.
+  // If guide_count cannot be read, default to 0 per UX requirement.
+  guideCount = 0;
   try {
     const { data: guideRow, error: guideCountError } = await supabase
       .from("users")
@@ -59,14 +59,22 @@ export default async function DashboardPage() {
         guideCount = parsed;
       }
     } else {
-      console.error("[dashboard] guide_count read failed; using skus length fallback", {
+      console.error("[dashboard] guide_count read failed; defaulting to 0", {
         code: guideCountError.code,
         message: guideCountError.message,
         details: (guideCountError as any).details,
         hint: (guideCountError as any).hint
       });
     }
+  } catch (e) {
+    console.error("[dashboard] guide_count query threw; defaulting to 0", {
+      userId: user.id,
+      error: e
+    });
+    guideCount = 0;
+  }
 
+  try {
     const { data: paidRow, error: paidSlotsError } = await supabase
       .from("users")
       .select("paid_guide_slots")
@@ -85,8 +93,12 @@ export default async function DashboardPage() {
         hint: (paidSlotsError as any).hint
       });
     }
-  } catch {
-    guideCount = skus.length;
+  } catch (e) {
+    console.error("[dashboard] paid_guide_slots query threw; defaulting to 0", {
+      userId: user.id,
+      error: e
+    });
+    paidGuideSlots = 0;
   }
 
   return (
