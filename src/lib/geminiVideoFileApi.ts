@@ -211,7 +211,8 @@ export async function generateContentWithVideoFile(
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/${env.geminiModel()}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  /** fileData parts require the v1beta generateContent endpoint (v1 rejects unknown field "fileData"). */
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.geminiModel()}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetch(url, {
     method: "POST",
