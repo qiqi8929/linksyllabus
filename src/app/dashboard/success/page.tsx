@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { unstable_noStore } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import { tryActivateSkuFromCheckoutSessionId } from "@/lib/stripe/skuActivation";
+
+export const dynamic = "force-dynamic";
 
 type Search = { skuId?: string; checkout?: string; session_id?: string | string[] };
 
@@ -11,6 +14,7 @@ export default async function DashboardSuccessPage({
 }: {
   searchParams: Search | Promise<Search>;
 }) {
+  unstable_noStore();
   const sp = (await Promise.resolve(searchParams)) ?? {};
   const skuId = sp.skuId;
   if (!skuId) {

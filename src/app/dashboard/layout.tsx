@@ -3,18 +3,10 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { signOutAction } from "@/app/dashboard/serverActions";
+import { shouldRethrowFromRscCatch } from "@/lib/rscRethrow";
 
 /** Cookies/session require request-time rendering; avoids static prerender + DYNAMIC_SERVER_USAGE. */
 export const dynamic = "force-dynamic";
-
-function isDynamicServerUsageError(e: unknown): boolean {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    "digest" in e &&
-    (e as { digest?: string }).digest === "DYNAMIC_SERVER_USAGE"
-  );
-}
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   let user: { email?: string | null } | null = null;
@@ -29,7 +21,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     }
     user = data.user;
   } catch (e) {
-    if (isDynamicServerUsageError(e)) throw e;
+    if (shouldRethrowFromRscCatch(e)) throw e;
     console.error("[dashboard/layout] auth failed", e);
     return (
       <div className="container-page py-8">

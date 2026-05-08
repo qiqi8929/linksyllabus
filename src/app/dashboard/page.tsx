@@ -1,7 +1,11 @@
 import Link from "next/link";
+import { unstable_noStore } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { shouldRethrowFromRscCatch } from "@/lib/rscRethrow";
 import { DashboardTutorialActions } from "@/components/DashboardTutorialActions";
 import { TutorialCreator } from "@/components/TutorialCreator";
+
+export const dynamic = "force-dynamic";
 
 type StepRow = {
   id: string;
@@ -17,21 +21,15 @@ type SkuRow = {
   steps: StepRow[] | null;
 };
 
-function isDynamicServerUsageError(e: unknown): boolean {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    "digest" in e &&
-    (e as { digest?: string }).digest === "DYNAMIC_SERVER_USAGE"
-  );
-}
-
 export default async function DashboardPage({
   searchParams
 }: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?:
+    | Record<string, string | string[] | undefined>
+    | Promise<Record<string, string | string[] | undefined>>;
 }) {
-  void searchParams;
+  unstable_noStore();
+  await Promise.resolve(searchParams);
 
   try {
     const supabase = createSupabaseServerClient();
@@ -263,7 +261,7 @@ export default async function DashboardPage({
       </div>
     );
   } catch (e) {
-    if (isDynamicServerUsageError(e)) throw e;
+    if (shouldRethrowFromRscCatch(e)) throw e;
     console.error("[dashboard] fatal render error", e);
     return (
       <div className="card max-w-lg space-y-3 p-6">
