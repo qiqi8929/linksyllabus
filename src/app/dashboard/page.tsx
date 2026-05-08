@@ -59,9 +59,11 @@ export default async function DashboardPage() {
         guideCount = parsed;
       }
     } else {
-      console.warn("[dashboard] guide_count read failed; using skus length fallback", {
+      console.error("[dashboard] guide_count read failed; using skus length fallback", {
         code: guideCountError.code,
-        message: guideCountError.message
+        message: guideCountError.message,
+        details: (guideCountError as any).details,
+        hint: (guideCountError as any).hint
       });
     }
 
@@ -76,9 +78,11 @@ export default async function DashboardPage() {
         paidGuideSlots = paid;
       }
     } else {
-      console.warn("[dashboard] paid_guide_slots read failed; defaulting to 0", {
+      console.error("[dashboard] paid_guide_slots read failed; defaulting to 0", {
         code: paidSlotsError.code,
-        message: paidSlotsError.message
+        message: paidSlotsError.message,
+        details: (paidSlotsError as any).details,
+        hint: (paidSlotsError as any).hint
       });
     }
   } catch {

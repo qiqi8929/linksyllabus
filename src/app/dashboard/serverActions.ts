@@ -21,6 +21,25 @@ function isUsersUsageColumnMissing(error: unknown): boolean {
   return /guide_count|paid_guide_slots/i.test(merged);
 }
 
+function logUsersUsageSelectError(params: {
+  label: "guide_count" | "paid_guide_slots";
+  userId: string;
+  err: unknown;
+  fallback: string;
+}): void {
+  const e = params.err as { code?: string; message?: string; details?: string; hint?: string } | null;
+  // Avoid logging any secrets; userId is fine.
+  console.error("[dashboard/serverActions] users usage select failed", {
+    label: params.label,
+    userId: params.userId,
+    code: e?.code,
+    message: e?.message,
+    details: e?.details,
+    hint: e?.hint,
+    fallback: params.fallback
+  });
+}
+
 export async function signOutAction() {
   const supabase = createSupabaseServerClient();
   await supabase.auth.signOut();
@@ -122,13 +141,18 @@ export async function createInactiveSkuWithSteps(payload: {
     .select("guide_count")
     .eq("id", user.id)
     .maybeSingle();
-  if (guideErr && !isUsersUsageColumnMissing(guideErr)) {
-    throw new Error("Could not check tutorial usage.");
-  }
   if (!guideErr && guideRow) {
     const gc = Number(guideRow.guide_count);
     if (Number.isFinite(gc) && gc >= 0) guideCount = gc;
   } else {
+    if (guideErr) {
+      logUsersUsageSelectError({
+        label: "guide_count",
+        userId: user.id,
+        err: guideErr,
+        fallback: "count skus as guideCount"
+      });
+    }
     const { count: skuCount, error: skuCountError } = await supabase
       .from("skus")
       .select("id", { count: "exact", head: true })
@@ -144,12 +168,16 @@ export async function createInactiveSkuWithSteps(payload: {
     .select("paid_guide_slots")
     .eq("id", user.id)
     .maybeSingle();
-  if (paidErr && !isUsersUsageColumnMissing(paidErr)) {
-    throw new Error("Could not check tutorial usage.");
-  }
   if (!paidErr && paidRow) {
     const ps = Number(paidRow.paid_guide_slots);
     if (Number.isFinite(ps) && ps >= 0) paidSlots = ps;
+  } else if (paidErr) {
+    logUsersUsageSelectError({
+      label: "paid_guide_slots",
+      userId: user.id,
+      err: paidErr,
+      fallback: "paidSlots=0"
+    });
   }
 
   const maxGuides = maxAllowedGuides(paidSlots);
