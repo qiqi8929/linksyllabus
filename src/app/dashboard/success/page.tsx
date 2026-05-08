@@ -21,9 +21,11 @@ export default async function DashboardSuccessPage({
   const sessionId = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
 
   const supabase = createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  const { data: authData, error: authErr } = await supabase.auth.getUser();
+  if (authErr) {
+    console.error("[dashboard/success] getUser error", authErr.message);
+  }
+  const user = authData.user;
   if (!user) {
     redirect("/login");
   }

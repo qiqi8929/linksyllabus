@@ -28,9 +28,17 @@ function parseRequestCookieHeader(header: string | null): { name: string; value:
 }
 
 export function createSupabaseServerClient() {
+  const url = env.supabase.url()?.trim();
+  const anonKey = env.supabase.anonKey()?.trim();
+  if (!url || !anonKey) {
+    throw new Error(
+      "Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
+    );
+  }
+
   const cookieStore = cookies();
 
-  return createServerClient(env.supabase.url(), env.supabase.anonKey(), {
+  return createServerClient(url, anonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -53,10 +61,18 @@ export function createSupabaseServerClient() {
  * incoming `Request` cookies. Fixes `getUser()` returning null while the dashboard still works.
  */
 export function createSupabaseRouteHandlerClient(request: Request) {
+  const url = env.supabase.url()?.trim();
+  const anonKey = env.supabase.anonKey()?.trim();
+  if (!url || !anonKey) {
+    throw new Error(
+      "Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
+    );
+  }
+
   const fromHeader = parseRequestCookieHeader(request.headers.get("cookie"));
   const cookieStore = cookies();
 
-  return createServerClient(env.supabase.url(), env.supabase.anonKey(), {
+  return createServerClient(url, anonKey, {
     cookies: {
       getAll() {
         if (fromHeader.length > 0) return fromHeader;
