@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { unstable_noStore } from "next/cache";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { shouldRethrowFromRscCatch } from "@/lib/rscRethrow";
 import { DashboardTutorialActions } from "@/components/DashboardTutorialActions";
@@ -28,10 +29,10 @@ export default async function DashboardPage({
     | Record<string, string | string[] | undefined>
     | Promise<Record<string, string | string[] | undefined>>;
 }) {
-  unstable_noStore();
-  await Promise.resolve(searchParams);
-
   try {
+    unstable_noStore();
+    await Promise.resolve(searchParams);
+
     const supabase = createSupabaseServerClient();
     const { data: authData, error: authErr } = await supabase.auth.getUser();
     if (authErr) {
@@ -42,7 +43,7 @@ export default async function DashboardPage({
     }
     const user = authData.user;
     if (!user) {
-      return null;
+      redirect("/login");
     }
 
     // IMPORTANT: payment unlock is handled only by Stripe webhook (single source of truth).
@@ -125,7 +126,7 @@ export default async function DashboardPage({
       if (!guideCountError) {
         const parsed = Number(guideRow?.guide_count);
         if (Number.isFinite(parsed) && parsed >= 0) {
-          guideCount = parsed;
+          guideCount = Math.min(Number.MAX_SAFE_INTEGER, Math.floor(parsed));
         }
       } else {
         console.error("[dashboard] guide_count read failed; defaulting to 0", {
@@ -152,7 +153,7 @@ export default async function DashboardPage({
       if (!paidSlotsError) {
         const paid = Number(paidRow?.paid_guide_slots);
         if (Number.isFinite(paid) && paid >= 0) {
-          paidGuideSlots = paid;
+          paidGuideSlots = Math.min(Number.MAX_SAFE_INTEGER, Math.floor(paid));
         }
       } else {
         console.error("[dashboard] paid_guide_slots read failed; defaulting to 0", {
@@ -170,6 +171,10 @@ export default async function DashboardPage({
       paidGuideSlots = 0;
     }
 
+    const safeSkus = skus.filter(
+      (s) => typeof s.id === "string" && s.id.length > 0 && typeof s.name === "string"
+    );
+
     return (
       <div className="space-y-12">
         <TutorialCreator guideCount={guideCount} paidGuideSlots={paidGuideSlots} />
@@ -185,14 +190,16 @@ export default async function DashboardPage({
           </div>
 
           <div className="grid gap-4">
-            {skus.length === 0 ? (
+            {safeSkus.length === 0 ? (
               <div className="card p-6 text-sm text-zinc-600">
                 No tutorials yet. Use the form above to create one.
               </div>
             ) : null}
 
-            {skus.map((sku) => {
-              const steps = [...(sku.steps ?? [])].sort((a, b) => a.step_number - b.step_number);
+            {safeSkus.map((sku) => {
+              const steps = [...(sku.steps ?? [])]
+                .filter((st) => typeof st.id === "string" && st.id.length > 0)
+                .sort((a, b) => a.step_number - b.step_number);
               return (
                 <div key={sku.id} className="card overflow-hidden">
                   <div className="flex flex-col gap-3 border-b border-zinc-100 p-5 md:flex-row md:items-start md:justify-between">
