@@ -20,9 +20,9 @@ type SkuRow = {
 export default async function DashboardPage({
   searchParams
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  await searchParams;
+  void searchParams;
   const supabase = createSupabaseServerClient();
   const {
     data: { user }

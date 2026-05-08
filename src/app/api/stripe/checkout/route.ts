@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     const stripe = getStripe();
 
     if (payload.type === "guide_unlock") {
-      const success_url = `${appUrl}/dashboard?checkout=guide_unlock_success`;
+      const success_url = `${appUrl}/dashboard/guide-unlock-complete?session_id={CHECKOUT_SESSION_ID}`;
       let customerId = await getOrCreateStripeCustomerId(stripe, admin, user);
 
       const createUnlockSession = () =>

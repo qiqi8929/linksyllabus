@@ -313,7 +313,6 @@ export function TutorialCreator({
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   /** True when the server fell back to title-based time estimates (rare). */
   const [outlineEstimated, setOutlineEstimated] = useState(false);
-  const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string | null>(null);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(
     safeGuideCount >= maxGuides
   );
@@ -362,13 +361,7 @@ export function TutorialCreator({
     try {
       const params = new URLSearchParams(window.location.search);
       const checkout = params.get("checkout");
-      if (checkout === "guide_unlock_success") {
-        setPaymentSuccessMessage("Payment successful! You can now create your tutorial.");
-      }
-      const shouldRestore =
-        checkout === "guide_unlock_success" ||
-        checkout === "cancel" ||
-        checkout === "success";
+      const shouldRestore = checkout === "cancel" || checkout === "success";
       if (!shouldRestore) return;
 
       const raw = localStorage.getItem(TUTORIAL_CREATOR_DRAFT_KEY);
@@ -406,9 +399,6 @@ export function TutorialCreator({
         setToolsText(parsed.toolsText);
       }
       setUploadFile(null);
-      if (checkout === "guide_unlock_success") {
-        setShowUpgradePrompt(false);
-      }
     } catch {
       // Ignore invalid or inaccessible localStorage entries.
     }
@@ -830,7 +820,7 @@ export function TutorialCreator({
         return;
       }
       localStorage.removeItem(TUTORIAL_CREATOR_DRAFT_KEY);
-      window.location.href = `/tutorial/${skuId}`;
+      window.location.href = `/dashboard/success?checkout=success&skuId=${encodeURIComponent(skuId)}`;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Could not create tutorial.";
       setError(msg);
@@ -865,12 +855,6 @@ export function TutorialCreator({
           each additional guide is a one-time $9.99 payment.
         </p>
       </div>
-
-      {paymentSuccessMessage ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          {paymentSuccessMessage}
-        </div>
-      ) : null}
 
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
