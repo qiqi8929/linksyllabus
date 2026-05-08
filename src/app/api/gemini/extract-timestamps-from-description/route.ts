@@ -69,6 +69,7 @@ export async function POST(req: Request) {
         apiToken,
         customerSubdomain,
         videoId: streamVideoId,
+        // 500 MiB cap (MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS); Gemini Files API allows larger payloads server-side.
         maxBytes: MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS
       });
       const result = await extractTutorialStructureFromUploadedVideoBuffer(buffer, "video/mp4");
