@@ -161,21 +161,13 @@ export async function setCloudflareStreamVideoDownloadable(params: {
 }
 
 /**
- * Ensures the default MP4 exists, then downloads it into memory for server-side Gemini analysis.
- * Gemini cannot fetch Cloudflare Stream URLs reliably; callers upload this buffer via File API instead.
- * Size limits are enforced by Gemini Files API / hosting memory — no artificial cap here.
+ * Downloads the default MP4 from the public Stream URL for server-side Gemini analysis.
+ * Uses `GET https://{customerSubdomain}/{videoId}/downloads/default.mp4` only — no Stream API POST.
  */
 export async function fetchCloudflareStreamDefaultMp4Buffer(params: {
-  accountId: string;
-  apiToken: string;
   customerSubdomain: string;
   videoId: string;
 }): Promise<Buffer> {
-  await setCloudflareStreamVideoDownloadable({
-    accountId: params.accountId,
-    apiToken: params.apiToken,
-    videoId: params.videoId
-  });
   const url = buildCloudflareDownloadUrl(params.customerSubdomain, params.videoId);
   const res = await fetch(url, { redirect: "follow" });
   if (!res.ok) {
