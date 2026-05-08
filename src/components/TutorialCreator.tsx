@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createInactiveSkuWithSteps,
   type TutorialStepInput
@@ -312,6 +312,8 @@ export function TutorialCreator({
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(
     safeGuideCount >= maxGuides
   );
+  const [autoPublishAfterUnlock, setAutoPublishAfterUnlock] = useState(false);
+  const autoPublishTriggeredRef = useRef(false);
 
   const persistDraftToLocalStorage = useCallback(() => {
     try {
@@ -399,10 +401,22 @@ export function TutorialCreator({
       }
       setUploadFile(null);
       localStorage.removeItem(TUTORIAL_CREATOR_DRAFT_KEY);
+      if (checkout === "guide_unlock_success") {
+        setShowUpgradePrompt(false);
+        setAutoPublishAfterUnlock(true);
+      }
     } catch {
       // Ignore invalid or inaccessible localStorage entries.
     }
   }, []);
+
+  useEffect(() => {
+    if (!autoPublishAfterUnlock) return;
+    if (autoPublishTriggeredRef.current) return;
+    if (payLoading) return;
+    autoPublishTriggeredRef.current = true;
+    void onPay();
+  }, [autoPublishAfterUnlock, payLoading]);
 
   const updateStep = useCallback((id: string, patch: Partial<StepRow>) => {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -440,9 +454,6 @@ export function TutorialCreator({
     if (videoSourceTab === "youtube" && !extractYouTubeVideoId(chapter)) {
       return "Use a valid YouTube URL.";
     }
-    if (videoSourceTab === "upload" && !uploadFile) {
-      return "Upload a video file (MP4, MOV, or AVI).";
-    }
     for (let i = 0; i < steps.length; i++) {
       const s = steps[i];
       if (!s.step_name.trim()) {
@@ -457,7 +468,7 @@ export function TutorialCreator({
       }
     }
     return null;
-  }, [tutorialName, steps, chapterVideoUrl, videoSourceTab, uploadFile]);
+  }, [tutorialName, steps, chapterVideoUrl, videoSourceTab]);
 
   const uploadChapterFile = async (file: File) => {
     setError(null);
@@ -1277,20 +1288,22 @@ Example:
           <span className="text-xs text-zinc-500">
             Fills only steps with an empty description; you can edit any text afterward.
           </span>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={payLoading || safeGuideCount >= maxGuides}
-            onClick={onPay}
-          >
-            {payLoading
-              ? "Creating…"
-              : safeGuideCount < maxGuides
-                ? safeGuideCount < 1
+          {!showUpgradePrompt ? (
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={payLoading}
+              onClick={onPay}
+            >
+              {payLoading
+                ? autoPublishAfterUnlock
+                  ? "Publishing after payment…"
+                  : "Creating…"
+                : safeGuideCount < 1
                   ? "Create free tutorial"
-                  : "Create tutorial"
-                : "Guide limit reached"}
-          </button>
+                  : "Create tutorial"}
+            </button>
+          ) : null}
         </div>
       </section>
 
