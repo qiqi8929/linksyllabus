@@ -40,6 +40,18 @@ function logUsersUsageSelectError(params: {
   });
 }
 
+function logSupabaseOpError(label: string, userId: string, err: unknown): void {
+  const e = err as { code?: string; message?: string; details?: string; hint?: string } | null;
+  console.error("[dashboard/serverActions] supabase op failed", {
+    label,
+    userId,
+    code: e?.code,
+    message: e?.message,
+    details: e?.details,
+    hint: e?.hint
+  });
+}
+
 export async function signOutAction() {
   const supabase = createSupabaseServerClient();
   await supabase.auth.signOut();
@@ -128,7 +140,7 @@ export async function createInactiveSkuWithSteps(payload: {
     .from("users")
     .upsert({ id: user.id, email: user.email ?? null }, { onConflict: "id" });
   if (upsertUserError) {
-    throw new Error("Could not prepare user profile.");
+    logSupabaseOpError("users.upsert", user.id, upsertUserError);
   }
 
   // Usage: guide_count + paid_guide_slots. Query separately so one missing column
@@ -158,9 +170,11 @@ export async function createInactiveSkuWithSteps(payload: {
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id);
     if (skuCountError) {
-      throw new Error("Could not check tutorial usage.");
+      logSupabaseOpError("skus.count_for_guide_count", user.id, skuCountError);
+      guideCount = 0;
+    } else {
+      guideCount = Math.max(0, Number(skuCount ?? 0));
     }
-    guideCount = Math.max(0, Number(skuCount ?? 0));
   }
 
   const { data: paidRow, error: paidErr } = await supabase
@@ -213,8 +227,9 @@ export async function createInactiveSkuWithSteps(payload: {
     .from("users")
     .update({ guide_count: guideCount + 1 })
     .eq("id", user.id);
-  if (bumpGuideCountError && !isUsersUsageColumnMissing(bumpGuideCountError)) {
-    throw bumpGuideCountError;
+  if (bumpGuideCountError) {
+    // Tutorial is already created; avoid hard failure on usage-counter write issues.
+    logSupabaseOpError("users.update_guide_count", user.id, bumpGuideCountError);
   }
 
   const rows = normalized.map((r) => ({
