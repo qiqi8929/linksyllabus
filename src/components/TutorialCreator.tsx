@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createInactiveSkuWithSteps,
+  syncGuideUnlockFromStripeSession,
   type CreateInactiveSkuWithStepsResult,
   type TutorialStepInput
 } from "@/app/dashboard/serverActions";
@@ -382,6 +383,19 @@ export function TutorialCreator({
 
       if (checkout === "guide_unlock_success") {
         setShowUpgradePrompt(false);
+        const sessionId =
+          params.get("session_id")?.trim() ||
+          params.get("stripe_session_id")?.trim() ||
+          "";
+        if (sessionId.length > 0) {
+          void syncGuideUnlockFromStripeSession(sessionId).then((syncRes) => {
+            if (!syncRes.ok && syncRes.reason && syncRes.reason !== "not_paid") {
+              console.warn("[TutorialCreator] guide unlock session sync", syncRes);
+            }
+            window.dispatchEvent(new Event(DASHBOARD_BOOTSTRAP_REFETCH_EVENT));
+            router.refresh();
+          });
+        }
         const delays = [0, 900, 2000, 4000, 7000];
         refreshTimers = delays.map((ms) =>
           window.setTimeout(() => {

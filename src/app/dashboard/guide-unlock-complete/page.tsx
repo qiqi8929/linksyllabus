@@ -20,7 +20,7 @@ export default async function GuideUnlockCompleteRedirectPage({
 
   const dest = new URLSearchParams();
   dest.set("checkout", "guide_unlock_success");
-  if (sid) dest.set("stripe_session_id", sid);
+  if (sid) dest.set("session_id", sid);
 
   redirect(`/dashboard?${dest.toString()}`);
 }

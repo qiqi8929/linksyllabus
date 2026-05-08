@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { tryApplyGuideUnlockFromCheckoutSessionId } from "@/lib/stripe/guideUnlock";
 import { activateSkuFromCheckoutSession } from "@/lib/stripe/skuActivation";
 import { getStripe } from "@/lib/stripe/server";
 import { env } from "@/lib/env";
@@ -502,6 +503,37 @@ export async function unpublishSkuAction(skuId: string) {
   revalidatePath("/dashboard");
   revalidatePath(`/tutorial/${skuId}`);
   revalidatePath(`/tutorial/${skuId}/print`);
+}
+
+/**
+ * After guide-unlock Checkout, apply `paid_guide_slots` using the session id from the success URL
+ * when the Stripe webhook is delayed or not configured (mirrors webhook + idempotency table).
+ */
+export async function syncGuideUnlockFromStripeSession(sessionId: string): Promise<{
+  ok: boolean;
+  reason?: string;
+}> {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user?.id) {
+    return { ok: false, reason: "unauthorized" };
+  }
+  const sid = String(sessionId ?? "").trim();
+  if (!sid) {
+    return { ok: false, reason: "missing_session" };
+  }
+  try {
+    const r = await tryApplyGuideUnlockFromCheckoutSessionId(sid, user.id);
+    if (!r.ok) {
+      return { ok: false, reason: r.reason };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("[syncGuideUnlockFromStripeSession] failed", e);
+    return { ok: false, reason: e instanceof Error ? e.message : "unknown" };
+  }
 }
 
 /**

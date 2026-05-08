@@ -83,8 +83,8 @@ export async function POST(req: Request) {
     const stripe = getStripe();
 
     if (payload.type === "guide_unlock") {
-      // Back to Create tutorial: webhook updates paid_guide_slots; user clicks Create manually (no race).
-      const success_url = `${appUrl}/dashboard?checkout=guide_unlock_success`;
+      // session_id lets the client run the same unlock logic as the webhook if Stripe is slow or webhook URL/secret is wrong.
+      const success_url = `${appUrl}/dashboard?checkout=guide_unlock_success&session_id={CHECKOUT_SESSION_ID}`;
       let customerId = await getOrCreateStripeCustomerId(stripe, admin, user);
 
       const createUnlockSession = () =>

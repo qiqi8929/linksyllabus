@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe/server";
 import { env } from "@/lib/env";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { applyGuideUnlockFromPaidCheckoutSession } from "@/lib/stripe/guideUnlock";
 import { activateSkuFromCheckoutSession } from "@/lib/stripe/skuActivation";
 
 export const runtime = "nodejs";
@@ -35,8 +35,6 @@ export async function POST(req: Request) {
     const type = session.metadata?.type;
     const userId = session.metadata?.user_id;
 
-    const admin = createSupabaseAdminClient();
-
     if (type === "sku") {
       const paid =
         session.payment_status === "paid" ||
@@ -52,47 +50,15 @@ export async function POST(req: Request) {
         event.type === "checkout.session.async_payment_succeeded";
       if (paid) {
         try {
-          if (!session.id) {
-            console.error("[stripe webhook] guide_unlock missing session.id, skip increment", {
+          const result = await applyGuideUnlockFromPaidCheckoutSession(session, event.id, {
+            forcePaid: event.type === "checkout.session.async_payment_succeeded"
+          });
+          if (!result.ok) {
+            console.error("[stripe webhook] guide_unlock apply failed", {
               userId,
-              eventId: event.id
+              reason: result.reason,
+              sessionId: session.id
             });
-            return NextResponse.json({ received: true });
-          }
-
-          const { error: idempotencyErr } = await admin
-            .from("stripe_guide_unlock_events")
-            .insert({
-              session_id: session.id,
-              user_id: userId,
-              stripe_event_id: event.id
-            });
-
-          if (idempotencyErr) {
-            // Duplicate session: already processed, do not increment again.
-            if ((idempotencyErr as any).code === "23505") {
-              console.log("[stripe webhook] guide_unlock already processed; skip increment", {
-                userId,
-                sessionId: session.id
-              });
-              return NextResponse.json({ received: true, duplicate: true });
-            }
-            console.error("[stripe webhook] guide_unlock idempotency insert failed", idempotencyErr);
-            return NextResponse.json({ received: true });
-          }
-
-          const { data: row } = await admin
-            .from("users")
-            .select("paid_guide_slots")
-            .eq("id", userId)
-            .maybeSingle();
-          const current = Math.max(0, Number(row?.paid_guide_slots ?? 0));
-          const { error: upErr } = await admin
-            .from("users")
-            .update({ paid_guide_slots: current + 1 })
-            .eq("id", userId);
-          if (upErr) {
-            console.error("[stripe webhook] guide_unlock increment failed", upErr);
           }
         } catch (e) {
           console.error("[stripe webhook] guide_unlock handler error", e);
