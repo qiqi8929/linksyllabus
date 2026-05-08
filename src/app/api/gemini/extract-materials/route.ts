@@ -3,8 +3,7 @@ import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import {
   extractMaterialsAndToolsFromVideoBuffer,
-  extractMaterialsAndToolsFromYouTube,
-  MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS
+  extractMaterialsAndToolsFromYouTube
 } from "@/lib/gemini";
 import { fetchCloudflareStreamDefaultMp4Buffer } from "@/lib/cloudflareStream";
 import { extractYouTubeVideoId } from "@/lib/video";
@@ -53,8 +52,7 @@ export async function POST(req: Request) {
         accountId,
         apiToken,
         customerSubdomain,
-        videoId: streamVideoId,
-        maxBytes: MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS
+        videoId: streamVideoId
       });
       const { materials, tools } = await extractMaterialsAndToolsFromVideoBuffer(buffer, "video/mp4");
       return NextResponse.json({ materials, tools });

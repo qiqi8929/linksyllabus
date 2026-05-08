@@ -912,9 +912,6 @@ export async function extractMaterialsAndToolsFromPublicVideoUrl(
   return parseMaterialsToolsPayload(text);
 }
 
-/** Max video size for Gemini File API upload analysis paths (Gemini supports files up to ~2 GiB). */
-export const MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS = 500 * 1024 * 1024;
-
 /**
  * Same output shape as {@link extractTutorialStructureFromYouTubeVideo}, but analyzes an uploaded
  * video file via Gemini File API (no YouTube transcript).

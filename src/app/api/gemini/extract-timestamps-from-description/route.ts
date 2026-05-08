@@ -3,8 +3,7 @@ import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import {
   extractTutorialStructureFromUploadedVideoBuffer,
-  extractTutorialStructureFromYouTubeVideo,
-  MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS
+  extractTutorialStructureFromYouTubeVideo
 } from "@/lib/gemini";
 import { fetchCloudflareStreamDefaultMp4Buffer } from "@/lib/cloudflareStream";
 import { extractYouTubeVideoId } from "@/lib/video";
@@ -68,9 +67,7 @@ export async function POST(req: Request) {
         accountId,
         apiToken,
         customerSubdomain,
-        videoId: streamVideoId,
-        // 500 MiB cap (MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS); Gemini Files API allows larger payloads server-side.
-        maxBytes: MAX_VIDEO_BYTES_FOR_GEMINI_ANALYSIS
+        videoId: streamVideoId
       });
       const result = await extractTutorialStructureFromUploadedVideoBuffer(buffer, "video/mp4");
       return NextResponse.json({

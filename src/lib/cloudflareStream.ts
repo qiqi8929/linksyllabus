@@ -163,13 +163,13 @@ export async function setCloudflareStreamVideoDownloadable(params: {
 /**
  * Ensures the default MP4 exists, then downloads it into memory for server-side Gemini analysis.
  * Gemini cannot fetch Cloudflare Stream URLs reliably; callers upload this buffer via File API instead.
+ * Size limits are enforced by Gemini Files API / hosting memory — no artificial cap here.
  */
 export async function fetchCloudflareStreamDefaultMp4Buffer(params: {
   accountId: string;
   apiToken: string;
   customerSubdomain: string;
   videoId: string;
-  maxBytes: number;
 }): Promise<Buffer> {
   await setCloudflareStreamVideoDownloadable({
     accountId: params.accountId,
@@ -184,19 +184,6 @@ export async function fetchCloudflareStreamDefaultMp4Buffer(params: {
       `Cloudflare Stream MP4 fetch failed (HTTP ${res.status}). ${t.trim().slice(0, 240)}`
     );
   }
-  const cl = res.headers.get("content-length");
-  if (cl) {
-    const n = parseInt(cl, 10);
-    if (Number.isFinite(n) && n > params.maxBytes) {
-      throw new Error(
-        `Video exceeds the AI analysis size limit (${params.maxBytes} bytes, Content-Length ${n}).`
-      );
-    }
-  }
   const ab = await res.arrayBuffer();
-  const buf = Buffer.from(ab);
-  if (buf.length > params.maxBytes) {
-    throw new Error(`Video exceeds the AI analysis size limit (${params.maxBytes} bytes).`);
-  }
-  return buf;
+  return Buffer.from(ab);
 }
