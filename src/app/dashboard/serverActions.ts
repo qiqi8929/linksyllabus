@@ -86,9 +86,22 @@ export type TutorialStepInput = {
   end_time: number;
 };
 
+export type CreateInactiveSkuWithStepsResult =
+  | { ok: true; skuId: string; checkoutRequired: boolean }
+  | {
+      ok: false;
+      message: string;
+      kind?: "auth" | "validation" | "guide_limit" | "schema";
+    };
+
+const SCHEMA_MISSING_PAID_SLOTS_MESSAGE =
+  "Database setup incomplete: Supabase is missing usage columns (paid_guide_slots / guide_count). Run the SQL migrations from the repo supabase/ folder on your project, then reload.";
+
 /**
  * Creates an inactive tutorial and all steps in one transaction (via sequential inserts).
  * User completes Stripe checkout; webhook sets `skus.is_active = true`.
+ *
+ * Returns `{ ok: false }` for expected failures so the client can show a message without a 500.
  */
 export async function createInactiveSkuWithSteps(payload: {
   tutorialName: string;
@@ -97,31 +110,40 @@ export async function createInactiveSkuWithSteps(payload: {
   defaultYoutubeUrl?: string;
   materialsText?: string;
   toolsText?: string;
-}): Promise<{ skuId: string; checkoutRequired: boolean }> {
+}): Promise<CreateInactiveSkuWithStepsResult> {
   const supabase = createSupabaseServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
   if (!user) {
-    throw new Error("Unauthorized");
+    return { ok: false, message: "Sign in to create a tutorial.", kind: "auth" };
   }
 
   const name = payload.tutorialName.trim();
   if (!name) {
-    throw new Error("Tutorial name is required.");
+    return { ok: false, message: "Tutorial name is required.", kind: "validation" };
   }
   if (!payload.steps.length) {
-    throw new Error("Add at least one step.");
+    return { ok: false, message: "Add at least one step.", kind: "validation" };
   }
 
   if (!user.id) {
-    throw new Error("Missing user id.");
+    return { ok: false, message: "Missing user id.", kind: "validation" };
   }
 
   const defaultYoutubeUrl = String(payload.defaultYoutubeUrl ?? "").trim();
 
   /** Server actions may strip `undefined`; missing keys become NULL on insert — coerce everything. */
-  const normalized = payload.steps.map((s, idx) => {
+  const normalized: {
+    step_number: number;
+    step_name: string;
+    description: string;
+    youtube_url: string;
+    start_time: number;
+    end_time: number;
+  }[] = [];
+  for (let idx = 0; idx < payload.steps.length; idx++) {
+    const s = payload.steps[idx];
     const step_name = String(s.step_name ?? "").trim();
     const description = String(s.description ?? "").trim();
     const youtube_url =
@@ -132,27 +154,33 @@ export async function createInactiveSkuWithSteps(payload: {
     const end_time = Math.floor(endRaw);
 
     if (!step_name || !youtube_url) {
-      throw new Error(`Step ${idx + 1}: name and video URL are required.`);
+      return {
+        ok: false,
+        message: `Step ${idx + 1}: name and video URL are required.`,
+        kind: "validation"
+      };
     }
     if (
       !Number.isFinite(endRaw) ||
       !Number.isFinite(end_time) ||
       end_time <= start_time
     ) {
-      throw new Error(
-        `Step ${idx + 1}: end time (seconds) must be greater than start time.`
-      );
+      return {
+        ok: false,
+        message: `Step ${idx + 1}: end time (seconds) must be greater than start time.`,
+        kind: "validation"
+      };
     }
 
-    return {
+    normalized.push({
       step_number: idx + 1,
       step_name,
       description,
       youtube_url,
       start_time,
       end_time
-    };
-  });
+    });
+  }
 
   // Ensure user row exists first; avoid selecting migration-sensitive columns here.
   logUsersUpsertBefore({
@@ -178,6 +206,10 @@ export async function createInactiveSkuWithSteps(payload: {
   // - actual created tutorials come from skus count
   // guide_count is display-only and should not gate creation.
   let paidSlots = 0;
+  /** Set when admin fallback runs (used to detect missing DB columns vs RLS-only failures). */
+  let adminPaidSlotsErr:
+    | { code?: string; message?: string; details?: string; hint?: string }
+    | undefined;
 
   logUsersQueryBefore({
     context: "createInactiveSkuWithSteps.paid_guide_slots",
@@ -218,6 +250,7 @@ export async function createInactiveSkuWithSteps(payload: {
       .select("paid_guide_slots")
       .eq("id", user.id)
       .maybeSingle();
+    adminPaidSlotsErr = adminPaidErr ?? undefined;
     logUsersQueryAfter({
       context: "createInactiveSkuWithSteps.paid_guide_slots.admin",
       userId: user.id,
@@ -247,7 +280,23 @@ export async function createInactiveSkuWithSteps(payload: {
 
   const maxGuides = maxAllowedGuides(paidSlots);
   if (createdGuides >= maxGuides) {
-    throw new Error(FREE_TIER_UPGRADE_MESSAGE);
+    const paidSlotsColumnMissing =
+      paidErr != null &&
+      adminPaidSlotsErr != null &&
+      isUsersUsageColumnMissing(paidErr) &&
+      isUsersUsageColumnMissing(adminPaidSlotsErr);
+    if (paidSlotsColumnMissing) {
+      return {
+        ok: false,
+        message: SCHEMA_MISSING_PAID_SLOTS_MESSAGE,
+        kind: "schema"
+      };
+    }
+    return {
+      ok: false,
+      message: FREE_TIER_UPGRADE_MESSAGE,
+      kind: "guide_limit"
+    };
   }
 
   const materialsText = String(payload.materialsText ?? "").trim();
@@ -363,7 +412,7 @@ export async function createInactiveSkuWithSteps(payload: {
     );
   }
 
-  return { skuId: sku.id, checkoutRequired: false };
+  return { ok: true, skuId: sku.id, checkoutRequired: false };
 }
 
 export async function deleteSkuAction(skuId: string) {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createInactiveSkuWithSteps,
+  type CreateInactiveSkuWithStepsResult,
   type TutorialStepInput
 } from "@/app/dashboard/serverActions";
 import {
@@ -841,17 +842,21 @@ export function TutorialCreator({
     setPayLoading(true);
     try {
       const payload = buildStepPayload();
-      const result = await createInactiveSkuWithSteps({
+      const result: CreateInactiveSkuWithStepsResult = await createInactiveSkuWithSteps({
         tutorialName: tutorialName.trim(),
         steps: payload,
         defaultYoutubeUrl: chapterVideoUrl.trim(),
         materialsText: materialsText.trim(),
         toolsText: toolsText.trim()
       });
-      const skuId = result?.skuId;
-      if (!skuId) {
-        throw new Error("Could not create tutorial (missing id). Please try again.");
+      if (!result.ok) {
+        setError(result.message);
+        if (result.kind === "guide_limit") {
+          setShowUpgradePrompt(true);
+        }
+        return;
       }
+      const skuId = result.skuId;
       if (result.checkoutRequired) {
         persistDraftToLocalStorage();
         await startCheckout(skuId);
