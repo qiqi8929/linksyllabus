@@ -5,6 +5,53 @@ export type GeminiVideoDebugPayload = {
   modelText: string;
 };
 
+const LOG_PREFIX = "[geminiVideoFileApi]";
+
+type GoogleRpcError = {
+  code?: number;
+  message?: string;
+  status?: string;
+  details?: unknown[];
+};
+
+function formatGeminiHttpErrorBody(status: number, rawBody: string): string {
+  const trimmed = rawBody.trim();
+  try {
+    const j = JSON.parse(trimmed) as { error?: GoogleRpcError };
+    const e = j?.error;
+    if (!e) return trimmed.slice(0, 4000);
+    const bits: string[] = [];
+    if (e.message) bits.push(e.message);
+    if (e.status) bits.push(`status=${e.status}`);
+    if (typeof e.code === "number") bits.push(`code=${e.code}`);
+    if (e.details?.length) {
+      try {
+        bits.push(`details=${JSON.stringify(e.details).slice(0, 2500)}`);
+      } catch {
+        bits.push("details=(unserializable)");
+      }
+    }
+    return bits.join(" | ") || trimmed.slice(0, 4000);
+  } catch {
+    return trimmed.slice(0, 4000) || `(empty body, HTTP ${status})`;
+  }
+}
+
+function logGeminiFailure(
+  step: string,
+  context: Record<string, unknown>,
+  status: number,
+  rawBody: string
+): void {
+  const formatted = formatGeminiHttpErrorBody(status, rawBody);
+  console.error(`${LOG_PREFIX} ${step} failed`, {
+    ...context,
+    httpStatus: status,
+    responseBodyPreview: formatted.slice(0, 2000),
+    responseBodyLength: rawBody.length
+  });
+}
+
 /**
  * Upload raw video bytes to Google AI File API (multipart).
  * Caller must delete the file when done (`deleteGeminiFileByName`).
@@ -32,6 +79,7 @@ export async function uploadVideoToGemini(
     displayName
   );
 
+  const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=(redacted)`;
   const res = await fetch(
     `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${encodeURIComponent(apiKey)}`,
     {
@@ -41,16 +89,43 @@ export async function uploadVideoToGemini(
     }
   );
 
+  const rawText = await res.text();
   if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`Gemini file upload failed: ${res.status} ${t}`);
+    logGeminiFailure(
+      "uploadVideoToGemini (POST upload/v1beta/files)",
+      {
+        step: "file_upload_multipart",
+        displayName,
+        mimeType,
+        bufferBytes: buffer.byteLength,
+        endpoint: uploadUrl
+      },
+      res.status,
+      rawText
+    );
+    throw new Error(
+      `[Gemini File API: upload] HTTP ${res.status} — ${formatGeminiHttpErrorBody(res.status, rawText)}`
+    );
   }
 
-  const data = (await res.json()) as {
-    file?: { name?: string; uri?: string };
-  };
+  let data: { file?: { name?: string; uri?: string } };
+  try {
+    data = JSON.parse(rawText) as { file?: { name?: string; uri?: string } };
+  } catch {
+    console.error(`${LOG_PREFIX} uploadVideoToGemini: non-JSON success body`, {
+      displayName,
+      bufferBytes: buffer.byteLength,
+      preview: rawText.slice(0, 500)
+    });
+    throw new Error("[Gemini File API: upload] Success response was not valid JSON.");
+  }
   const f = data.file;
   if (!f?.name || !f?.uri) {
+    console.error(`${LOG_PREFIX} uploadVideoToGemini: missing file.name or file.uri`, {
+      displayName,
+      bufferBytes: buffer.byteLength,
+      parsedKeys: data && typeof data === "object" ? Object.keys(data) : []
+    });
     throw new Error("Gemini upload response missing file name or uri");
   }
   return { name: f.name, uri: f.uri };
@@ -66,19 +141,45 @@ export async function waitForGeminiFileReady(fileName: string): Promise<void> {
 
   for (let i = 0; i < 180; i++) {
     const res = await fetch(url);
+    const t = await res.text();
     if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`Gemini file status failed: ${res.status} ${t}`);
+      logGeminiFailure(
+        "waitForGeminiFileReady (GET file metadata)",
+        {
+          step: "file_poll_active",
+          fileName,
+          pollAttempt: i + 1,
+          endpoint: `GET v1beta/${fileName}`
+        },
+        res.status,
+        t
+      );
+      throw new Error(
+        `[Gemini File API: file status] HTTP ${res.status} — ${formatGeminiHttpErrorBody(res.status, t)}`
+      );
     }
-    const data = (await res.json()) as {
-      state?: string;
-      error?: { message?: string };
-    };
+    let data: { state?: string; error?: { message?: string } };
+    try {
+      data = JSON.parse(t) as { state?: string; error?: { message?: string } };
+    } catch {
+      console.error(`${LOG_PREFIX} waitForGeminiFileReady: non-JSON poll body`, {
+        fileName,
+        attempt: i + 1,
+        preview: t.slice(0, 400)
+      });
+      throw new Error("[Gemini File API: file status] Poll response was not valid JSON.");
+    }
     if (data.state === "ACTIVE") {
       return;
     }
     if (data.state === "FAILED") {
-      throw new Error(data.error?.message ?? "Video processing failed in Gemini");
+      console.error(`${LOG_PREFIX} waitForGeminiFileReady: file FAILED`, {
+        fileName,
+        error: data.error
+      });
+      throw new Error(
+        data.error?.message ?? "[Gemini File API: file status] Video processing failed (state=FAILED)."
+      );
     }
     await new Promise((r) => setTimeout(r, 1000));
   }
@@ -127,17 +228,43 @@ export async function generateContentWithYouTubeWatchUrl(
     })
   });
 
+  const errBody = await res.text();
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini YouTube video request failed: ${res.status} ${errText}`);
+    logGeminiFailure(
+      "generateContentWithYouTubeWatchUrl",
+      { step: "generateContent", model: env.geminiModel(), source: "youtube_fileData" },
+      res.status,
+      errBody
+    );
+    throw new Error(
+      `[Gemini generateContent: YouTube URL] HTTP ${res.status} — ${formatGeminiHttpErrorBody(res.status, errBody)}`
+    );
   }
 
-  const data = (await res.json()) as {
+  let data: {
+    error?: GoogleRpcError;
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    promptFeedback?: unknown;
   };
+  try {
+    data = JSON.parse(errBody) as typeof data;
+  } catch {
+    throw new Error("[Gemini generateContent: YouTube] Response was not valid JSON.");
+  }
+  if (data.error) {
+    console.error(`${LOG_PREFIX} generateContentWithYouTubeWatchUrl: error in body`, data.error);
+    throw new Error(
+      `[Gemini generateContent: YouTube] ${data.error.message ?? JSON.stringify(data.error)}`
+    );
+  }
 
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) {
+    console.error(`${LOG_PREFIX} generateContentWithYouTubeWatchUrl: no candidate text`, {
+      model: env.geminiModel(),
+      promptFeedback: data.promptFeedback,
+      candidatesLength: data.candidates?.length ?? 0
+    });
     throw new Error("Empty response from Gemini (YouTube video)");
   }
   onGemini?.({ responseJson: data, modelText: text });
@@ -182,17 +309,55 @@ export async function generateContentWithPublicVideoUrl(
     })
   });
 
+  const rawBody = await res.text();
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini public video request failed: ${res.status} ${errText}`);
+    logGeminiFailure(
+      "generateContentWithPublicVideoUrl",
+      {
+        step: "generateContent",
+        model: env.geminiModel(),
+        source: "public_url_fileData",
+        mimeType,
+        videoUrlHost: (() => {
+          try {
+            return new URL(videoUrl.trim()).hostname;
+          } catch {
+            return "(invalid-url)";
+          }
+        })()
+      },
+      res.status,
+      rawBody
+    );
+    throw new Error(
+      `[Gemini generateContent: public video URL] HTTP ${res.status} — ${formatGeminiHttpErrorBody(res.status, rawBody)}`
+    );
   }
 
-  const data = (await res.json()) as {
+  let data: {
+    error?: GoogleRpcError;
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    promptFeedback?: unknown;
   };
+  try {
+    data = JSON.parse(rawBody) as typeof data;
+  } catch {
+    throw new Error("[Gemini generateContent: public URL] Response was not valid JSON.");
+  }
+  if (data.error) {
+    console.error(`${LOG_PREFIX} generateContentWithPublicVideoUrl: error in body`, data.error);
+    throw new Error(
+      `[Gemini generateContent: public URL] ${data.error.message ?? JSON.stringify(data.error)}`
+    );
+  }
 
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) {
+    console.error(`${LOG_PREFIX} generateContentWithPublicVideoUrl: no candidate text`, {
+      model: env.geminiModel(),
+      promptFeedback: data.promptFeedback,
+      candidatesLength: data.candidates?.length ?? 0
+    });
     throw new Error("Empty response from Gemini (public video URL)");
   }
   onGemini?.({ responseJson: data, modelText: text });
@@ -232,18 +397,64 @@ export async function generateContentWithVideoFile(
     })
   });
 
+  const rawBody = await res.text();
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini request failed: ${res.status} ${errText}`);
+    logGeminiFailure(
+      "generateContentWithVideoFile (uploaded Files API reference)",
+      {
+        step: "generateContent",
+        model: env.geminiModel(),
+        source: "file_api_fileData",
+        mimeType,
+        fileUriPrefix: fileUri.slice(0, 96),
+        promptChars: prompt.length,
+        temperature
+      },
+      res.status,
+      rawBody
+    );
+    throw new Error(
+      `[Gemini generateContent: uploaded video file] HTTP ${res.status} — ${formatGeminiHttpErrorBody(res.status, rawBody)}`
+    );
   }
 
-  const data = (await res.json()) as {
+  let data: {
+    error?: GoogleRpcError;
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    promptFeedback?: unknown;
   };
+  try {
+    data = JSON.parse(rawBody) as typeof data;
+  } catch {
+    console.error(`${LOG_PREFIX} generateContentWithVideoFile: non-JSON body`, {
+      model: env.geminiModel(),
+      preview: rawBody.slice(0, 400)
+    });
+    throw new Error("[Gemini generateContent: uploaded file] Response was not valid JSON.");
+  }
+  if (data.error) {
+    console.error(`${LOG_PREFIX} generateContentWithVideoFile: error object in 200 body`, data.error);
+    throw new Error(
+      `[Gemini generateContent: uploaded file] ${data.error.message ?? JSON.stringify(data.error)}`
+    );
+  }
 
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) {
-    throw new Error("Empty response from Gemini");
+    console.error(`${LOG_PREFIX} generateContentWithVideoFile: no candidate text`, {
+      model: env.geminiModel(),
+      mimeType,
+      fileUriPrefix: fileUri.slice(0, 96),
+      promptChars: prompt.length,
+      promptFeedback: data.promptFeedback,
+      candidatesLength: data.candidates?.length ?? 0,
+      firstCandidate: data.candidates?.[0]
+        ? JSON.stringify(data.candidates[0]).slice(0, 1500)
+        : undefined
+    });
+    throw new Error(
+      "Empty response from Gemini (uploaded file): no text in candidates — see server logs for promptFeedback / finishReason."
+    );
   }
   onGemini?.({ responseJson: data, modelText: text });
   return text;

@@ -88,6 +88,23 @@ type StepRow = {
   description: string;
 };
 
+type TutorialDraft = {
+  tutorialName: string;
+  videoSourceTab: "youtube" | "upload";
+  chapterVideoUrl: string;
+  steps: Array<{
+    step_name: string;
+    start_time: number;
+    end_time: number;
+    description: string;
+  }>;
+  materialsText: string;
+  toolsText: string;
+  savedAt: number;
+};
+
+const TUTORIAL_CREATOR_DRAFT_KEY = "tutorialCreatorDraft.v1";
+
 function makeId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -296,6 +313,28 @@ export function TutorialCreator({
     safeGuideCount >= maxGuides
   );
 
+  const persistDraftToLocalStorage = useCallback(() => {
+    try {
+      const draft: TutorialDraft = {
+        tutorialName: tutorialName.trim(),
+        videoSourceTab,
+        chapterVideoUrl: chapterVideoUrl.trim(),
+        steps: steps.map((s) => ({
+          step_name: s.step_name,
+          start_time: s.start_time,
+          end_time: s.end_time,
+          description: s.description
+        })),
+        materialsText,
+        toolsText,
+        savedAt: Date.now()
+      };
+      localStorage.setItem(TUTORIAL_CREATOR_DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // Ignore storage quota / privacy mode failures.
+    }
+  }, [tutorialName, videoSourceTab, chapterVideoUrl, steps, materialsText, toolsText]);
+
   useEffect(() => {
     if (!uploadFile) {
       setUploadPreviewUrl(null);
@@ -313,6 +352,57 @@ export function TutorialCreator({
   useEffect(() => {
     setShowUpgradePrompt(safeGuideCount >= maxGuides);
   }, [safeGuideCount, maxGuides]);
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const checkout = params.get("checkout");
+      const shouldRestore =
+        checkout === "guide_unlock_success" ||
+        checkout === "cancel" ||
+        checkout === "success";
+      if (!shouldRestore) return;
+
+      const raw = localStorage.getItem(TUTORIAL_CREATOR_DRAFT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<TutorialDraft>;
+      if (!parsed || typeof parsed !== "object") return;
+
+      if (typeof parsed.tutorialName === "string") {
+        setTutorialName(parsed.tutorialName);
+      }
+      if (parsed.videoSourceTab === "youtube" || parsed.videoSourceTab === "upload") {
+        setVideoSourceTab(parsed.videoSourceTab);
+      }
+      if (typeof parsed.chapterVideoUrl === "string") {
+        setChapterVideoUrl(parsed.chapterVideoUrl);
+      }
+      if (Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+        const restored = parsed.steps
+          .map((s) => ({
+            id: makeId(),
+            step_name: String(s?.step_name ?? "").trim(),
+            start_time: Math.floor(Number(s?.start_time ?? 0)),
+            end_time: Math.floor(Number(s?.end_time ?? 60)),
+            description: String(s?.description ?? "").trim()
+          }))
+          .filter((s) => s.step_name || s.description || s.end_time > s.start_time);
+        if (restored.length > 0) {
+          setSteps(restored);
+        }
+      }
+      if (typeof parsed.materialsText === "string") {
+        setMaterialsText(parsed.materialsText);
+      }
+      if (typeof parsed.toolsText === "string") {
+        setToolsText(parsed.toolsText);
+      }
+      setUploadFile(null);
+      localStorage.removeItem(TUTORIAL_CREATOR_DRAFT_KEY);
+    } catch {
+      // Ignore invalid or inaccessible localStorage entries.
+    }
+  }, []);
 
   const updateStep = useCallback((id: string, patch: Partial<StepRow>) => {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -728,9 +818,11 @@ export function TutorialCreator({
         throw new Error("Could not create tutorial (missing id). Please try again.");
       }
       if (result.checkoutRequired) {
+        persistDraftToLocalStorage();
         await startCheckout(skuId);
         return;
       }
+      localStorage.removeItem(TUTORIAL_CREATOR_DRAFT_KEY);
       window.location.href = `/tutorial/${skuId}`;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Could not create tutorial.";
@@ -747,6 +839,7 @@ export function TutorialCreator({
     setError(null);
     setUpgradeLoading(true);
     try {
+      persistDraftToLocalStorage();
       await startGuideUnlockCheckout();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not start checkout.");
@@ -782,24 +875,6 @@ export function TutorialCreator({
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <span className="font-medium">Estimated outline:</span> Step times were inferred without a
           full video parse (e.g. title-only fallback). Review and edit before publishing.
-        </div>
-      ) : null}
-
-      {showUpgradePrompt ? (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-medium">Tutorial guide limit reached</p>
-          <p className="mt-1">
-            Pay $9.99 once to unlock another guide slot. You can purchase additional slots whenever you
-            need more tutorials.
-          </p>
-          <button
-            type="button"
-            className="btn-primary mt-3"
-            disabled={upgradeLoading}
-            onClick={() => void onUpgrade()}
-          >
-            {upgradeLoading ? "Redirecting…" : "Add guide slot ($9.99)"}
-          </button>
         </div>
       ) : null}
 
@@ -1174,6 +1249,23 @@ Example:
         </div>
 
         <div className="flex flex-wrap items-center gap-2 pt-2">
+          {showUpgradePrompt ? (
+            <div className="w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-medium">Tutorial guide limit reached</p>
+              <p className="mt-1">
+                Pay $9.99 once to unlock another guide slot. You can purchase additional slots whenever
+                you need more tutorials.
+              </p>
+              <button
+                type="button"
+                className="btn-primary mt-3"
+                disabled={upgradeLoading}
+                onClick={() => void onUpgrade()}
+              >
+                {upgradeLoading ? "Redirecting…" : "Add guide slot ($9.99)"}
+              </button>
+            </div>
+          ) : null}
           <button
             type="button"
             className="btn-ghost"

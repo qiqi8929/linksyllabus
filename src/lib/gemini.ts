@@ -985,6 +985,17 @@ export async function extractTutorialStructureFromUploadedVideoBuffer(
       steps,
       estimated: false
     };
+  } catch (e) {
+    console.error(
+      "[gemini] extractTutorialStructureFromUploadedVideoBuffer: pipeline error (after MP4 buffer)",
+      {
+        bufferBytes: buffer.byteLength,
+        mimeType,
+        geminiFileName: fileName,
+        error: e instanceof Error ? e.message : String(e)
+      }
+    );
+    throw e;
   } finally {
     if (fileName) {
       await deleteGeminiFileByName(fileName).catch(() => {});
@@ -1023,6 +1034,17 @@ export async function extractMaterialsAndToolsFromVideoBuffer(
     );
 
     return parseMaterialsToolsPayload(text);
+  } catch (e) {
+    console.error(
+      "[gemini] extractMaterialsAndToolsFromVideoBuffer: pipeline error (after MP4 buffer)",
+      {
+        bufferBytes: buffer.byteLength,
+        mimeType,
+        geminiFileName: fileName,
+        error: e instanceof Error ? e.message : String(e)
+      }
+    );
+    throw e;
   } finally {
     if (fileName) {
       await deleteGeminiFileByName(fileName).catch(() => {});
