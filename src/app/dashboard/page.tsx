@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { DashboardTutorialActions } from "@/components/DashboardTutorialActions";
 import { TutorialCreator } from "@/components/TutorialCreator";
 
@@ -17,7 +19,20 @@ type SkuRow = {
   steps: StepRow[] | null;
 };
 
-export default async function DashboardPage() {
+function readSearchParam(
+  value: string | string[] | undefined
+): string {
+  if (Array.isArray(value)) return String(value[0] ?? "").trim();
+  return String(value ?? "").trim();
+}
+
+export default async function DashboardPage({
+  searchParams
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const checkout = readSearchParam(sp.checkout);
   const supabase = createSupabaseServerClient();
   const {
     data: { user }
@@ -25,6 +40,49 @@ export default async function DashboardPage() {
 
   if (!user) {
     return null;
+  }
+
+  if (checkout === "guide_unlock_success") {
+    try {
+      const admin = createSupabaseAdminClient();
+      const { data: row, error: readErr } = await admin
+        .from("users")
+        .select("paid_guide_slots")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (readErr) {
+        console.error("[dashboard] guide_unlock_success read paid_guide_slots failed", {
+          userId: user.id,
+          code: readErr.code,
+          message: readErr.message,
+          details: (readErr as any).details,
+          hint: (readErr as any).hint
+        });
+      } else {
+        const current = Math.max(0, Number(row?.paid_guide_slots ?? 0));
+        const { error: upErr } = await admin
+          .from("users")
+          .update({ paid_guide_slots: current + 1 })
+          .eq("id", user.id);
+        if (upErr) {
+          console.error("[dashboard] guide_unlock_success increment paid_guide_slots failed", {
+            userId: user.id,
+            code: upErr.code,
+            message: upErr.message,
+            details: (upErr as any).details,
+            hint: (upErr as any).hint
+          });
+        }
+      }
+    } catch (e) {
+      console.error("[dashboard] guide_unlock_success server-side increment threw", {
+        userId: user.id,
+        error: e
+      });
+    }
+
+    // Strip query params so refreshes don't repeat increment logic.
+    redirect("/dashboard");
   }
 
   let skus: SkuRow[] = [];
