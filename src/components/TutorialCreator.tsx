@@ -309,6 +309,7 @@ export function TutorialCreator({
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   /** True when the server fell back to title-based time estimates (rare). */
   const [outlineEstimated, setOutlineEstimated] = useState(false);
+  const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string | null>(null);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(
     safeGuideCount >= maxGuides
   );
@@ -359,6 +360,9 @@ export function TutorialCreator({
     try {
       const params = new URLSearchParams(window.location.search);
       const checkout = params.get("checkout");
+      if (checkout === "guide_unlock_success") {
+        setPaymentSuccessMessage("Payment successful! You can now create your tutorial.");
+      }
       const shouldRestore =
         checkout === "guide_unlock_success" ||
         checkout === "cancel" ||
@@ -400,7 +404,6 @@ export function TutorialCreator({
         setToolsText(parsed.toolsText);
       }
       setUploadFile(null);
-      localStorage.removeItem(TUTORIAL_CREATOR_DRAFT_KEY);
       if (checkout === "guide_unlock_success") {
         setShowUpgradePrompt(false);
         setAutoPublishAfterUnlock(true);
@@ -869,6 +872,12 @@ export function TutorialCreator({
           each additional guide is a one-time $9.99 payment.
         </p>
       </div>
+
+      {paymentSuccessMessage ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          {paymentSuccessMessage}
+        </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">

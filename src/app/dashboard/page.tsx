@@ -33,6 +33,7 @@ export default async function DashboardPage({
 }) {
   const sp = (await searchParams) ?? {};
   const checkout = readSearchParam(sp.checkout);
+  const unlockProcessed = readSearchParam(sp.unlockProcessed);
   const supabase = createSupabaseServerClient();
   const {
     data: { user }
@@ -42,7 +43,7 @@ export default async function DashboardPage({
     return null;
   }
 
-  if (checkout === "guide_unlock_success") {
+  if (checkout === "guide_unlock_success" && unlockProcessed !== "1") {
     try {
       const admin = createSupabaseAdminClient();
       const { error: ensureErr } = await admin
@@ -113,8 +114,9 @@ export default async function DashboardPage({
       });
     }
 
-    // Strip query params so refreshes don't repeat increment logic.
-    redirect("/dashboard");
+    // Preserve checkout param for client draft restore/success UI,
+    // but mark processed to avoid duplicate increments on refresh.
+    redirect("/dashboard?checkout=guide_unlock_success&unlockProcessed=1");
   }
 
   let skus: SkuRow[] = [];
