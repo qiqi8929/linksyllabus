@@ -18,7 +18,7 @@ import {
   buildYouTubeEmbedUrl,
   buildYouTubeWatchUrl
 } from "@/lib/youtubeUrls";
-import { detectVideoKind, extractYouTubeVideoId } from "@/lib/video";
+import { detectVideoKind, extractVimeoVideoId, extractYouTubeVideoId } from "@/lib/video";
 import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
 
 export type TutorialStepPayload = {
@@ -83,19 +83,30 @@ export function TutorialViewClient({
   const [view, setView] = useState<"materials" | "step">("step");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [playbackRate, setPlaybackRate] = useState<(typeof SPEEDS)[number]>(1);
+  const [streamReplayNonce, setStreamReplayNonce] = useState(0);
 
   const step = view === "step" ? steps[currentIndex] ?? steps[0] : undefined;
   const videoId = step ? extractYouTubeVideoId(step.youtube_url) : null;
+  const vimeoId = step ? extractVimeoVideoId(step.youtube_url) : null;
   const kind = step ? detectVideoKind(step.youtube_url) : "unknown";
   const isYoutube =
     view === "step" && Boolean(videoId && kind === "youtube");
   const isStorageVideo =
     view === "step" && Boolean(step && kind === "storage");
+  const isStreamVideo =
+    view === "step" && Boolean(step && kind === "stream");
+  const isVimeoVideo =
+    view === "step" && Boolean(step && kind === "vimeo" && vimeoId);
 
   const storagePlaybackSrc = useMemo(() => {
     if (!isStorageVideo || !step) return "";
     return `/api/video/playback?stepId=${encodeURIComponent(step.id)}`;
   }, [isStorageVideo, step?.id]);
+
+  const streamPlaybackSrc = useMemo(() => {
+    if (!isStreamVideo || !step) return "";
+    return `/api/video/playback?stepId=${encodeURIComponent(step.id)}`;
+  }, [isStreamVideo, step?.id]);
 
   useEffect(() => {
     if (currentIndex >= steps.length) {
@@ -267,6 +278,10 @@ export function TutorialViewClient({
       void v.play();
       return;
     }
+    if (isStreamVideo) {
+      setStreamReplayNonce((n) => n + 1);
+      return;
+    }
     if (!videoId) return;
     const el = iframeRef.current;
     if (!el) return;
@@ -287,7 +302,7 @@ export function TutorialViewClient({
     window.setTimeout(() => {
       postYtIframeCommand("setPlaybackRate", [playbackRateRef.current]);
     }, 900);
-  }, [videoId, postYtIframeCommand, isStorageVideo]);
+  }, [videoId, postYtIframeCommand, isStorageVideo, isStreamVideo]);
 
   const onVoicePause = useCallback(() => {
     if (isStorageVideo) htmlVideoRef.current?.pause();
@@ -494,6 +509,37 @@ export function TutorialViewClient({
         </div>
         <div className="mt-3">{controlsBar}</div>
       </>
+    ) : isStreamVideo && step && streamPlaybackSrc ? (
+      <>
+        <div
+          ref={videoWrapRef}
+          className="relative aspect-video w-full min-h-0 min-w-0 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-black shadow-sm"
+        >
+          <iframe
+            key={`${skuId}-${step.id}-stream-${streamReplayNonce}`}
+            src={streamPlaybackSrc}
+            className="absolute left-0 top-0 h-full w-full"
+            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+            allowFullScreen
+            title="Tutorial video clip"
+          />
+        </div>
+        <div className="mt-3">{controlsBar}</div>
+      </>
+    ) : isVimeoVideo && vimeoId ? (
+      <div className="flex aspect-video flex-col items-center justify-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-6 text-center text-sm text-amber-950">
+        <p>
+          Vimeo clips are best viewed in the single-step player for precise clip timing.{" "}
+          {step ? (
+            <Link
+              className="font-medium text-orange-700 underline"
+              href={`/play/${step.id}`}
+            >
+              Open the single-step player
+            </Link>
+          ) : null}
+        </p>
+      </div>
     ) : !isYoutube ? (
       <div className="flex aspect-video flex-col items-center justify-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-6 text-center text-sm text-amber-950">
         <p>
