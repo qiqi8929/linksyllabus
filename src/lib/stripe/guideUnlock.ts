@@ -99,3 +99,63 @@ export async function tryApplyGuideUnlockFromCheckoutSessionId(
   }
   return applyGuideUnlockFromPaidCheckoutSession(session, `sync:${sessionId}`);
 }
+
+/**
+ * Reconcile missing paid slots from Stripe by replaying paid guide_unlock sessions idempotently.
+ * Used as a last-resort recovery when the user hits limit but webhook/return callback was delayed.
+ */
+export async function reconcileGuideUnlockSlotsFromStripe(userId: string): Promise<{
+  attempted: number;
+  applied: number;
+  duplicates: number;
+  failed: number;
+  reasons: string[];
+}> {
+  const admin = createSupabaseAdminClient();
+  const { data: subRow, error: subErr } = await admin
+    .from("subscriptions")
+    .select("stripe_customer_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (subErr) {
+    return { attempted: 0, applied: 0, duplicates: 0, failed: 1, reasons: ["subscription_read_failed"] };
+  }
+  const customerId = String(subRow?.stripe_customer_id ?? "").trim();
+  if (!customerId) {
+    return { attempted: 0, applied: 0, duplicates: 0, failed: 0, reasons: ["no_customer"] };
+  }
+
+  if (!env.stripe.secretKey()) {
+    return { attempted: 0, applied: 0, duplicates: 0, failed: 1, reasons: ["stripe_not_configured"] };
+  }
+
+  const stripe = getStripe();
+  const sessions = await stripe.checkout.sessions.list({ customer: customerId, limit: 100 });
+  const paidUnlocks = sessions.data.filter(
+    (s) => s.metadata?.type === "guide_unlock" && s.metadata?.user_id === userId && s.payment_status === "paid"
+  );
+
+  let applied = 0;
+  let duplicates = 0;
+  let failed = 0;
+  const reasons = new Set<string>();
+
+  for (const s of paidUnlocks) {
+    const r = await applyGuideUnlockFromPaidCheckoutSession(s, `reconcile:${s.id}`);
+    if (r.ok) {
+      if (r.duplicate) duplicates += 1;
+      else applied += 1;
+    } else {
+      failed += 1;
+      reasons.add(r.reason);
+    }
+  }
+
+  return {
+    attempted: paidUnlocks.length,
+    applied,
+    duplicates,
+    failed,
+    reasons: Array.from(reasons)
+  };
+}

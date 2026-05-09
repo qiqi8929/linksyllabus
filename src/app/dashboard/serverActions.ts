@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { tryApplyGuideUnlockFromCheckoutSessionId } from "@/lib/stripe/guideUnlock";
+import {
+  reconcileGuideUnlockSlotsFromStripe,
+  tryApplyGuideUnlockFromCheckoutSessionId
+} from "@/lib/stripe/guideUnlock";
 import { activateSkuFromCheckoutSession } from "@/lib/stripe/skuActivation";
 import { getStripe } from "@/lib/stripe/server";
 import { env } from "@/lib/env";
@@ -279,7 +282,47 @@ export async function createInactiveSkuWithSteps(payload: {
     createdGuides = Math.max(0, Number(skuCount ?? 0));
   }
 
-  const maxGuides = maxAllowedGuides(paidSlots);
+  let maxGuides = maxAllowedGuides(paidSlots);
+  if (createdGuides >= maxGuides) {
+    // Recovery path: if webhook/return callback lagged, reconcile paid unlocks before denying create.
+    const reconcile = await reconcileGuideUnlockSlotsFromStripe(user.id);
+    if (reconcile.applied > 0) {
+      const admin = createSupabaseAdminClient();
+      logUsersQueryBefore({
+        context: "createInactiveSkuWithSteps.reconcile_refresh_paid_guide_slots",
+        userId: user.id,
+        columns: "paid_guide_slots"
+      });
+      const { data: refreshedPaidRow, error: refreshedPaidErr } = await admin
+        .from("users")
+        .select("paid_guide_slots")
+        .eq("id", user.id)
+        .maybeSingle();
+      logUsersQueryAfter({
+        context: "createInactiveSkuWithSteps.reconcile_refresh_paid_guide_slots",
+        userId: user.id,
+        columns: "paid_guide_slots",
+        ok: !refreshedPaidErr,
+        error: refreshedPaidErr,
+        rowReturned: refreshedPaidRow != null
+      });
+      if (!refreshedPaidErr && refreshedPaidRow) {
+        const refreshed = Number(refreshedPaidRow.paid_guide_slots);
+        if (Number.isFinite(refreshed) && refreshed >= 0) {
+          paidSlots = refreshed;
+          maxGuides = maxAllowedGuides(paidSlots);
+        }
+      }
+      console.log("[createInactiveSkuWithSteps] reconcile guide unlock slots", {
+        userId: user.id,
+        ...reconcile,
+        paidSlotsAfterReconcile: paidSlots,
+        maxGuidesAfterReconcile: maxGuides,
+        createdGuides
+      });
+    }
+  }
+
   if (createdGuides >= maxGuides) {
     const paidSlotsColumnMissing =
       paidErr != null &&
