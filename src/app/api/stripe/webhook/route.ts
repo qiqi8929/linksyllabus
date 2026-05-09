@@ -44,6 +44,8 @@ export async function POST(req: Request) {
       }
     }
 
+    // Same idempotent apply as GET /api/stripe/guide-unlock-return: if return URL already ran,
+    // stripe_guide_unlock_events insert hits 23505 and paid_guide_slots is not incremented again.
     if (type === "guide_unlock" && userId) {
       const paid =
         session.payment_status === "paid" ||

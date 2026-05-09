@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 /**
- * Legacy Stripe success_url pointed here. Old sessions may still redirect to this path.
- * Never run server actions — only send users back to the dashboard (webhook + manual Create).
+ * Legacy Stripe success_url pointed here. Forward through the return handler so slots apply on the server.
  */
 export default async function GuideUnlockCompleteRedirectPage({
   searchParams
@@ -18,9 +17,9 @@ export default async function GuideUnlockCompleteRedirectPage({
   const sessionId = Array.isArray(raw) ? raw[0] : raw;
   const sid = typeof sessionId === "string" ? sessionId.trim() : "";
 
-  const dest = new URLSearchParams();
-  dest.set("checkout", "guide_unlock_success");
-  if (sid) dest.set("session_id", sid);
+  if (!sid) {
+    redirect("/dashboard?checkout=guide_unlock_missing_session");
+  }
 
-  redirect(`/dashboard?${dest.toString()}`);
+  redirect(`/api/stripe/guide-unlock-return?session_id=${encodeURIComponent(sid)}`);
 }
