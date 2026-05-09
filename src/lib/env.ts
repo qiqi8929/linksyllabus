@@ -64,6 +64,16 @@ export const env = {
     apiToken: () => process.env.CLOUDFLARE_STREAM_API_TOKEN as string | undefined,
     customerSubdomain: () =>
       process.env.CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN as string | undefined
+  },
+
+  landing: {
+    /**
+     * Optional Cloudflare Stream video id for homepage hero.
+     * When set together with CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN, homepage hero iframe
+     * switches from the legacy YouTube embed to this Stream video.
+     */
+    heroStreamVideoId: () =>
+      process.env.NEXT_PUBLIC_LANDING_HERO_STREAM_VIDEO_ID as string | undefined
   }
 };
 
