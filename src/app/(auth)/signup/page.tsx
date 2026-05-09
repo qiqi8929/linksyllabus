@@ -34,6 +34,21 @@ export default function SignupPage() {
         if (dbErr && dbErr.code !== "23505") {
           throw dbErr;
         }
+
+        const device =
+          typeof navigator === "undefined"
+            ? "Unknown device"
+            : navigator.userAgent || "Unknown device";
+        // Best-effort notification; never block successful signup.
+        await fetch("/api/notifications/new-signup", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            email: data.user.email,
+            device
+          })
+        }).catch(() => {});
       }
 
       router.replace("/dashboard");

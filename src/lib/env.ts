@@ -66,6 +66,14 @@ export const env = {
       process.env.CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN as string | undefined
   },
 
+  email: {
+    smtpHost: () => process.env.SMTP_HOST as string | undefined,
+    smtpPort: () => process.env.SMTP_PORT as string | undefined,
+    smtpUser: () => process.env.SMTP_USER as string | undefined,
+    smtpPass: () => process.env.SMTP_PASS as string | undefined,
+    from: () => process.env.EMAIL_FROM as string | undefined
+  },
+
   landing: {
     /** Optional full iframe URL for homepage hero (highest priority). */
     heroStreamIframeUrl: () =>
