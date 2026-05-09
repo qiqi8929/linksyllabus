@@ -10,30 +10,53 @@ export const dynamic = "force-dynamic";
 
 const LEGACY_HERO_YOUTUBE_EMBED =
   "https://www.youtube.com/embed/q9WEi19Py9o?autoplay=1&mute=1&loop=1&playlist=q9WEi19Py9o&controls=0&modestbranding=1&playsinline=1";
+const HERO_MEDIA_TOKEN = "{{HERO_MEDIA}}";
 
-function resolveLandingHeroEmbedUrl(): string {
+function resolveLandingHeroSource():
+  | { kind: "iframe"; src: string }
+  | { kind: "video"; src: string }
+  | { kind: "legacy"; src: string } {
+  const demoMp4 = process.env.NEXT_PUBLIC_LANDING_HERO_DEMO_MP4?.trim();
+  if (demoMp4) {
+    return { kind: "video", src: demoMp4 };
+  }
   const explicitIframeUrl = env.landing.heroStreamIframeUrl()?.trim();
   if (explicitIframeUrl) {
-    return explicitIframeUrl;
+    return { kind: "iframe", src: explicitIframeUrl };
   }
   const streamId = env.landing.heroStreamVideoId()?.trim();
   const customerSubdomain = env.cloudflareStream.customerSubdomain()?.trim();
   if (streamId && customerSubdomain) {
-    return `https://${customerSubdomain}/${encodeURIComponent(streamId)}/iframe?autoplay=true&muted=true&loop=true&controls=false`;
+    return {
+      kind: "iframe",
+      src: `https://${customerSubdomain}/${encodeURIComponent(streamId)}/iframe?autoplay=true&muted=true&loop=true&controls=false`
+    };
   }
-  return LEGACY_HERO_YOUTUBE_EMBED;
+  return { kind: "legacy", src: LEGACY_HERO_YOUTUBE_EMBED };
+}
+
+function renderLandingHeroMediaHtml(): string {
+  const hero = resolveLandingHeroSource();
+  if (hero.kind === "video") {
+    return `<video src="${hero.src}" style="width:100%; aspect-ratio:16/9; border:none; border-radius:12px;" autoplay muted loop playsinline controls></video>`;
+  }
+  return `<iframe src="${hero.src}" style="width:100%; aspect-ratio:16/9; border:none; border-radius:12px;" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
 }
 
 const getLandingMarkup = cache(() => {
   const raw = fs.readFileSync(path.join(process.cwd(), "src/app/landing-body.html"), "utf8");
-  const heroUrl = resolveLandingHeroEmbedUrl();
-  if (raw.includes(LEGACY_HERO_YOUTUBE_EMBED)) {
-    return raw.replace(LEGACY_HERO_YOUTUBE_EMBED, heroUrl);
+  const heroHtml = renderLandingHeroMediaHtml();
+  if (raw.includes(HERO_MEDIA_TOKEN)) {
+    return raw.replace(HERO_MEDIA_TOKEN, heroHtml);
   }
-  // Fallback: replace the src in the first hero iframe under `.player-wrap`.
+  const hero = resolveLandingHeroSource();
+  if (raw.includes(LEGACY_HERO_YOUTUBE_EMBED)) {
+    return raw.replace(LEGACY_HERO_YOUTUBE_EMBED, hero.src);
+  }
+  // Fallback for older HTML snapshots without HERO_MEDIA token.
   return raw.replace(
-    /(<div class="player-wrap">[\s\S]*?<iframe[\s\S]*?\ssrc=")([^"]+)(")/,
-    `$1${heroUrl}$3`
+    /<div class="player-wrap">[\s\S]*?<div class="vid-area">[\s\S]*?<\/div>/,
+    `<div class="player-wrap"><div class="vid-area">${heroHtml}</div>`
   );
 });
 
