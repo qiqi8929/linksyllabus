@@ -103,7 +103,10 @@ export async function POST(req: Request) {
 
       try {
         const session = await createUnlockSession();
-        return NextResponse.json({ url: session.url });
+        return NextResponse.json({
+          url: session.url,
+          checkoutSessionId: session.id ?? null
+        });
       } catch (e) {
         if (!isStaleStripeCustomerError(e)) throw e;
         await admin
@@ -112,7 +115,10 @@ export async function POST(req: Request) {
           .eq("user_id", user.id);
         customerId = await getOrCreateStripeCustomerId(stripe, admin, user);
         const session = await createUnlockSession();
-        return NextResponse.json({ url: session.url });
+        return NextResponse.json({
+          url: session.url,
+          checkoutSessionId: session.id ?? null
+        });
       }
     }
 

@@ -12,12 +12,45 @@ import {
   FREE_TIER_UPGRADE_MESSAGE,
   maxAllowedGuides
 } from "@/lib/freeTier";
-import { DASHBOARD_BOOTSTRAP_REFETCH_EVENT } from "@/lib/dashboardEvents";
+import {
+  DASHBOARD_BOOTSTRAP_REFETCH_EVENT,
+  PENDING_GUIDE_UNLOCK_CHECKOUT_SESSION_KEY
+} from "@/lib/dashboardEvents";
 import { parseAiTutorialPaste } from "@/lib/parseAiTutorialPaste";
 import { extractYouTubeVideoId } from "@/lib/video";
 import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
 import { DefaultHttpStack, Upload } from "tus-js-client";
 import type { HttpRequest, HttpResponse, HttpStack } from "tus-js-client";
+
+function guideUnlockSyncUserMessage(reason: string | undefined): string {
+  switch (reason) {
+    case "idempotency_table_missing":
+      return (
+        "Payment succeeded, but the database is missing table stripe_guide_unlock_events. " +
+        "In Supabase → SQL Editor, run the file supabase/migration_stripe_guide_unlock_idempotency.sql from this project, then refresh this page."
+      );
+    case "missing_session":
+      return (
+        "Payment succeeded, but we could not verify the Stripe session. Click “Refresh payment status” below, or hard-refresh. " +
+        "If it persists: deploy the latest app, ensure STRIPE_WEBHOOK_SECRET on Vercel matches Stripe CLI/dashboard, and run the Supabase migrations for paid_guide_slots + stripe_guide_unlock_events."
+      );
+    case "stripe_not_configured":
+      return "Server is missing STRIPE_SECRET_KEY; unlock cannot be verified.";
+    case "user_mismatch":
+      return "This Stripe session belongs to a different account. Sign in with the same user you used at checkout.";
+    case "not_guide_unlock":
+      return "This checkout was not a guide-slot unlock. Use “Add guide slot ($9.99)” from the dashboard.";
+    case "idempotency_insert_failed":
+    case "update_failed":
+      return (
+        "Could not record your guide slot in the database. Check Supabase logs and that paid_guide_slots exists on public.users."
+      );
+    default:
+      return reason
+        ? `Could not apply guide unlock (${reason}). Try “Refresh payment status” or hard-refresh.`
+        : "Could not apply guide unlock. Try refreshing.";
+  }
+}
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 /** Cloudflare Stream tus: min 5 MiB per chunk (except final), max 200 MiB; must be a multiple of 256 KiB. */
@@ -283,8 +316,15 @@ async function startGuideUnlockCheckout() {
     const t = await res.text();
     throw new Error(t || "Checkout failed");
   }
-  const data = (await res.json()) as { url?: string };
+  const data = (await res.json()) as { url?: string; checkoutSessionId?: string | null };
   if (!data?.url) throw new Error("Missing checkout URL");
+  if (data.checkoutSessionId) {
+    try {
+      localStorage.setItem(PENDING_GUIDE_UNLOCK_CHECKOUT_SESSION_KEY, data.checkoutSessionId);
+    } catch {
+      /* quota / privacy mode */
+    }
+  }
   window.location.href = data.url;
 }
 
@@ -371,90 +411,134 @@ export function TutorialCreator({
   }, [safeGuideCount, maxGuides]);
 
   useEffect(() => {
+    let cancelled = false;
     let refreshTimers: number[] = [];
+
+    const refetchBootstrap = () => {
+      window.dispatchEvent(new Event(DASHBOARD_BOOTSTRAP_REFETCH_EVENT));
+      router.refresh();
+    };
+
+    const runUnlockSync = (sessionId: string) => {
+      const sid = sessionId.trim();
+      if (!sid) return;
+      void syncGuideUnlockFromStripeSession(sid).then((syncRes) => {
+        if (cancelled) return;
+        if (!syncRes.ok) {
+          console.warn("[TutorialCreator] guide unlock session sync", syncRes);
+          if (syncRes.reason === "unauthorized") {
+            window.setTimeout(() => {
+              if (cancelled) return;
+              void syncGuideUnlockFromStripeSession(sid).then((retry) => {
+                if (cancelled) return;
+                if (!retry.ok && retry.reason !== "not_paid") {
+                  setError(guideUnlockSyncUserMessage(retry.reason));
+                } else if (retry.ok) {
+                  try {
+                    localStorage.removeItem(PENDING_GUIDE_UNLOCK_CHECKOUT_SESSION_KEY);
+                  } catch {
+                    /* ignore */
+                  }
+                  setShowUpgradePrompt(false);
+                }
+                refetchBootstrap();
+              });
+            }, 1600);
+            return;
+          }
+          if (syncRes.reason !== "not_paid") {
+            setError(guideUnlockSyncUserMessage(syncRes.reason));
+          }
+        } else {
+          try {
+            localStorage.removeItem(PENDING_GUIDE_UNLOCK_CHECKOUT_SESSION_KEY);
+          } catch {
+            /* ignore */
+          }
+          setShowUpgradePrompt(false);
+        }
+        refetchBootstrap();
+      });
+    };
+
     try {
       const params = new URLSearchParams(window.location.search);
       const checkout = params.get("checkout");
-      const shouldRestore =
-        checkout === "guide_unlock_success" ||
-        checkout === "cancel" ||
-        checkout === "success";
-      if (!shouldRestore) return;
 
-      if (checkout === "guide_unlock_success") {
-        setShowUpgradePrompt(false);
-        const sessionId =
-          params.get("session_id")?.trim() ||
-          params.get("stripe_session_id")?.trim() ||
-          "";
-        const unlockSyncMessage = (reason: string | undefined): string => {
-          switch (reason) {
-            case "idempotency_table_missing":
-              return (
-                "Payment succeeded, but the database is missing table stripe_guide_unlock_events. " +
-                "In Supabase → SQL Editor, run the file supabase/migration_stripe_guide_unlock_idempotency.sql from this project, then refresh this page."
-              );
-            case "missing_session":
-              return (
-                "Payment succeeded, but the return URL had no Stripe session id (older deploy or bookmark). " +
-                "Deploy the latest app (success URL must include session_id), or wait for the Stripe webhook; then refresh. " +
-                "If it persists, check Vercel Stripe webhook URL and STRIPE_WEBHOOK_SECRET."
-              );
-            case "stripe_not_configured":
-              return "Server is missing STRIPE_SECRET_KEY; unlock cannot be verified.";
-            case "user_mismatch":
-              return "This Stripe session belongs to a different account. Sign in with the same user you used at checkout.";
-            case "not_guide_unlock":
-              return "This checkout was not a guide-slot unlock. Use “Add guide slot ($9.99)” from the dashboard.";
-            case "idempotency_insert_failed":
-            case "update_failed":
-              return (
-                "Could not record your guide slot in the database. Check Supabase logs and that paid_guide_slots exists on public.users."
-              );
-            default:
-              return reason
-                ? `Could not apply guide unlock (${reason}). Try refreshing; if it repeats, contact support.`
-                : "Could not apply guide unlock. Try refreshing.";
-          }
-        };
-        if (sessionId.length > 0) {
-          void syncGuideUnlockFromStripeSession(sessionId).then((syncRes) => {
-            if (!syncRes.ok) {
-              console.warn("[TutorialCreator] guide unlock session sync", syncRes);
-              if (syncRes.reason !== "not_paid") {
-                setError(unlockSyncMessage(syncRes.reason));
-              }
-            }
-            window.dispatchEvent(new Event(DASHBOARD_BOOTSTRAP_REFETCH_EVENT));
-            router.refresh();
-          });
-        } else {
-          setError(unlockSyncMessage("missing_session"));
-          window.dispatchEvent(new Event(DASHBOARD_BOOTSTRAP_REFETCH_EVENT));
-        }
-        const delays = [0, 900, 2000, 4000, 7000];
-        refreshTimers = delays.map((ms) =>
-          window.setTimeout(() => {
-            window.dispatchEvent(new Event(DASHBOARD_BOOTSTRAP_REFETCH_EVENT));
-            router.refresh();
-          }, ms)
-        );
+      if (checkout === "cancel") {
         try {
-          const clean = new URL(window.location.href);
-          clean.searchParams.delete("checkout");
-          window.history.replaceState({}, "", clean.pathname + clean.search + clean.hash);
+          localStorage.removeItem(PENDING_GUIDE_UNLOCK_CHECKOUT_SESSION_KEY);
         } catch {
           /* ignore */
         }
       }
 
+      let storageSessionId = "";
+      try {
+        storageSessionId =
+          localStorage.getItem(PENDING_GUIDE_UNLOCK_CHECKOUT_SESSION_KEY)?.trim() ?? "";
+      } catch {
+        /* ignore */
+      }
+
+      const urlSessionId =
+        params.get("session_id")?.trim() || params.get("stripe_session_id")?.trim() || "";
+
+      if (storageSessionId && checkout !== "cancel" && checkout !== "guide_unlock_success") {
+        runUnlockSync(storageSessionId);
+      }
+
+      const shouldRestore =
+        checkout === "guide_unlock_success" ||
+        checkout === "cancel" ||
+        checkout === "success";
+      if (!shouldRestore) {
+        return () => {
+          cancelled = true;
+          refreshTimers.forEach((id) => window.clearTimeout(id));
+        };
+      }
+
+      if (checkout === "guide_unlock_success") {
+        setShowUpgradePrompt(false);
+        const sessionId = urlSessionId || storageSessionId;
+        if (sessionId) {
+          runUnlockSync(sessionId);
+        } else {
+          setError(guideUnlockSyncUserMessage("missing_session"));
+          refetchBootstrap();
+        }
+        const delays = [0, 900, 2000, 4000, 7000];
+        refreshTimers = delays.map((ms) =>
+          window.setTimeout(() => {
+            if (cancelled) return;
+            refetchBootstrap();
+          }, ms)
+        );
+        window.setTimeout(() => {
+          try {
+            const clean = new URL(window.location.href);
+            clean.searchParams.delete("checkout");
+            window.history.replaceState({}, "", clean.pathname + clean.search + clean.hash);
+          } catch {
+            /* ignore */
+          }
+        }, 400);
+      }
+
       const raw = localStorage.getItem(TUTORIAL_CREATOR_DRAFT_KEY);
       if (!raw) {
-        return () => refreshTimers.forEach((id) => window.clearTimeout(id));
+        return () => {
+          cancelled = true;
+          refreshTimers.forEach((id) => window.clearTimeout(id));
+        };
       }
       const parsed = JSON.parse(raw) as Partial<TutorialDraft>;
       if (!parsed || typeof parsed !== "object") {
-        return () => refreshTimers.forEach((id) => window.clearTimeout(id));
+        return () => {
+          cancelled = true;
+          refreshTimers.forEach((id) => window.clearTimeout(id));
+        };
       }
 
       if (typeof parsed.tutorialName === "string") {
@@ -490,7 +574,10 @@ export function TutorialCreator({
     } catch {
       // Ignore invalid or inaccessible localStorage entries.
     }
-    return () => refreshTimers.forEach((id) => window.clearTimeout(id));
+    return () => {
+      cancelled = true;
+      refreshTimers.forEach((id) => window.clearTimeout(id));
+    };
   }, [router]);
 
   const updateStep = useCallback((id: string, patch: Partial<StepRow>) => {
@@ -1346,14 +1433,48 @@ Example:
                 Pay $9.99 once to unlock another guide slot. You can purchase additional slots whenever
                 you need more tutorials.
               </p>
-              <button
-                type="button"
-                className="btn-primary mt-3"
-                disabled={upgradeLoading}
-                onClick={() => void onUpgrade()}
-              >
-                {upgradeLoading ? "Redirecting…" : "Add guide slot ($9.99)"}
-              </button>
+              <p className="mt-2 text-xs text-amber-950/90">
+                Already paid? Wait a few seconds, then use refresh — the app re-reads your slots from the
+                server (webhook can take a moment).
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={upgradeLoading}
+                  onClick={() => void onUpgrade()}
+                >
+                  {upgradeLoading ? "Redirecting…" : "Add guide slot ($9.99)"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost border border-amber-400/80 bg-white"
+                  onClick={() => {
+                    window.dispatchEvent(new Event(DASHBOARD_BOOTSTRAP_REFETCH_EVENT));
+                    try {
+                      const sid =
+                        localStorage.getItem(PENDING_GUIDE_UNLOCK_CHECKOUT_SESSION_KEY)?.trim() ?? "";
+                      if (sid) {
+                        void syncGuideUnlockFromStripeSession(sid).then((r) => {
+                          if (r.ok) {
+                            try {
+                              localStorage.removeItem(PENDING_GUIDE_UNLOCK_CHECKOUT_SESSION_KEY);
+                            } catch {
+                              /* ignore */
+                            }
+                            setShowUpgradePrompt(false);
+                          }
+                          window.dispatchEvent(new Event(DASHBOARD_BOOTSTRAP_REFETCH_EVENT));
+                        });
+                      }
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                >
+                  Refresh payment status
+                </button>
+              </div>
             </div>
           ) : null}
           <button
