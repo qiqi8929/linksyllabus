@@ -419,6 +419,98 @@
     }
 
     /* ─── WHO ─── */
+    #lp-root .comparison-section {
+      padding-top: 4.25rem;
+      padding-bottom: 4.25rem;
+    }
+    #lp-root .comparison-section .section-title {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    #lp-root .comparison-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    #lp-root .comparison-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--white);
+      overflow: hidden;
+      cursor: pointer;
+      text-align: left;
+      transition: transform .2s, box-shadow .2s, border-color .2s;
+    }
+    #lp-root .comparison-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px rgba(0,0,0,.08);
+      border-color: var(--brand-mid);
+    }
+    #lp-root .comparison-card img {
+      width: 100%;
+      aspect-ratio: 16/10;
+      object-fit: cover;
+      background: #f3f3f1;
+    }
+    #lp-root .comparison-label {
+      display: block;
+      padding: .8rem .95rem;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    #lp-root .comparison-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 400;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,.62);
+      padding: 1rem;
+    }
+    #lp-root .comparison-modal.open {
+      display: flex;
+    }
+    #lp-root .comparison-modal-dialog {
+      width: min(960px, 100%);
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      padding: .75rem;
+      position: relative;
+    }
+    #lp-root .comparison-modal-dialog img {
+      width: 100%;
+      height: auto;
+      border-radius: var(--radius-md);
+      object-fit: contain;
+      background: #f3f3f1;
+      max-height: 80vh;
+    }
+    #lp-root .comparison-modal-close {
+      position: absolute;
+      right: .75rem;
+      top: .75rem;
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(255,255,255,.9);
+      color: var(--ink);
+      font-size: 24px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    #lp-root .comparison-modal-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink-2);
+      text-align: center;
+      padding: .65rem .25rem .2rem;
+    }
+
+    /* ─── WHO ─── */
     #lp-root .who-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -532,5 +624,6 @@
       #lp-root .section-title { font-size: 26px; }
       #lp-root .flow-diagram { grid-template-columns: 1fr; gap: 8px; }
       #lp-root .flow-arrow { transform: rotate(90deg); font-size: 16px; }
+      #lp-root .comparison-grid { grid-template-columns: 1fr; }
     }
   
