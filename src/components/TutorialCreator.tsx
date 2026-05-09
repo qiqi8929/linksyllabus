@@ -220,17 +220,20 @@ async function fetchJsonFromApi(
   if (!res.ok) {
     let msg = String(data.error ?? `Request failed (HTTP ${res.status}).`);
     if (/^Bad Request: The request was invalid\.|^Bad Request$/i.test(msg.trim())) {
-      if (url.includes("/api/gemini/")) {
-        msg =
-          "Video analysis couldn't finish (server rejected the request). Refresh the page and try again.";
-      } else if (url.includes("/api/video/direct-upload")) {
+      if (url.includes("/api/video/direct-upload")) {
         msg =
           "Couldn't start the video upload. Refresh the page and try again.";
-      } else {
+      } else if (!url.includes("/api/gemini/")) {
         msg =
           "Something went wrong talking to the server. Refresh the page and try again.";
       }
     }
+    if (url.includes("/api/gemini/") && /^Bad Request: The request was invalid\.|^Bad Request$/i.test(msg.trim())) {
+      msg =
+        "Video analysis request was rejected upstream. If you just uploaded, wait 30-60 seconds and retry. " +
+        "If it keeps failing, verify Gemini model/API key and Cloudflare Stream download readiness in server logs.";
+    }
+    msg += `\n\n— Request —\n${url} (HTTP ${res.status})`;
     const dbg = data.debug;
     if (dbg !== undefined && dbg !== null) {
       try {
