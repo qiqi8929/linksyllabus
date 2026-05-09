@@ -15,7 +15,9 @@ export const dynamic = "force-dynamic";
  * Allowed when the parent SKU is active or the viewer is the owner.
  */
 export async function GET(req: Request) {
-  const stepId = new URL(req.url).searchParams.get("stepId");
+  const parsedUrl = new URL(req.url);
+  const stepId = parsedUrl.searchParams.get("stepId");
+  const format = String(parsedUrl.searchParams.get("format") ?? "").trim().toLowerCase();
   if (!stepId) {
     return NextResponse.json({ error: "stepId is required." }, { status: 400 });
   }
@@ -78,6 +80,10 @@ export async function GET(req: Request) {
   const customerSubdomain = env.cloudflareStream.customerSubdomain()?.trim();
   if (!customerSubdomain || !streamId) {
     return NextResponse.json({ error: "Cloudflare Stream is not configured." }, { status: 500 });
+  }
+  if (format === "mp4") {
+    const mp4Url = `https://${customerSubdomain}/${encodeURIComponent(streamId)}/downloads/default.mp4`;
+    return NextResponse.redirect(mp4Url);
   }
   const iframeUrl = buildCloudflareIframeUrl(customerSubdomain, streamId);
   return NextResponse.redirect(iframeUrl);

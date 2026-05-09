@@ -83,7 +83,6 @@ export function TutorialViewClient({
   const [view, setView] = useState<"materials" | "step">("step");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [playbackRate, setPlaybackRate] = useState<(typeof SPEEDS)[number]>(1);
-  const [streamReplayNonce, setStreamReplayNonce] = useState(0);
 
   const step = view === "step" ? steps[currentIndex] ?? steps[0] : undefined;
   const videoId = step ? extractYouTubeVideoId(step.youtube_url) : null;
@@ -105,7 +104,7 @@ export function TutorialViewClient({
 
   const streamPlaybackSrc = useMemo(() => {
     if (!isStreamVideo || !step) return "";
-    return `/api/video/playback?stepId=${encodeURIComponent(step.id)}`;
+    return `/api/video/playback?stepId=${encodeURIComponent(step.id)}&format=mp4`;
   }, [isStreamVideo, step?.id]);
 
   useEffect(() => {
@@ -139,7 +138,7 @@ export function TutorialViewClient({
   }, [isYoutube, videoId, step?.id, startTime, endTime]);
 
   useEffect(() => {
-    if (!isStorageVideo || !step) return;
+    if ((!isStorageVideo && !isStreamVideo) || !step) return;
     const el = htmlVideoRef.current;
     if (!el) return;
     const apply = () => {
@@ -151,10 +150,10 @@ export function TutorialViewClient({
     return () => {
       el.removeEventListener("loadedmetadata", apply);
     };
-  }, [isStorageVideo, step?.id, startTime, endTime]);
+  }, [isStorageVideo, isStreamVideo, step?.id, startTime, endTime]);
 
   useEffect(() => {
-    if (!isStorageVideo) return;
+    if (!isStorageVideo && !isStreamVideo) return;
     const el = htmlVideoRef.current;
     if (!el) return;
     const onTimeUpdate = () => {
@@ -169,7 +168,7 @@ export function TutorialViewClient({
       el.removeEventListener("timeupdate", onTimeUpdate);
       el.removeEventListener("seeking", onSeeking);
     };
-  }, [isStorageVideo, startTime, endTime, step?.id]);
+  }, [isStorageVideo, isStreamVideo, startTime, endTime, step?.id]);
 
   const playbackRateRef = useRef(playbackRate);
   playbackRateRef.current = playbackRate;
@@ -200,13 +199,13 @@ export function TutorialViewClient({
   const onSpeedClick = useCallback(
     (r: (typeof SPEEDS)[number]) => {
       setPlaybackRate(r);
-      if (isStorageVideo && htmlVideoRef.current) {
+      if ((isStorageVideo || isStreamVideo) && htmlVideoRef.current) {
         htmlVideoRef.current.playbackRate = r;
         return;
       }
       postYtIframeCommand("setPlaybackRate", [r]);
     },
-    [postYtIframeCommand, isStorageVideo]
+    [postYtIframeCommand, isStorageVideo, isStreamVideo]
   );
 
   /** Optional autoplay when landing with ?step=N (browser may still require a gesture). */
@@ -269,17 +268,13 @@ export function TutorialViewClient({
   }, []);
 
   const replay = useCallback(() => {
-    if (isStorageVideo) {
+    if (isStorageVideo || isStreamVideo) {
       const v = htmlVideoRef.current;
       if (!v) return;
       const { start: rs } = timesRef.current;
       v.currentTime = rs;
       v.playbackRate = playbackRateRef.current;
       void v.play();
-      return;
-    }
-    if (isStreamVideo) {
-      setStreamReplayNonce((n) => n + 1);
       return;
     }
     if (!videoId) return;
@@ -305,12 +300,12 @@ export function TutorialViewClient({
   }, [videoId, postYtIframeCommand, isStorageVideo, isStreamVideo]);
 
   const onVoicePause = useCallback(() => {
-    if (isStorageVideo) htmlVideoRef.current?.pause();
-  }, [isStorageVideo]);
+    if (isStorageVideo || isStreamVideo) htmlVideoRef.current?.pause();
+  }, [isStorageVideo, isStreamVideo]);
 
   const onVoicePlay = useCallback(() => {
-    if (isStorageVideo) void htmlVideoRef.current?.play();
-  }, [isStorageVideo]);
+    if (isStorageVideo || isStreamVideo) void htmlVideoRef.current?.play();
+  }, [isStorageVideo, isStreamVideo]);
 
   const {
     voiceArmed,
@@ -326,7 +321,7 @@ export function TutorialViewClient({
   });
 
   const toggleFullscreen = useCallback(() => {
-    if (isStorageVideo && htmlVideoRef.current) {
+    if ((isStorageVideo || isStreamVideo) && htmlVideoRef.current) {
       const v = htmlVideoRef.current;
       if (document.fullscreenElement) {
         void document.exitFullscreen();
@@ -342,7 +337,7 @@ export function TutorialViewClient({
     } else {
       void el.requestFullscreen?.();
     }
-  }, [isStorageVideo]);
+  }, [isStorageVideo, isStreamVideo]);
 
   const controlsBar = (
     <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:py-2">
@@ -515,12 +510,14 @@ export function TutorialViewClient({
           ref={videoWrapRef}
           className="relative aspect-video w-full min-h-0 min-w-0 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-black shadow-sm"
         >
-          <iframe
-            key={`${skuId}-${step.id}-stream-${streamReplayNonce}`}
+          <video
+            ref={htmlVideoRef}
+            key={`${skuId}-${step.id}-stream-${startTime}-${endTime}`}
             src={streamPlaybackSrc}
-            className="absolute left-0 top-0 h-full w-full"
-            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-            allowFullScreen
+            className="absolute left-0 top-0 h-full w-full object-contain"
+            controls
+            playsInline
+            preload="metadata"
             title="Tutorial video clip"
           />
         </div>
