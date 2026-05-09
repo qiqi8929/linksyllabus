@@ -67,6 +67,9 @@ export const env = {
   },
 
   landing: {
+    /** Optional full iframe URL for homepage hero (highest priority). */
+    heroStreamIframeUrl: () =>
+      process.env.NEXT_PUBLIC_LANDING_HERO_STREAM_IFRAME_URL as string | undefined,
     /**
      * Optional Cloudflare Stream video id for homepage hero.
      * When set together with CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN, homepage hero iframe
