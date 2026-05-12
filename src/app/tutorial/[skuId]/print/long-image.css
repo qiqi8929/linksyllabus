@@ -246,7 +246,8 @@
   print-color-adjust: exact;
   border: 0.5px solid #e8e4de;
   border-radius: 5px;
-  padding: 9px 9px 32px;
+  /* Bottom space reserved for the 40px QR + caption row beneath it. */
+  padding: 9px 9px 58px;
   position: relative;
   /* Keep card text fully visible — no clamp, no overflow hidden. */
   overflow: visible;
@@ -279,7 +280,8 @@
   font-size: 9px;
   color: #666;
   line-height: 1.55;
-  padding-right: 30px;
+  /* Leaves clearance to the right of the 40px QR badge. */
+  padding-right: 50px;
   font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -295,10 +297,10 @@
 
 .pmli-root .pmli-qr {
   position: absolute;
-  bottom: 8px;
+  bottom: 16px;
   right: 8px;
-  width: 24px;
-  height: 24px;
+  width: 40px;
+  height: 40px;
   border: 0.5px solid #ccc;
   border-radius: 3px;
   background: #ffffff;
@@ -313,6 +315,20 @@
   height: 100%;
   object-fit: contain;
   display: block;
+}
+
+.pmli-root .pmli-qr-caption {
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  width: 40px;
+  text-align: center;
+  font-size: 7px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: #999;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+  pointer-events: none;
 }
 
 .pmli-root .pmli-steps-empty {

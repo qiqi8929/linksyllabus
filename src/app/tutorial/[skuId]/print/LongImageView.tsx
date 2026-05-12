@@ -1,5 +1,6 @@
 import { stripLeadingStepNumberFromTitle } from "@/lib/stepTitle";
 import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
+import { hasStepTimestamp } from "@/lib/stepTimestamp";
 import "./long-image.css";
 
 type StepRow = {
@@ -7,6 +8,9 @@ type StepRow = {
   step_number: number;
   step_name: string;
   description: string;
+  /** Optional — when both are 0/missing the QR links to the full video. */
+  start_time?: number | null;
+  end_time?: number | null;
 };
 
 type LongImageSku = {
@@ -179,6 +183,7 @@ function StepCard({
   qrSrc: string;
 }) {
   const paras = descriptionToParas(step.description);
+  const noTimestamp = !hasStepTimestamp(step);
   return (
     <div className="pmli-step">
       <div className="pmli-step-num">{formatStepNum(step.step_number)}</div>
@@ -192,8 +197,11 @@ function StepCard({
       </div>
       <div className="pmli-qr">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={qrSrc} alt="" width={24} height={24} />
+        <img src={qrSrc} alt="" width={40} height={40} />
       </div>
+      {noTimestamp ? (
+        <div className="pmli-qr-caption">Full video</div>
+      ) : null}
     </div>
   );
 }

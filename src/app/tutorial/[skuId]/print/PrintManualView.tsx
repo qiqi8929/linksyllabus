@@ -1,5 +1,6 @@
 import { stripLeadingStepNumberFromTitle } from "@/lib/stepTitle";
 import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
+import { hasStepTimestamp } from "@/lib/stepTimestamp";
 import "./print-manual.css";
 
 type StepRow = {
@@ -7,6 +8,9 @@ type StepRow = {
   step_number: number;
   step_name: string;
   description: string;
+  /** Optional — when both are 0/missing the QR links to the full video. */
+  start_time?: number | null;
+  end_time?: number | null;
 };
 
 export type SkuPrint = {
@@ -76,7 +80,9 @@ function StepBlock({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={qrSrc} alt="" width={80} height={80} />
             </div>
-            <span className="pm-qr-caption">Scan or tap to watch</span>
+            <span className="pm-qr-caption">
+              {hasStepTimestamp(step) ? "Scan or tap to watch" : "Full video"}
+            </span>
           </a>
         </div>
       </div>

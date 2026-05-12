@@ -14,6 +14,7 @@ import {
   VoiceMicCluster
 } from "@/app/play/[id]/player";
 import { formatStepNameForDisplay } from "@/lib/stepTitle";
+import { hasStepTimestamp } from "@/lib/stepTimestamp";
 import {
   buildYouTubeEmbedUrl,
   buildYouTubeWatchUrl
@@ -85,6 +86,8 @@ export function TutorialViewClient({
   const [playbackRate, setPlaybackRate] = useState<(typeof SPEEDS)[number]>(1);
 
   const step = view === "step" ? steps[currentIndex] ?? steps[0] : undefined;
+  const stepHasTimestamp = step ? hasStepTimestamp(step) : false;
+  const showNoTimestampNote = view === "step" && Boolean(step) && !stepHasTimestamp;
   const videoId = step ? extractYouTubeVideoId(step.youtube_url) : null;
   const vimeoId = step ? extractVimeoVideoId(step.youtube_url) : null;
   const kind = step ? detectVideoKind(step.youtube_url) : "unknown";
@@ -670,6 +673,7 @@ export function TutorialViewClient({
                   ) : null}
                   {steps.map((s, idx) => {
                     const active = view === "step" && idx === currentIndex;
+                    const noTs = !hasStepTimestamp(s);
                     return (
                       <li key={s.id}>
                         <button
@@ -680,6 +684,11 @@ export function TutorialViewClient({
                               ? "bg-orange-500 font-medium text-white shadow-sm"
                               : "text-zinc-700 hover:bg-zinc-100"
                           }`}
+                          title={
+                            noTs
+                              ? "No timestamp — plays full video"
+                              : undefined
+                          }
                         >
                           <span
                             className={`shrink-0 tabular-nums ${
@@ -688,9 +697,19 @@ export function TutorialViewClient({
                           >
                             {s.step_number}.
                           </span>
-                          <span className="line-clamp-2">
+                          <span className="line-clamp-2 flex-1">
                             {formatStepNameForDisplay(s.step_name)}
                           </span>
+                          {noTs ? (
+                            <span
+                              className={`shrink-0 self-center text-xs ${
+                                active ? "text-white/80" : "text-zinc-400"
+                              }`}
+                              aria-label="No timestamp — plays full video"
+                            >
+                              —
+                            </span>
+                          ) : null}
                         </button>
                       </li>
                     );
@@ -732,6 +751,7 @@ export function TutorialViewClient({
                 ) : null}
                 {steps.map((s, idx) => {
                   const active = view === "step" && idx === currentIndex;
+                  const noTs = !hasStepTimestamp(s);
                   return (
                     <li key={`m-${s.id}`}>
                       <button
@@ -742,6 +762,9 @@ export function TutorialViewClient({
                             ? "bg-orange-500 font-medium text-white shadow-sm"
                             : "text-zinc-700 hover:bg-zinc-100"
                         }`}
+                        title={
+                          noTs ? "No timestamp — plays full video" : undefined
+                        }
                       >
                         <span
                           className={`shrink-0 tabular-nums ${
@@ -750,9 +773,19 @@ export function TutorialViewClient({
                         >
                           {s.step_number}.
                         </span>
-                        <span className="line-clamp-2">
+                        <span className="line-clamp-2 flex-1">
                           {formatStepNameForDisplay(s.step_name)}
                         </span>
+                        {noTs ? (
+                          <span
+                            className={`shrink-0 self-center text-xs ${
+                              active ? "text-white/80" : "text-zinc-400"
+                            }`}
+                            aria-label="No timestamp — plays full video"
+                          >
+                            —
+                          </span>
+                        ) : null}
                       </button>
                     </li>
                   );
@@ -763,6 +796,15 @@ export function TutorialViewClient({
           <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
             <div className="min-h-0 min-w-0 w-full lg:w-[60%]">
               {videoBlock}
+              {showNoTimestampNote ? (
+                <p
+                  className="mt-1 text-center"
+                  style={{ fontSize: "12px", color: "#aaa" }}
+                  role="status"
+                >
+                  No timestamp available for this step — watching from beginning
+                </p>
+              ) : null}
               <a
                 href={printHref}
                 target="_blank"
