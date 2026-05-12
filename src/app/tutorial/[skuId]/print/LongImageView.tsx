@@ -28,6 +28,58 @@ const TAGLINE =
   "Scan the QR code next to each step to watch that moment in the video. No searching. No scrubbing. Just make.";
 
 /**
+ * Heuristic only for the long-image export (no DB field). Prefer crochet when
+ * the title/description clearly describe yarn work; otherwise treat strong
+ * cooking/recipe signals as a recipe guide.
+ */
+function inferLongImageRecipeGuide(sku: LongImageSku): boolean {
+  const name = (sku.name ?? "").toLowerCase();
+  const desc = (sku.description ?? "").toLowerCase();
+  const matRaw = stripLeadingMaterialsMetaLines(
+    (sku.materials_text ?? "").trim()
+  ).toLowerCase();
+  const toolsRaw = stripLeadingMaterialsMetaLines(
+    (sku.tools_text ?? "").trim()
+  ).toLowerCase();
+  const head = `${name}\n${desc}`;
+  const blob = `${head}\n${matRaw}\n${toolsRaw}`;
+
+  const crochetDominant =
+    /\b(crochet|amigurumi|yarn(?:\s|$|,|weight)|crochet hook|knitting needles?|granny square|magic ring| slip stitch|single crochet|double crochet|half double| hdc\b|\bsc\b|\bdc\b|stitch count|round\s+\d+)\b/i.test(
+      head
+    );
+
+  const recipeLex =
+    /\b(recipe|how to cook|cooking tutorial|bake(?:d|r|s)?|baking|in the oven|preheat|tablespoon|teaspoon|\btsp\b|\btbsp\b|simmer|bring to a boil|saut[eé]|marinate|brais(e|ed)|broil|grill(?:ing)?|meal prep|pastry|frosting|icing|sous vide|slow cooker|instant pot|air fryer|wok\b|julienne| mise en place)\b/i.test(
+      blob
+    );
+
+  const foodInMaterials =
+    /\b(flour|sugar|butter|salt|pepper|olive oil|vegetable oil|garlic|onion|chicken|beef|pork|fish|egg[s]?|milk|cream|cheese|tomato|potato|carrot|rice|pasta|noodle|broth|stock|soy sauce|vinegar|yeast|baking powder|baking soda|heavy cream|all[- ]purpose flour)\b/i.test(
+      matRaw
+    );
+  const measuresInMaterials =
+    /\b(\d+\s*(tsp|tbsp|cup|cups|g|grams?|ml|oz|lb|lbs|pound|tablespoon|teaspoon)|\d+\/\d+\s*cup)\b/i.test(
+      matRaw
+    );
+  const recipeFromIngredients = foodInMaterials && measuresInMaterials;
+
+  if (crochetDominant && !recipeLex && !recipeFromIngredients) {
+    return false;
+  }
+  if (recipeLex || recipeFromIngredients) {
+    return true;
+  }
+  if (
+    /\b(cook(ing)?|recipe|kitchen|food)\b/i.test(head) &&
+    !crochetDominant
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * YouTube `hqdefault.jpg` is 480×360 (4:3) and includes black letterbox bars
  * on the top and bottom of the actual content. We swap to `mqdefault.jpg`
  * (320×180, 16:9, no letterboxing) for the long image so the cover renders
@@ -93,6 +145,19 @@ function parseItemsFromText(raw: string): string[] {
     .filter(Boolean);
 }
 
+function MaterialsItemsList({ items }: { items: string[] }) {
+  return (
+    <div className="pmli-materials-list">
+      {items.map((item, i) => (
+        <div key={i} className="pmli-mat-item">
+          <span className="pmli-mat-dot" />
+          <span className="pmli-mat-text">{item}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * Column count for the steps grid. Spec pins 6→3 and 8→4. Other counts aim for
  * roughly two rows where it looks balanced.
@@ -151,13 +216,21 @@ export function LongImageView({
   const materialItems = parseItemsFromText(materialsBody);
   const toolItems = parseItemsFromText(toolsBody);
   const combinedItems = [...materialItems, ...toolItems];
+  const isRecipe = inferLongImageRecipeGuide(sku);
   const hasMaterialsSection = combinedItems.length > 0;
+  const hasIngredientsBlock = materialItems.length > 0;
+  const hasToolsBlock = toolItems.length > 0;
+  const showRecipeMaterials =
+    isRecipe && (hasIngredientsBlock || hasToolsBlock);
+  const showCraftMaterials =
+    !isRecipe && hasMaterialsSection;
 
   const stepCount = steps.length;
   const cols = stepsGridColumns(stepCount);
   const gridStyle = { gridTemplateColumns: `repeat(${cols}, 1fr)` };
 
   const bylineCreator = resolveBylineCreator(sku);
+  const eyebrowKind = isRecipe ? "RECIPE GUIDE" : "CROCHET GUIDE";
 
   return (
     <div className="pmli-root" id="pm-long-image-root">
@@ -175,7 +248,9 @@ export function LongImageView({
 
       {/* Section 2: Cover text */}
       <div className="pmli-cover-text">
-        <div className="pmli-eyebrow">CROCHET GUIDE · LINKSYLLABUS.COM</div>
+        <div className="pmli-eyebrow">
+          {eyebrowKind} · LINKSYLLABUS.COM
+        </div>
         <h1 className="pmli-title">{sku.name}</h1>
         {bylineCreator ? (
           <div className="pmli-byline">
@@ -187,26 +262,40 @@ export function LongImageView({
             {stepCount} {stepCount === 1 ? "step" : "steps"}
           </span>
           <span className="pmli-tag pmli-tag-green">{sku.display_level}</span>
-          {hasMaterialsSection ? (
-            <span className="pmli-tag pmli-tag-gray">Materials &amp; tools included</span>
+          {showRecipeMaterials || showCraftMaterials ? (
+            <span className="pmli-tag pmli-tag-gray">
+              {isRecipe
+                ? "Ingredients & tools included"
+                : "Materials & tools included"}
+            </span>
           ) : null}
           <span className="pmli-tag pmli-tag-gray">QR-linked steps</span>
         </div>
         <div className="pmli-tagline">{TAGLINE}</div>
       </div>
 
-      {/* Section 3: Materials & Tools (optional) */}
-      {hasMaterialsSection ? (
+      {/* Section 3: Materials / ingredients (optional) */}
+      {showRecipeMaterials ? (
+        <div className="pmli-materials">
+          {hasIngredientsBlock ? (
+            <div className="pmli-materials-sub">
+              <div className="pmli-section-label">INGREDIENTS</div>
+              <MaterialsItemsList items={materialItems} />
+            </div>
+          ) : null}
+          {hasToolsBlock ? (
+            <div
+              className={`pmli-materials-sub${hasIngredientsBlock ? " pmli-materials-sub-after" : ""}`}
+            >
+              <div className="pmli-section-label">TOOLS</div>
+              <MaterialsItemsList items={toolItems} />
+            </div>
+          ) : null}
+        </div>
+      ) : showCraftMaterials ? (
         <div className="pmli-materials">
           <div className="pmli-section-label">MATERIALS &amp; TOOLS</div>
-          <div className="pmli-materials-list">
-            {combinedItems.map((item, i) => (
-              <div key={i} className="pmli-mat-item">
-                <span className="pmli-mat-dot" />
-                <span className="pmli-mat-text">{item}</span>
-              </div>
-            ))}
-          </div>
+          <MaterialsItemsList items={combinedItems} />
         </div>
       ) : null}
 

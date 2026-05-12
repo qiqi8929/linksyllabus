@@ -193,6 +193,12 @@
   gap: 4px 18px;
 }
 
+.pmli-root .pmli-materials-sub + .pmli-materials-sub.pmli-materials-sub-after {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e8e4de;
+}
+
 .pmli-root .pmli-mat-item {
   display: inline-flex;
   align-items: center;
