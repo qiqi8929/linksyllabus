@@ -41,6 +41,7 @@ create table if not exists public.steps (
   youtube_url text not null,
   start_time int not null default 0,
   end_time int not null,
+  timestamp_source text,
   scan_count int not null default 0,
   created_at timestamptz not null default now(),
   unique (sku_id, step_number)

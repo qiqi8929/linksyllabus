@@ -65,7 +65,7 @@ function parseDescriptionsPayload(raw: string): { descriptions: string[] } {
 }
 
 /**
- * Uses YouTube transcript + Gemini to estimate clip bounds for a single step.
+ * Uses Gemini (+ optional fallbacks) to estimate clip bounds for a single step.
  */
 export async function extractVideoTimestamps(
   youtubeUrl: string,
@@ -634,6 +634,135 @@ async function generateContentPlainText(
   }
   onGemini?.({ responseJson: data, modelText: text });
   return text;
+}
+
+function firstSentenceHint(description: string, maxLen: number): string {
+  const t = String(description ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) return "";
+  const m = t.match(/^([\s\S]{1,500}?[.!?…])(\s|$)/);
+  const chunk = m ? String(m[1]).trim() : t.slice(0, maxLen);
+  if (chunk.length <= maxLen) return chunk;
+  return `${chunk.slice(0, maxLen)}…`;
+}
+
+function parseTranscriptClipsPayload(raw: string): Array<{
+  step_number: number;
+  start_time_seconds: number;
+  end_time_seconds: number;
+}> {
+  let s = raw.trim();
+  s = s.replace(/^```(?:json)?\s*\r?\n?/i, "");
+  s = s.replace(/\r?\n?```\s*$/i, "");
+  s = s.trim();
+
+  const coerce = (chunk: string) => {
+    const o = JSON.parse(chunk) as { clips?: unknown };
+    if (!Array.isArray(o.clips)) return null;
+    const out: Array<{
+      step_number: number;
+      start_time_seconds: number;
+      end_time_seconds: number;
+    }> = [];
+    for (const item of o.clips) {
+      if (!item || typeof item !== "object") continue;
+      const it = item as Record<string, unknown>;
+      const step_number = Math.floor(
+        Number(it.step_number ?? it.stepNumber ?? it.n ?? 0)
+      );
+      const start_time_seconds = Math.floor(
+        Number(it.start_time_seconds ?? it.start_time ?? it.startSec ?? it.start ?? 0)
+      );
+      const end_time_seconds = Math.floor(
+        Number(it.end_time_seconds ?? it.end_time ?? it.endSec ?? it.end ?? it.stop ?? 0)
+      );
+      if (!Number.isFinite(step_number) || step_number < 1) continue;
+      out.push({ step_number, start_time_seconds, end_time_seconds });
+    }
+    return out.length ? out : null;
+  };
+
+  try {
+    const r = coerce(s);
+    if (r) return r;
+  } catch {
+    /* fall through */
+  }
+
+  const start = s.indexOf("{");
+  const end = s.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      const r = coerce(s.slice(start, end + 1));
+      if (r) return r;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  throw new Error(
+    `Gemini transcript clips: expected JSON with clips[]; got: ${raw.length > 220 ? `${raw.slice(0, 220)}…` : raw}`
+  );
+}
+
+/**
+ * Maps each tutorial step to a clip in the video using Gemini + timed transcript text.
+ */
+export async function inferTutorialStepClipsFromTranscript(params: {
+  videoId: string;
+  transcriptText: string;
+  steps: Array<{ step_number: number; step_name: string; description: string }>;
+  onGemini?: (payload: GeminiTimestampsDebugPayload) => void;
+}): Promise<Map<number, { start_time: number; end_time: number }>> {
+  const { videoId, transcriptText, steps, onGemini } = params;
+  const out = new Map<number, { start_time: number; end_time: number }>();
+  if (!steps.length || !transcriptText.trim()) return out;
+
+  const wanted = new Set(steps.map((s) => s.step_number));
+  const stepLines = steps
+    .map((s) => {
+      const hint = firstSentenceHint(s.description, 320);
+      return `${s.step_number}. ${String(s.step_name).trim()} | ${hint}`.trim();
+    })
+    .join("\n");
+
+  const nums = [...wanted].sort((a, b) => a - b).join(", ");
+  const prompt = `YouTube video ID: ${videoId}
+
+TRANSCRIPT (each line is [seconds] spoken text):
+${transcriptText}
+
+Tutorial steps (find where each step begins in the transcript; use title + hint):
+${stepLines}
+
+Return ONLY valid JSON, no markdown fences, exact shape:
+{"clips":[{"step_number":1,"start_time_seconds":0,"end_time_seconds":45},...]}
+
+Rules:
+- Include exactly one clip per step_number: ${nums}
+- Whole seconds from video start.
+- end_time_seconds must be at least 15 greater than start_time_seconds.
+- Times must be justified by transcript content near those seconds (no arbitrary guesses).`;
+
+  try {
+    const text = await generateContentPlainText(prompt, 0.15, onGemini);
+    const rows = parseTranscriptClipsPayload(text);
+    for (const row of rows) {
+      if (!wanted.has(row.step_number)) continue;
+      let st = Math.floor(Number(row.start_time_seconds));
+      let en = Math.floor(Number(row.end_time_seconds));
+      if (!Number.isFinite(st) || !Number.isFinite(en)) continue;
+      if (st < 0) st = 0;
+      if (en <= st) en = st + 30;
+      if (en - st < 15) en = st + 15;
+      if (en - st > 900) en = st + 900;
+      out.set(row.step_number, { start_time: st, end_time: en });
+    }
+  } catch (e: unknown) {
+    console.error("[gemini] inferTutorialStepClipsFromTranscript failed", e);
+  }
+  return out;
 }
 
 function linearEstimatedTimestamps(

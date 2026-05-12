@@ -60,7 +60,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Step name is required." }, { status: 400 });
     }
     try {
-      // Transcript is fetched inside extractVideoTimestamps → matchStepsToTranscript
       const result = await extractVideoTimestamps(youtubeUrl, stepName, {
         onGemini: (payload) => {
           if (mode === "timestamps") {
@@ -115,6 +114,13 @@ export async function POST(req: Request) {
     endTime: Number(s.endTime ?? 0)
   }));
 
+  const clipsForModel = steps.map((s) => {
+    const unset = s.startTime === 0 && s.endTime === 0;
+    return unset
+      ? { ...s, startTime: 0, endTime: 120 }
+      : { ...s };
+  });
+
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
     if (!s.stepName || !s.videoUrl) {
@@ -123,20 +129,28 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+    const unset = s.startTime === 0 && s.endTime === 0;
     if (
-      !Number.isFinite(s.startTime) ||
-      !Number.isFinite(s.endTime) ||
-      s.endTime <= s.startTime
+      !unset &&
+      (!Number.isFinite(s.startTime) ||
+        !Number.isFinite(s.endTime) ||
+        s.endTime <= s.startTime)
     ) {
       return NextResponse.json(
         { error: `Step ${i + 1}: end time must be greater than start time (seconds).` },
         { status: 400 }
       );
     }
+    if (unset && (!Number.isFinite(s.startTime) || !Number.isFinite(s.endTime))) {
+      return NextResponse.json(
+        { error: `Step ${i + 1}: invalid clip times (seconds).` },
+        { status: 400 }
+      );
+    }
   }
 
   try {
-    const descriptions = await generateStepDescriptions(tutorialName, steps);
+    const descriptions = await generateStepDescriptions(tutorialName, clipsForModel);
     return NextResponse.json({ descriptions });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Generation failed";

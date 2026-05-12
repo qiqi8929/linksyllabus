@@ -154,7 +154,7 @@ function emptyStep(): StepRow {
     id: makeId(),
     step_name: "",
     start_time: 0,
-    end_time: 60,
+    end_time: 0,
     description: ""
   };
 }
@@ -559,10 +559,16 @@ export function TutorialCreator({
             id: makeId(),
             step_name: String(s?.step_name ?? "").trim(),
             start_time: Math.floor(Number(s?.start_time ?? 0)),
-            end_time: Math.floor(Number(s?.end_time ?? 60)),
+            end_time: Math.floor(Number(s?.end_time ?? 0)),
             description: String(s?.description ?? "").trim()
           }))
-          .filter((s) => s.step_name || s.description || s.end_time > s.start_time);
+          .filter(
+            (s) =>
+              s.step_name ||
+              s.description ||
+              s.end_time > s.start_time ||
+              (s.start_time === 0 && s.end_time === 0)
+          );
         if (restored.length > 0) {
           setSteps(restored);
         }
@@ -627,9 +633,9 @@ export function TutorialCreator({
       if (
         !Number.isFinite(s.start_time) ||
         !Number.isFinite(s.end_time) ||
-        s.end_time <= s.start_time
+        (!(s.start_time === 0 && s.end_time === 0) && s.end_time <= s.start_time)
       ) {
-        return `Step ${i + 1}: end time must be greater than start time (seconds).`;
+        return `Step ${i + 1}: end time must be greater than start time (seconds), or use 0 and 0 to mark an unset clip.`;
       }
     }
     return null;

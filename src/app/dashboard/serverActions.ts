@@ -9,6 +9,7 @@ import {
 import { activateSkuFromCheckoutSession } from "@/lib/stripe/skuActivation";
 import { getStripe } from "@/lib/stripe/server";
 import { env } from "@/lib/env";
+import { applyAiTranscriptTimestampsForSku } from "@/lib/applyAiTranscriptTimestampsForSku";
 import {
   FREE_TIER_UPGRADE_MESSAGE,
   maxAllowedGuides
@@ -145,6 +146,7 @@ export async function createInactiveSkuWithSteps(payload: {
     youtube_url: string;
     start_time: number;
     end_time: number;
+    timestamp_source: "chapter" | null;
   }[] = [];
   for (let idx = 0; idx < payload.steps.length; idx++) {
     const s = payload.steps[idx];
@@ -164,11 +166,15 @@ export async function createInactiveSkuWithSteps(payload: {
         kind: "validation"
       };
     }
-    if (
-      !Number.isFinite(endRaw) ||
-      !Number.isFinite(end_time) ||
-      end_time <= start_time
-    ) {
+    const unsetClip = start_time === 0 && end_time === 0;
+    if (!Number.isFinite(endRaw) || !Number.isFinite(end_time)) {
+      return {
+        ok: false,
+        message: `Step ${idx + 1}: end time (seconds) must be a valid number.`,
+        kind: "validation"
+      };
+    }
+    if (!unsetClip && end_time <= start_time) {
       return {
         ok: false,
         message: `Step ${idx + 1}: end time (seconds) must be greater than start time.`,
@@ -182,7 +188,9 @@ export async function createInactiveSkuWithSteps(payload: {
       description,
       youtube_url,
       start_time,
-      end_time
+      end_time,
+      timestamp_source:
+        start_time === 0 && end_time === 0 ? null : ("chapter" as const)
     });
   }
 
@@ -443,7 +451,8 @@ export async function createInactiveSkuWithSteps(payload: {
     description: r.description,
     youtube_url: r.youtube_url,
     start_time: r.start_time,
-    end_time: r.end_time
+    end_time: r.end_time,
+    timestamp_source: r.timestamp_source
   }));
 
   const { error: stepErr } = await supabase.from("steps").insert(rows);
@@ -454,6 +463,20 @@ export async function createInactiveSkuWithSteps(payload: {
         stepErr
       )}`
     );
+  }
+
+  try {
+    const ai = await applyAiTranscriptTimestampsForSku(supabase, {
+      skuId: sku.id,
+      userId: user.id
+    });
+    if (ai.updated > 0) {
+      revalidatePath("/dashboard");
+      revalidatePath(`/tutorial/${sku.id}`);
+      revalidatePath(`/tutorial/${sku.id}/print`);
+    }
+  } catch (e: unknown) {
+    console.error("[createInactiveSkuWithSteps] transcript timestamp AI failed", e);
   }
 
   return { ok: true, skuId: sku.id, checkoutRequired: false };
@@ -737,7 +760,8 @@ export async function updateTutorialAction(
         description: String(s.description ?? "").trim(),
         youtube_url,
         start_time,
-        end_time
+        end_time,
+        timestamp_source: "manual"
       })
       .eq("id", s.id)
       .eq("sku_id", skuId);
