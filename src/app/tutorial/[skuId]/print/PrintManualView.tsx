@@ -76,8 +76,8 @@ function StepBlock({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={qrSrc} alt="" width={80} height={80} />
             </div>
+            <span className="pm-qr-caption">Scan or tap to watch</span>
           </a>
-          <span className="pm-qr-caption">Scan or tap to watch</span>
         </div>
       </div>
     </div>
@@ -158,10 +158,10 @@ export function PrintManualView({
                   height={112}
                 />
               </div>
+              <span className="pm-cover-qr-caption">
+                Scan or tap to follow along on your phone
+              </span>
             </a>
-            <span className="pm-cover-qr-caption">
-              Scan or tap to follow along on your phone
-            </span>
           </div>
         </div>
       </div>

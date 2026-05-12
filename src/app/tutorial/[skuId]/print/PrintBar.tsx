@@ -1,5 +1,6 @@
 "use client";
 
+import html2canvas from "html2canvas";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -8,6 +9,31 @@ const SHARE_TEXT =
 
 const PM_MANUAL_ROOT_ID = "pm-manual-root";
 const PNG_EXPORT_MAX_EDGE_PX = 14_000;
+
+/** 1×1 transparent GIF — html2canvas cannot paint most cross-origin photos without tainting the canvas. */
+const TRANSPARENT_PIXEL_GIF =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+function neutralizeCrossOriginImagesInClone(clonedRoot: HTMLElement) {
+  const origin = window.location.origin;
+  clonedRoot.querySelectorAll("img").forEach((node) => {
+    const img = node as HTMLImageElement;
+    const raw = (img.currentSrc || img.getAttribute("src") || "").trim();
+    if (!raw) {
+      return;
+    }
+    let resolved: URL;
+    try {
+      resolved = new URL(raw, origin);
+    } catch {
+      return;
+    }
+    if (resolved.origin !== origin) {
+      img.removeAttribute("srcset");
+      img.src = TRANSPARENT_PIXEL_GIF;
+    }
+  });
+}
 
 function pickHtml2CanvasScale(width: number, height: number): number {
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
@@ -34,14 +60,17 @@ export function PrintBar({
   const [copied, setCopied] = useState(false);
   const [pngBusy, setPngBusy] = useState(false);
   const [pngError, setPngError] = useState<string | null>(null);
+  const [pngOk, setPngOk] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pngErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pngOkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pngExportingRef = useRef(false);
 
   useEffect(
     () => () => {
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       if (pngErrorTimerRef.current) clearTimeout(pngErrorTimerRef.current);
+      if (pngOkTimerRef.current) clearTimeout(pngOkTimerRef.current);
     },
     []
   );
@@ -88,13 +117,17 @@ export function PrintBar({
     pngExportingRef.current = true;
     setPngBusy(true);
     setPngError(null);
+    setPngOk(false);
     if (pngErrorTimerRef.current) {
       clearTimeout(pngErrorTimerRef.current);
       pngErrorTimerRef.current = null;
     }
 
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    window.scrollTo(0, 0);
+
     try {
-      const { default: html2canvas } = await import("html2canvas");
       const w = root.scrollWidth;
       const h = root.scrollHeight;
       const scale = pickHtml2CanvasScale(w, h);
@@ -105,8 +138,12 @@ export function PrintBar({
         scale,
         useCORS: true,
         allowTaint: false,
+        foreignObjectRendering: false,
         logging: false,
-        backgroundColor: bg || "#f5f2ee"
+        backgroundColor: bg || "#f5f2ee",
+        onclone: (_doc, cloned) => {
+          neutralizeCrossOriginImagesInClone(cloned);
+        }
       });
 
       await new Promise<void>((resolve, reject) => {
@@ -130,7 +167,14 @@ export function PrintBar({
           "image/png"
         );
       });
+      setPngOk(true);
+      if (pngOkTimerRef.current) clearTimeout(pngOkTimerRef.current);
+      pngOkTimerRef.current = setTimeout(() => {
+        setPngOk(false);
+        pngOkTimerRef.current = null;
+      }, 3500);
     } catch (e) {
+      setPngOk(false);
       const msg = e instanceof Error ? e.message : "Export failed.";
       setPngError(msg);
       pngErrorTimerRef.current = setTimeout(() => {
@@ -138,6 +182,7 @@ export function PrintBar({
         pngErrorTimerRef.current = null;
       }, 5000);
     } finally {
+      window.scrollTo(scrollX, scrollY);
       pngExportingRef.current = false;
       setPngBusy(false);
     }
@@ -182,6 +227,11 @@ export function PrintBar({
       {pngError ? (
         <span className="pm-png-error" role="status">
           {pngError}
+        </span>
+      ) : null}
+      {pngOk && !pngError ? (
+        <span className="pm-png-ok" role="status">
+          Saved — check your Downloads folder. 已保存，请查看下载文件夹。
         </span>
       ) : null}
     </div>

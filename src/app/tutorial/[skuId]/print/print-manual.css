@@ -74,6 +74,14 @@
   margin: -4px 0 0;
 }
 
+#pm-root .pm-png-ok {
+  flex-basis: 100%;
+  text-align: right;
+  font-size: 13px;
+  color: #15803d;
+  margin: -4px 0 0;
+}
+
 #pm-root .pm-print-btn {
   display: inline-flex;
   align-items: center;
@@ -162,12 +170,15 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 0;
   padding-top: 8px;
 }
 
 #pm-root .pm-cover-qr-link {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   text-decoration: none;
   color: inherit;
   border-radius: 12px;
@@ -475,11 +486,15 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 0;
 }
 
 #pm-root .pm-qr-link {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   text-decoration: none;
   color: inherit;
   border-radius: 10px;
@@ -522,6 +537,10 @@
   letter-spacing: 0.5px;
   text-align: center;
   text-transform: uppercase;
+}
+
+#pm-root .pm-qr-link .pm-qr-caption {
+  color: var(--light-muted);
 }
 
 #pm-root .pm-page-footer {
