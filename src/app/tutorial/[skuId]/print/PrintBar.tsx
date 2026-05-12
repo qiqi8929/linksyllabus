@@ -15,32 +15,94 @@ const PNG_EXPORT_MAX_EDGE_PX = 14_000;
 const TRANSPARENT_PIXEL_GIF =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
-function neutralizeCrossOriginImagesInClone(clonedRoot: HTMLElement) {
+/**
+ * Prefetch cross-origin images via our proxy as blob: URLs and wait for decode.
+ * html2canvas often paints before async img loads when only swapping src in onclone.
+ */
+async function rewriteImagesForHtml2Canvas(root: HTMLElement): Promise<() => void> {
   const origin = window.location.origin;
-  clonedRoot.querySelectorAll("img").forEach((node) => {
-    const img = node as HTMLImageElement;
-    const raw = (img.currentSrc || img.getAttribute("src") || "").trim();
-    if (!raw || raw.startsWith("data:")) {
-      return;
+  const blobUrls: string[] = [];
+  const revert: { img: HTMLImageElement; src: string; srcset: string | null }[] = [];
+
+  try {
+    for (const node of Array.from(root.querySelectorAll("img"))) {
+      const img = node as HTMLImageElement;
+      const raw = (img.currentSrc || img.getAttribute("src") || "").trim();
+      if (!raw || raw.startsWith("data:")) {
+        continue;
+      }
+
+      let resolved: URL;
+      try {
+        resolved = new URL(raw, origin);
+      } catch {
+        continue;
+      }
+      if (resolved.origin === origin) {
+        continue;
+      }
+
+      revert.push({
+        img,
+        src: raw,
+        srcset: img.getAttribute("srcset")
+      });
+      img.removeAttribute("srcset");
+
+      if (isAllowedPrintImageProxyUrl(resolved)) {
+        try {
+          const res = await fetch(
+            `${origin}/api/print-image-proxy?url=${encodeURIComponent(resolved.href)}`
+          );
+          if (!res.ok) {
+            img.src = TRANSPARENT_PIXEL_GIF;
+            continue;
+          }
+          const blob = await res.blob();
+          const u = URL.createObjectURL(blob);
+          blobUrls.push(u);
+          img.src = u;
+        } catch {
+          img.src = TRANSPARENT_PIXEL_GIF;
+        }
+      } else {
+        img.src = TRANSPARENT_PIXEL_GIF;
+      }
     }
-    let resolved: URL;
-    try {
-      resolved = new URL(raw, origin);
-    } catch {
-      return;
+
+    await Promise.all(
+      Array.from(root.querySelectorAll("img")).map((el) =>
+        (el as HTMLImageElement).decode().catch(() => undefined)
+      )
+    );
+  } catch (e) {
+    for (const u of blobUrls) {
+      URL.revokeObjectURL(u);
     }
-    if (resolved.origin === origin) {
-      return;
+    for (const { img, src, srcset } of revert) {
+      img.src = src;
+      if (srcset) {
+        img.setAttribute("srcset", srcset);
+      } else {
+        img.removeAttribute("srcset");
+      }
     }
-    img.removeAttribute("srcset");
-    /* Same-origin proxy so html2canvas can paint covers (YouTube thumbs, etc.). */
-    if (isAllowedPrintImageProxyUrl(resolved)) {
-      img.src = `${origin}/api/print-image-proxy?url=${encodeURIComponent(resolved.href)}`;
-      img.removeAttribute("crossorigin");
-      return;
+    throw e;
+  }
+
+  return () => {
+    for (const u of blobUrls) {
+      URL.revokeObjectURL(u);
     }
-    img.src = TRANSPARENT_PIXEL_GIF;
-  });
+    for (const { img, src, srcset } of revert) {
+      img.src = src;
+      if (srcset) {
+        img.setAttribute("srcset", srcset);
+      } else {
+        img.removeAttribute("srcset");
+      }
+    }
+  };
 }
 
 function pickHtml2CanvasScale(width: number, height: number): number {
@@ -135,23 +197,44 @@ export function PrintBar({
     const scrollY = window.scrollY;
     window.scrollTo(0, 0);
 
+    const pmRoot = document.getElementById("pm-root");
+    if (!pmRoot) {
+      setPngError("Layout not ready.");
+      pngExportingRef.current = false;
+      setPngBusy(false);
+      window.scrollTo(scrollX, scrollY);
+      return;
+    }
+
+    const clone = root.cloneNode(true) as HTMLElement;
+    clone.removeAttribute("id");
+    clone.setAttribute("aria-hidden", "true");
+    clone.style.cssText = [
+      "position:fixed",
+      "left:-99999px",
+      "top:0",
+      `width:${Math.max(1, Math.ceil(root.scrollWidth))}px`,
+      "pointer-events:none",
+      "z-index:2147483646",
+      "margin:0"
+    ].join(";");
+
+    let restoreImages: (() => void) | undefined;
     try {
-      const w = root.scrollWidth;
-      const h = root.scrollHeight;
+      pmRoot.appendChild(clone);
+      restoreImages = await rewriteImagesForHtml2Canvas(clone);
+
+      const w = clone.scrollWidth;
+      const h = clone.scrollHeight;
       const scale = pickHtml2CanvasScale(w, h);
-      const pmRoot = document.getElementById("pm-root");
-      const bg =
-        pmRoot != null ? getComputedStyle(pmRoot).backgroundColor : "rgb(245, 242, 238)";
-      const canvas = await html2canvas(root, {
+      const bg = getComputedStyle(pmRoot).backgroundColor;
+      const canvas = await html2canvas(clone, {
         scale,
         useCORS: true,
         allowTaint: false,
         foreignObjectRendering: false,
         logging: false,
-        backgroundColor: bg || "#f5f2ee",
-        onclone: (_doc, cloned) => {
-          neutralizeCrossOriginImagesInClone(cloned);
-        }
+        backgroundColor: bg || "#f5f2ee"
       });
 
       await new Promise<void>((resolve, reject) => {
@@ -190,6 +273,8 @@ export function PrintBar({
         pngErrorTimerRef.current = null;
       }, 5000);
     } finally {
+      restoreImages?.();
+      clone.remove();
       window.scrollTo(scrollX, scrollY);
       pngExportingRef.current = false;
       setPngBusy(false);
