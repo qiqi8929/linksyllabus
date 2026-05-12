@@ -1,0 +1,314 @@
+/*
+ * Styles for the "Download as long image" PNG output.
+ *
+ * Scoped to .pmli-root (a class, not an id) because the PNG export in
+ * PrintBar.tsx clones the root and strips its id; classes survive the clone
+ * so html2canvas captures the styled clone correctly.
+ *
+ * Completely independent from print-manual.css / the PDF path.
+ *
+ * Layout target: 595px wide A4 column, grows to fit content vertically.
+ */
+
+.pmli-host {
+  position: fixed;
+  left: -99999px;
+  top: 0;
+  width: 595px;
+  pointer-events: none;
+  z-index: -1;
+  margin: 0;
+  padding: 0;
+}
+
+@media print {
+  .pmli-host {
+    display: none !important;
+  }
+}
+
+.pmli-root,
+.pmli-root *,
+.pmli-root *::before,
+.pmli-root *::after {
+  box-sizing: border-box;
+}
+
+.pmli-root {
+  width: 595px;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---------- Section 1: Cover image ---------- */
+
+.pmli-root .pmli-cover-image {
+  width: 595px;
+  height: 200px;
+  overflow: hidden;
+  position: relative;
+  background: #f1efe8;
+  line-height: 0;
+}
+
+.pmli-root .pmli-cover-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pmli-root .pmli-cover-image-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+  background: linear-gradient(180deg, #1D9E75 0%, #157d5d 100%);
+  color: #ffffff;
+  font-family: var(--font-pm-playfair), "Playfair Display", Georgia, serif;
+  font-size: 22px;
+  line-height: 1.3;
+  text-align: center;
+}
+
+/* ---------- Section 2: Cover text ---------- */
+
+.pmli-root .pmli-cover-text {
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid #e8e4de;
+  background: #ffffff;
+}
+
+.pmli-root .pmli-eyebrow {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: #1D9E75;
+  font-weight: 500;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.pmli-root .pmli-title {
+  font-family: var(--font-pm-playfair), "Playfair Display", Georgia, serif;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: #1a1a1a;
+  margin: 0 0 6px;
+}
+
+.pmli-root .pmli-byline {
+  font-size: 10px;
+  color: #888;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+
+.pmli-root .pmli-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+}
+
+.pmli-root .pmli-tag {
+  display: inline-block;
+  font-size: 9px;
+  line-height: 1.5;
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.pmli-root .pmli-tag-green {
+  background: #E1F5EE;
+  color: #0F6E56;
+}
+
+.pmli-root .pmli-tag-gray {
+  background: #f1efe8;
+  color: #5a5855;
+}
+
+.pmli-root .pmli-tagline {
+  font-size: 9.5px;
+  color: #999;
+  font-style: italic;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+/* ---------- Section 3: Materials & Tools ---------- */
+
+.pmli-root .pmli-materials {
+  padding: 11px 20px 12px;
+  background: #fafaf8;
+  border-bottom: 1px solid #e8e4de;
+}
+
+.pmli-root .pmli-section-label {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: #aaa;
+  font-weight: 500;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+  margin: 0 0 7px;
+  text-transform: uppercase;
+}
+
+.pmli-root .pmli-materials-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.pmli-root .pmli-mat-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: #555;
+  line-height: 1.5;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+}
+
+.pmli-root .pmli-mat-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #5DCAA5;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.pmli-root .pmli-mat-text {
+  display: inline-block;
+}
+
+/* ---------- Section 4: Steps ---------- */
+
+.pmli-root .pmli-steps {
+  padding: 12px 20px 16px;
+  background: #ffffff;
+}
+
+.pmli-root .pmli-steps-grid {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+}
+
+.pmli-root .pmli-step {
+  background: #f8f6f3;
+  border: 0.5px solid #e8e4de;
+  border-radius: 5px;
+  padding: 9px 9px 32px;
+  position: relative;
+  /* Keep card text fully visible — no clamp, no overflow hidden. */
+  overflow: visible;
+  min-width: 0;
+}
+
+.pmli-root .pmli-step-num {
+  font-size: 8px;
+  font-weight: 600;
+  color: #1D9E75;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+  line-height: 1.2;
+}
+
+.pmli-root .pmli-step-title {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #1a1a1a;
+  line-height: 1.3;
+  margin-bottom: 4px;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+  /* Allow long words to wrap inside narrow columns instead of overflowing. */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.pmli-root .pmli-step-desc {
+  font-size: 9px;
+  color: #666;
+  line-height: 1.55;
+  padding-right: 30px;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.pmli-root .pmli-step-desc p {
+  margin: 0 0 4px;
+}
+
+.pmli-root .pmli-step-desc p:last-child {
+  margin-bottom: 0;
+}
+
+.pmli-root .pmli-qr {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: 0.5px solid #ccc;
+  border-radius: 3px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px;
+}
+
+.pmli-root .pmli-qr img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.pmli-root .pmli-steps-empty {
+  font-size: 10px;
+  color: #888;
+  padding: 12px 0;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+}
+
+/* ---------- Section 5: Footer ---------- */
+
+.pmli-root .pmli-footer {
+  padding: 7px 20px;
+  border-top: 1px solid #e8e4de;
+  background: #fafaf8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.pmli-root .pmli-footer-left,
+.pmli-root .pmli-footer-right {
+  font-size: 8px;
+  color: #bbb;
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+  line-height: 1.4;
+}

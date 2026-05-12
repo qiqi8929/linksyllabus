@@ -8,7 +8,11 @@ import { isAllowedPrintImageProxyUrl } from "@/lib/printImageProxy";
 const SHARE_TEXT =
   "Step-by-step guide with QR codes · Free at linksyllabus.com";
 
-const PM_MANUAL_ROOT_ID = "pm-manual-root";
+/**
+ * The "Download as long image" button captures the LongImageView render only.
+ * The PDF path (window.print) still targets the existing PrintManualView.
+ */
+const PM_LONG_IMAGE_ROOT_ID = "pm-long-image-root";
 const PNG_EXPORT_MAX_EDGE_PX = 14_000;
 
 /** 1×1 transparent GIF — html2canvas cannot paint most cross-origin photos without tainting the canvas. */
@@ -178,7 +182,7 @@ export function PrintBar({
 
   const handleDownloadLongPng = useCallback(async () => {
     if (pngExportingRef.current) return;
-    const root = document.getElementById(PM_MANUAL_ROOT_ID);
+    const root = document.getElementById(PM_LONG_IMAGE_ROOT_ID);
     if (!root) {
       setPngError("Guide not found on page.");
       return;

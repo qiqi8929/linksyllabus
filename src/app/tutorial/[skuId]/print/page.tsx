@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { extractYouTubeVideoId } from "@/lib/video";
 import { fetchSkuVisibleToViewer, fetchTutorialSteps } from "../tutorialAccess";
+import { LongImageView } from "./LongImageView";
 import { PrintBar } from "./PrintBar";
 import { PrintManualView, type SkuPrint } from "./PrintManualView";
 import { resolvePrintBranding } from "./resolvePrintBranding";
@@ -93,7 +94,7 @@ export default async function TutorialPrintPage({
   const steps = stepRows ?? [];
 
   const row = sku as SkuRow;
-  const { displayLevel } = resolvePrintBranding({
+  const { displayCreatorName, displayLevel } = resolvePrintBranding({
     creator_name: row.creator_name,
     author: row.author,
     level: row.level
@@ -131,6 +132,27 @@ export default async function TutorialPrintPage({
         pngDownloadBasename={pngDownloadBasename(row.name, row.id)}
       />
       <PrintManualView sku={skuPrint} steps={steps} />
+      {/*
+        Off-screen render used only by the "Download as long image" button.
+        Hidden from screen and from @media print (see long-image.css .pmli-host),
+        so it never alters the PDF output. html2canvas targets #pm-long-image-root.
+      */}
+      <div className="pmli-host" aria-hidden>
+        <LongImageView
+          sku={{
+            id: row.id,
+            name: row.name,
+            description: row.description ?? "",
+            level: row.level ?? null,
+            materials_text: row.materials_text ?? null,
+            tools_text: row.tools_text ?? null,
+            display_level: displayLevel,
+            display_creator_name: displayCreatorName,
+            cover_hero_image_url: coverHeroImageUrl
+          }}
+          steps={steps}
+        />
+      </div>
     </div>
   );
 }
