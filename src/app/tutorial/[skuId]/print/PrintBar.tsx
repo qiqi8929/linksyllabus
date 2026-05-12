@@ -3,6 +3,7 @@
 import html2canvas from "html2canvas";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isAllowedPrintImageProxyUrl } from "@/lib/printImageProxy";
 
 const SHARE_TEXT =
   "Step-by-step guide with QR codes · Free at linksyllabus.com";
@@ -19,7 +20,7 @@ function neutralizeCrossOriginImagesInClone(clonedRoot: HTMLElement) {
   clonedRoot.querySelectorAll("img").forEach((node) => {
     const img = node as HTMLImageElement;
     const raw = (img.currentSrc || img.getAttribute("src") || "").trim();
-    if (!raw) {
+    if (!raw || raw.startsWith("data:")) {
       return;
     }
     let resolved: URL;
@@ -28,10 +29,17 @@ function neutralizeCrossOriginImagesInClone(clonedRoot: HTMLElement) {
     } catch {
       return;
     }
-    if (resolved.origin !== origin) {
-      img.removeAttribute("srcset");
-      img.src = TRANSPARENT_PIXEL_GIF;
+    if (resolved.origin === origin) {
+      return;
     }
+    img.removeAttribute("srcset");
+    /* Same-origin proxy so html2canvas can paint covers (YouTube thumbs, etc.). */
+    if (isAllowedPrintImageProxyUrl(resolved)) {
+      img.src = `${origin}/api/print-image-proxy?url=${encodeURIComponent(resolved.href)}`;
+      img.removeAttribute("crossorigin");
+      return;
+    }
+    img.src = TRANSPARENT_PIXEL_GIF;
   });
 }
 
