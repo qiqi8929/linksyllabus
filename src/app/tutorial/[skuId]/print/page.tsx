@@ -94,7 +94,7 @@ export default async function TutorialPrintPage({
   const steps = stepRows ?? [];
 
   const row = sku as SkuRow;
-  const { displayCreatorName, displayLevel } = resolvePrintBranding({
+  const { displayLevel } = resolvePrintBranding({
     creator_name: row.creator_name,
     author: row.author,
     level: row.level
@@ -147,7 +147,8 @@ export default async function TutorialPrintPage({
             materials_text: row.materials_text ?? null,
             tools_text: row.tools_text ?? null,
             display_level: displayLevel,
-            display_creator_name: displayCreatorName,
+            creator_name: row.creator_name ?? null,
+            author: row.author ?? null,
             cover_hero_image_url: coverHeroImageUrl
           }}
           steps={steps}

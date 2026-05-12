@@ -17,12 +17,55 @@ type LongImageSku = {
   materials_text: string | null;
   tools_text: string | null;
   display_level: string;
-  display_creator_name: string;
+  /** Manual override (creator_name field). */
+  creator_name: string | null;
+  /** Auto-populated from YouTube imports (channel name). */
+  author: string | null;
   cover_hero_image_url: string | null;
 };
 
 const TAGLINE =
   "Scan the QR code next to each step to watch that moment in the video. No searching. No scrubbing. Just make.";
+
+/**
+ * YouTube `hqdefault.jpg` is 480×360 (4:3) and includes black letterbox bars
+ * on the top and bottom of the actual content. We swap to `mqdefault.jpg`
+ * (320×180, 16:9, no letterboxing) for the long image so the cover renders
+ * cleanly without object-fit cropping artifacts. The PDF path keeps using
+ * `hqdefault.jpg` — this transformation is scoped to the long image only.
+ */
+function preferCleanThumbForLongImage(url: string): string {
+  if (!url) return url;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  const host = parsed.hostname.toLowerCase();
+  const isYouTubeThumbHost =
+    host === "img.youtube.com" ||
+    host === "i.ytimg.com" ||
+    host.endsWith(".ytimg.com");
+  if (!isYouTubeThumbHost) return url;
+  if (parsed.pathname.endsWith("/hqdefault.jpg")) {
+    parsed.pathname = parsed.pathname.replace(
+      /\/hqdefault\.jpg$/,
+      "/mqdefault.jpg"
+    );
+    return parsed.toString();
+  }
+  return url;
+}
+
+/** Best creator/channel name from the guide row, or null when we have neither. */
+function resolveBylineCreator(sku: LongImageSku): string | null {
+  const explicit = sku.creator_name?.trim();
+  if (explicit) return explicit;
+  const channel = sku.author?.trim();
+  if (channel) return channel;
+  return null;
+}
 
 function formatStepNum(n: number): string {
   return String(n).padStart(2, "0");
@@ -97,7 +140,8 @@ export function LongImageView({
   sku: LongImageSku;
   steps: StepRow[];
 }) {
-  const coverHeroSrc = sku.cover_hero_image_url?.trim() || "";
+  const rawCoverSrc = sku.cover_hero_image_url?.trim() || "";
+  const coverHeroSrc = preferCleanThumbForLongImage(rawCoverSrc);
   const materialsBody = stripLeadingMaterialsMetaLines(
     sku.materials_text?.trim() ?? ""
   );
@@ -113,7 +157,7 @@ export function LongImageView({
   const cols = stepsGridColumns(stepCount);
   const gridStyle = { gridTemplateColumns: `repeat(${cols}, 1fr)` };
 
-  const creator = sku.display_creator_name?.trim() || "the creator";
+  const bylineCreator = resolveBylineCreator(sku);
 
   return (
     <div className="pmli-root" id="pm-long-image-root">
@@ -134,7 +178,9 @@ export function LongImageView({
         <div className="pmli-eyebrow">CROCHET GUIDE · LINKSYLLABUS.COM</div>
         <h1 className="pmli-title">{sku.name}</h1>
         <div className="pmli-byline">
-          Tutorial by {creator} · Guide from linksyllabus.com
+          {bylineCreator
+            ? `Tutorial by ${bylineCreator} · Guide from linksyllabus.com`
+            : "Crochet tutorial · Guide from linksyllabus.com"}
         </div>
         <div className="pmli-tags">
           <span className="pmli-tag pmli-tag-green">
