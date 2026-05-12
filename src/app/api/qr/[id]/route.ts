@@ -2,57 +2,33 @@ import { NextResponse } from "next/server";
 import { publicSiteOriginFromRequest } from "@/lib/publicOrigin";
 import { qrPngBuffer } from "@/lib/qrPng";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { hasStepTimestamp } from "@/lib/stepTimestamp";
-import { extractVimeoVideoId, extractYouTubeVideoId } from "@/lib/video";
+import { resolveStepQrTarget, type StepLikeForQr } from "@/lib/stepQrTarget";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type StepRow = {
-  id: string;
-  youtube_url: string | null;
-  start_time: number | null;
-  end_time: number | null;
-};
-
 /**
- * Public "play from beginning" URL for a step's source video, when its
- * `start_time` / `end_time` are missing. Returns `null` for sources that have
- * no scannable public URL (uploaded files / Cloudflare Stream ids), so the
- * caller can fall back to the play page.
+ * Single QR endpoint for both surfaces:
+ *   - PDF (rendered by the browser print dialog) — `<img src="/api/qr/{id}?surface=pdf">`
+ *   - Long image (html2canvas) — `<img src="/api/qr/{id}?surface=long-image">`
+ * The `surface` query param is purely a log label. The encoded URL is the
+ * same regardless — it's computed by `resolveStepQrTarget` once, here.
  */
-function publicFullVideoUrl(rawUrl: string | null | undefined): string | null {
-  const raw = (rawUrl ?? "").trim();
-  if (!raw) return null;
-
-  const ytId = extractYouTubeVideoId(raw);
-  if (ytId) {
-    return `https://www.youtube.com/watch?v=${encodeURIComponent(ytId)}`;
-  }
-
-  const vimeoId = extractVimeoVideoId(raw);
-  if (vimeoId) {
-    return `https://vimeo.com/${encodeURIComponent(vimeoId)}`;
-  }
-
-  return null;
-}
-
-/** Final guard: any non-empty http(s) URL is scannable; everything else falls back. */
-function safeQrTarget(url: string, fallback: string): string {
-  const t = (url ?? "").trim();
-  if (!/^https?:\/\//i.test(t)) return fallback;
-  return t;
-}
-
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
-  const base = publicSiteOriginFromRequest(req);
-  const playUrl = `${base}/play/${params.id}`;
+  const url = new URL(req.url);
+  const origin = publicSiteOriginFromRequest(req);
+  const surfaceParam = (url.searchParams.get("surface") ?? "").trim();
+  const surface: "pdf" | "long-image" | "unspecified" =
+    surfaceParam === "pdf"
+      ? "pdf"
+      : surfaceParam === "long-image"
+        ? "long-image"
+        : "unspecified";
 
-  let target = playUrl;
+  let target = `${origin}/play/${params.id}`;
   try {
     const admin = createSupabaseAdminClient();
     const { data } = await admin
@@ -61,23 +37,21 @@ export async function GET(
       .eq("id", params.id)
       .maybeSingle();
 
-    const step = data as StepRow | null;
-    if (step) {
-      if (hasStepTimestamp(step)) {
-        target = playUrl;
-      } else {
-        const sourceUrl = publicFullVideoUrl(step.youtube_url);
-        target = sourceUrl ?? playUrl;
-      }
-    }
+    target = resolveStepQrTarget(data as StepLikeForQr | null, origin);
   } catch {
-    /* fall through to playUrl */
+    /* keep play-page fallback */
   }
 
-  const finalTarget = safeQrTarget(target, playUrl);
-  const png = await qrPngBuffer(finalTarget);
+  if (surface === "pdf") {
+    console.log("PDF QR URL:", target);
+  } else if (surface === "long-image") {
+    console.log("Long image QR URL:", target);
+  } else {
+    console.log("[QR] target:", target);
+  }
 
-  const download = new URL(req.url).searchParams.get("download") === "1";
+  const png = await qrPngBuffer(target);
+  const download = url.searchParams.get("download") === "1";
   const body = new Uint8Array(png);
 
   return new NextResponse(body, {

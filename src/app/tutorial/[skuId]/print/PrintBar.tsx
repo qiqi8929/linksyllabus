@@ -20,8 +20,14 @@ const TRANSPARENT_PIXEL_GIF =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
 /**
- * Prefetch cross-origin images via our proxy as blob: URLs and wait for decode.
- * html2canvas often paints before async img loads when only swapping src in onclone.
+ * Prefetch images into blob: URLs and wait for decode, so html2canvas paints
+ * from fully-loaded sources:
+ *   - Cross-origin photos → fetched through `/api/print-image-proxy`.
+ *   - Same-origin QR PNGs (`/api/qr/...`) → fetched directly. Same-origin
+ *     images normally work, but pre-fetching guarantees the QR is fully
+ *     decoded before html2canvas starts painting; otherwise a long-image
+ *     export with many QRs can capture partially-loaded (blurry) PNGs.
+ * Other same-origin images are left untouched.
  */
 async function rewriteImagesForHtml2Canvas(root: HTMLElement): Promise<() => void> {
   const origin = window.location.origin;
@@ -42,7 +48,11 @@ async function rewriteImagesForHtml2Canvas(root: HTMLElement): Promise<() => voi
       } catch {
         continue;
       }
-      if (resolved.origin === origin) {
+      const isSameOrigin = resolved.origin === origin;
+      const isQrImage =
+        isSameOrigin && resolved.pathname.startsWith("/api/qr/");
+
+      if (isSameOrigin && !isQrImage) {
         continue;
       }
 
@@ -52,6 +62,24 @@ async function rewriteImagesForHtml2Canvas(root: HTMLElement): Promise<() => voi
         srcset: img.getAttribute("srcset")
       });
       img.removeAttribute("srcset");
+
+      if (isQrImage) {
+        console.log("Long image QR URL:", resolved.href);
+        try {
+          const res = await fetch(resolved.href);
+          if (!res.ok) {
+            img.src = TRANSPARENT_PIXEL_GIF;
+            continue;
+          }
+          const blob = await res.blob();
+          const u = URL.createObjectURL(blob);
+          blobUrls.push(u);
+          img.src = u;
+        } catch {
+          img.src = TRANSPARENT_PIXEL_GIF;
+        }
+        continue;
+      }
 
       if (isAllowedPrintImageProxyUrl(resolved)) {
         try {

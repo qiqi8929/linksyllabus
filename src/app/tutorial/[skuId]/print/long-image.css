@@ -246,8 +246,8 @@
   print-color-adjust: exact;
   border: 0.5px solid #e8e4de;
   border-radius: 5px;
-  /* Bottom space reserved for the 40px QR + caption row beneath it. */
-  padding: 9px 9px 58px;
+  /* Bottom space reserved for the 64px QR + caption row beneath it. */
+  padding: 9px 9px 84px;
   position: relative;
   /* Keep card text fully visible — no clamp, no overflow hidden. */
   overflow: visible;
@@ -280,8 +280,8 @@
   font-size: 9px;
   color: #666;
   line-height: 1.55;
-  /* Leaves clearance to the right of the 40px QR badge. */
-  padding-right: 50px;
+  /* Leaves clearance to the right of the 64px QR badge. */
+  padding-right: 74px;
   font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -297,17 +297,17 @@
 
 .pmli-root .pmli-qr {
   position: absolute;
-  bottom: 16px;
+  bottom: 18px;
   right: 8px;
-  width: 40px;
-  height: 40px;
+  width: 64px;
+  height: 64px;
   border: 0.5px solid #ccc;
   border-radius: 3px;
   background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1px;
+  padding: 2px;
 }
 
 .pmli-root .pmli-qr img {
@@ -315,13 +315,17 @@
   height: 100%;
   object-fit: contain;
   display: block;
+  /* Keep QR module edges crisp through html2canvas downsampling.
+     Falls back to default smoothing in browsers that ignore it. */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 .pmli-root .pmli-qr-caption {
   position: absolute;
   right: 8px;
   bottom: 4px;
-  width: 40px;
+  width: 64px;
   text-align: center;
   font-size: 7px;
   line-height: 1.1;

@@ -222,13 +222,13 @@ export function PrintManualView({
                 <div className="pm-steps-pair">
                   <StepBlock
                     step={left}
-                    qrSrc={`/api/qr/${encodeURIComponent(left.id)}`}
+                    qrSrc={`/api/qr/${encodeURIComponent(left.id)}?surface=pdf`}
                     playHref={`/play/${encodeURIComponent(left.id)}`}
                   />
                   {right ? (
                     <StepBlock
                       step={right}
-                      qrSrc={`/api/qr/${encodeURIComponent(right.id)}`}
+                      qrSrc={`/api/qr/${encodeURIComponent(right.id)}?surface=pdf`}
                       playHref={`/play/${encodeURIComponent(right.id)}`}
                     />
                   ) : (

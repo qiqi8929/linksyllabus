@@ -197,7 +197,7 @@ function StepCard({
       </div>
       <div className="pmli-qr">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={qrSrc} alt="" width={40} height={40} />
+        <img src={qrSrc} alt="" width={64} height={64} />
       </div>
       {noTimestamp ? (
         <div className="pmli-qr-caption">Full video</div>
@@ -316,7 +316,7 @@ export function LongImageView({
               <StepCard
                 key={s.id}
                 step={s}
-                qrSrc={`/api/qr/${encodeURIComponent(s.id)}`}
+                qrSrc={`/api/qr/${encodeURIComponent(s.id)}?surface=long-image`}
               />
             ))}
           </div>
