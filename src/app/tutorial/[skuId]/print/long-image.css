@@ -226,14 +226,18 @@
 .pmli-root .pmli-steps-grid {
   display: grid;
   gap: 7px;
+  column-gap: 7px;
+  row-gap: 7px;
   width: 100%;
 }
 
 .pmli-root .pmli-step {
-  /* Explicit background-color (not the `background` shorthand) renders more
-     reliably through html2canvas than the shorthand on some platforms. */
+  /* Warm card fill + html2canvas: shorthand + color-adjust so white never wins. */
+  background: #f8f6f3;
   background-color: #f8f6f3;
   background-image: none;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
   border: 0.5px solid #e8e4de;
   border-radius: 5px;
   padding: 9px 9px 32px;

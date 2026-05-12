@@ -177,11 +177,11 @@ export function LongImageView({
       <div className="pmli-cover-text">
         <div className="pmli-eyebrow">CROCHET GUIDE · LINKSYLLABUS.COM</div>
         <h1 className="pmli-title">{sku.name}</h1>
-        <div className="pmli-byline">
-          {bylineCreator
-            ? `Tutorial by ${bylineCreator} · Guide from linksyllabus.com`
-            : "Crochet tutorial · Guide from linksyllabus.com"}
-        </div>
+        {bylineCreator ? (
+          <div className="pmli-byline">
+            Tutorial by {bylineCreator} · Guide from linksyllabus.com
+          </div>
+        ) : null}
         <div className="pmli-tags">
           <span className="pmli-tag pmli-tag-green">
             {stepCount} {stepCount === 1 ? "step" : "steps"}
