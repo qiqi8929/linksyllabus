@@ -40,10 +40,12 @@ const DEFAULT_COVER_BLURB =
 
 function StepBlock({
   step,
-  qrSrc
+  qrSrc,
+  playHref
 }: {
   step: StepRow;
   qrSrc: string;
+  playHref: string;
 }) {
   const paras = descriptionToParas(step.description);
   return (
@@ -63,11 +65,19 @@ function StepBlock({
           )}
         </div>
         <div className="pm-qr-wrap">
-          <div className="pm-qr-box">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qrSrc} alt="" width={80} height={80} />
-          </div>
-          <span className="pm-qr-caption">Scan to watch</span>
+          <a
+            className="pm-qr-link"
+            href={playHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Open video for step ${step.step_number}`}
+          >
+            <div className="pm-qr-box">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrSrc} alt="" width={80} height={80} />
+            </div>
+          </a>
+          <span className="pm-qr-caption">Scan or tap to watch</span>
         </div>
       </div>
     </div>
@@ -91,6 +101,7 @@ export function PrintManualView({
   }
 
   const footerBrand = "linksyllabus.com";
+  const tutorialHref = `/tutorial/${encodeURIComponent(sku.id)}`;
 
   const materialsBody = stripLeadingMaterialsMetaLines(
     sku.materials_text?.trim() ?? ""
@@ -101,7 +112,7 @@ export function PrintManualView({
   const showMaterialsSheet = materialsBody.length > 0 || toolsBody.length > 0;
 
   return (
-    <div className="pm-manual">
+    <div className="pm-manual" id="pm-manual-root">
       <div className="pm-cover">
         <div className="pm-cover-layout">
           <div className="pm-cover-main">
@@ -131,17 +142,25 @@ export function PrintManualView({
             </div>
           </div>
           <div className="pm-cover-qr-aside">
-            <div className="pm-cover-qr-box">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/api/qr/tutorial/${encodeURIComponent(sku.id)}`}
-                alt=""
-                width={112}
-                height={112}
-              />
-            </div>
+            <a
+              className="pm-cover-qr-link"
+              href={tutorialHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open this tutorial on the web"
+            >
+              <div className="pm-cover-qr-box">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/qr/tutorial/${encodeURIComponent(sku.id)}`}
+                  alt=""
+                  width={112}
+                  height={112}
+                />
+              </div>
+            </a>
             <span className="pm-cover-qr-caption">
-              Scan to follow along on your phone
+              Scan or tap to follow along on your phone
             </span>
           </div>
         </div>
@@ -198,11 +217,13 @@ export function PrintManualView({
                   <StepBlock
                     step={left}
                     qrSrc={`/api/qr/${encodeURIComponent(left.id)}`}
+                    playHref={`/play/${encodeURIComponent(left.id)}`}
                   />
                   {right ? (
                     <StepBlock
                       step={right}
                       qrSrc={`/api/qr/${encodeURIComponent(right.id)}`}
+                      playHref={`/play/${encodeURIComponent(right.id)}`}
                     />
                   ) : (
                     <div aria-hidden />

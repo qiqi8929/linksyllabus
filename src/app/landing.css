@@ -687,7 +687,27 @@
     #lp-root .foot-links { display: flex; gap: 2rem; }
     #lp-root .foot-links a { font-size: 13px; color: var(--ink-3); }
     #lp-root .foot-links a:hover { color: var(--brand); }
-    #lp-root .foot-copy { font-size: 13px; color: var(--ink-3); }
+    #lp-root .foot-copy {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.35rem;
+      text-align: right;
+      font-size: 13px;
+      color: var(--ink-3);
+    }
+    #lp-root .foot-contact,
+    #lp-root .foot-legal {
+      margin: 0;
+      line-height: 1.5;
+    }
+    #lp-root .foot-contact a {
+      font-size: 13px;
+      color: var(--ink-3);
+    }
+    #lp-root .foot-contact a:hover {
+      color: var(--brand);
+    }
 
     /* ─── ANIMATIONS ─── */
     @keyframes fadeUp {

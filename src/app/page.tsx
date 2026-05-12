@@ -112,7 +112,11 @@ const getLandingMarkup = cache(() => {
 export const metadata: Metadata = {
   title: "LinkSyllabus — Turn Your Tutorial Into a Step-by-Step Experience",
   description:
-    "Paste a YouTube link or upload your own video. AI splits it into steps in seconds — distraction-free, scannable, and ready to print."
+    "Paste a YouTube link or upload your own video. AI splits it into steps in seconds — distraction-free, scannable, and ready to print.",
+  /** Pinterest checks the homepage URL — set here so merge with root layout cannot drop it. */
+  other: {
+    "p:domain_verify": "5e4b1cc9f935476bf76bac3225f0f9bb"
+  }
 };
 
 export default function HomePage() {

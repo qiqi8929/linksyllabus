@@ -17,6 +17,21 @@ async function resolveParams(
   return Promise.resolve(params);
 }
 
+/** Filename stem for long-PNG download (no extension, filesystem-safe). */
+function pngDownloadBasename(name: string, id: string): string {
+  const cleaned = name
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001f]+/g, " ")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 72);
+  if (cleaned.length > 0) {
+    return cleaned;
+  }
+  return `tutorial-${id.slice(0, 8)}`;
+}
+
 type SkuRow = {
   id: string;
   name: string;
@@ -113,6 +128,7 @@ export default async function TutorialPrintPage({
       <PrintBar
         tutorialHref={`/tutorial/${encodeURIComponent(sku.id)}`}
         tutorialTitle={row.name}
+        pngDownloadBasename={pngDownloadBasename(row.name, row.id)}
       />
       <PrintManualView sku={skuPrint} steps={steps} />
     </div>

@@ -40,40 +40,36 @@ export async function applyGuideUnlockFromPaidCheckoutSession(
     return { ok: false, reason: "missing_session_id" };
   }
 
-  const admin = createSupabaseAdminClient();
-  const { error: idempotencyErr } = await admin.from("stripe_guide_unlock_events").insert({
-    session_id: session.id,
-    user_id: userId,
-    stripe_event_id: stripeEventId
+  let admin: ReturnType<typeof createSupabaseAdminClient>;
+  try {
+    admin = createSupabaseAdminClient();
+  } catch (e) {
+    console.error("[guideUnlock] admin client unavailable", e);
+    return { ok: false, reason: "supabase_admin_unconfigured" };
+  }
+
+  const { data: incremented, error: rpcErr } = await admin.rpc("apply_stripe_guide_unlock", {
+    p_session_id: session.id,
+    p_user_id: userId,
+    p_stripe_event_id: stripeEventId
   });
 
-  if (idempotencyErr) {
-    if ((idempotencyErr as { code?: string }).code === "23505") {
-      return { ok: true, duplicate: true };
-    }
-    if (isIdempotencyTableMissing(idempotencyErr)) {
-      console.error("[guideUnlock] stripe_guide_unlock_events table missing", idempotencyErr);
+  if (rpcErr) {
+    if (isIdempotencyTableMissing(rpcErr)) {
+      console.error("[guideUnlock] stripe_guide_unlock_events missing or RPC not deployed", rpcErr);
       return { ok: false, reason: "idempotency_table_missing" };
     }
-    console.error("[guideUnlock] idempotency insert failed", idempotencyErr);
-    return { ok: false, reason: "idempotency_insert_failed" };
+    const msg = `${(rpcErr as { message?: string }).message ?? ""} ${(rpcErr as { details?: string }).details ?? ""}`;
+    if (/apply_stripe_guide_unlock|schema cache/i.test(msg) && /not find|could not find/i.test(msg)) {
+      console.error("[guideUnlock] apply_stripe_guide_unlock RPC missing — run supabase/migration_apply_stripe_guide_unlock_atomic.sql", rpcErr);
+      return { ok: false, reason: "rpc_not_deployed" };
+    }
+    console.error("[guideUnlock] apply_stripe_guide_unlock RPC failed", rpcErr);
+    return { ok: false, reason: "rpc_failed" };
   }
 
-  const { data: row } = await admin
-    .from("users")
-    .select("paid_guide_slots")
-    .eq("id", userId)
-    .maybeSingle();
-  const current = Math.max(0, Number(row?.paid_guide_slots ?? 0));
-  const { error: upErr } = await admin
-    .from("users")
-    .update({ paid_guide_slots: current + 1 })
-    .eq("id", userId);
-  if (upErr) {
-    console.error("[guideUnlock] paid_guide_slots increment failed", upErr);
-    return { ok: false, reason: "update_failed" };
-  }
-  return { ok: true, duplicate: false };
+  const didIncrement = incremented === true;
+  return { ok: true, duplicate: !didIncrement };
 }
 
 /**
