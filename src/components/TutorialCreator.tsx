@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createInactiveSkuWithSteps,
@@ -373,6 +373,16 @@ export function TutorialCreator({
   );
   const router = useRouter();
 
+  const resetTutorialVideoFields = useCallback(() => {
+    setMaterialsText("");
+    setToolsText("");
+    setSteps([emptyStep()]);
+    setOutlineEstimated(false);
+    setError(null);
+  }, []);
+
+  const prevResolvedYoutubeIdRef = useRef<string | null | undefined>(undefined);
+
   const persistDraftToLocalStorage = useCallback(() => {
     try {
       const draft: TutorialDraft = {
@@ -552,6 +562,10 @@ export function TutorialCreator({
       }
       if (typeof parsed.chapterVideoUrl === "string") {
         setChapterVideoUrl(parsed.chapterVideoUrl);
+        if (parsed.videoSourceTab === "youtube") {
+          const tid = extractYouTubeVideoId(parsed.chapterVideoUrl.trim());
+          prevResolvedYoutubeIdRef.current = tid ?? null;
+        }
       }
       if (Array.isArray(parsed.steps) && parsed.steps.length > 0) {
         const restored = parsed.steps
@@ -588,6 +602,41 @@ export function TutorialCreator({
       refreshTimers.forEach((id) => window.clearTimeout(id));
     };
   }, [router]);
+
+  useEffect(() => {
+    if (videoSourceTab !== "youtube") {
+      return;
+    }
+    const trim = chapterVideoUrl.trim();
+    const id = extractYouTubeVideoId(trim);
+
+    if (!trim) {
+      if (typeof prevResolvedYoutubeIdRef.current === "string") {
+        prevResolvedYoutubeIdRef.current = null;
+        resetTutorialVideoFields();
+      }
+      return;
+    }
+
+    if (!id) {
+      return;
+    }
+
+    const prev = prevResolvedYoutubeIdRef.current;
+
+    if (prev === undefined) {
+      prevResolvedYoutubeIdRef.current = id;
+      resetTutorialVideoFields();
+      return;
+    }
+
+    if (id === prev) {
+      return;
+    }
+
+    prevResolvedYoutubeIdRef.current = id;
+    resetTutorialVideoFields();
+  }, [chapterVideoUrl, videoSourceTab, resetTutorialVideoFields]);
 
   const updateStep = useCallback((id: string, patch: Partial<StepRow>) => {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -753,7 +802,7 @@ export function TutorialCreator({
     }
   };
 
-  /** One click: structure from video, then materials/tools only if still empty. */
+  /** One click: steps from video analysis, then materials/tools from a dedicated extract (always replaces). */
   const runFullAutoFromVideo = async () => {
     const url = chapterVideoUrl.trim();
     if (videoSourceTab === "upload" && !uploadFile) {
@@ -805,14 +854,6 @@ export function TutorialCreator({
         throw new Error("The model did not return any instructional steps.");
       }
       setOutlineEstimated(data.estimated === true);
-      const mat = stripLeadingMaterialsMetaLines(
-        String(data.materialsText ?? data.materials_text ?? "").trim()
-      );
-      const tools = stripLeadingMaterialsMetaLines(
-        String(data.toolsText ?? data.tools_text ?? "").trim()
-      );
-      setMaterialsText(mat);
-      setToolsText(tools);
       const mapped = list.map((item) => {
         const s = item as Record<string, unknown>;
         const stepName = String(s.stepName ?? s.step_name ?? "").trim();
@@ -835,32 +876,27 @@ export function TutorialCreator({
       }
       setSteps(withNames);
 
-      const needsMaterials = !mat && !tools;
-      if (needsMaterials) {
-        const materialsBody: Record<string, string> =
-          videoSourceTab === "upload" && uploadFile
-            ? { streamVideoId: chapterVideoUrl.trim() }
-            : { youtubeUrl: url };
-        logFillFromVideoRequest(
-          "extract-materials",
-          "/api/gemini/extract-materials",
-          materialsBody,
-          {
-            videoSourceTab,
-            chapterVideoUrl: chapterVideoUrl.trim(),
-            hasUploadFile: !!uploadFile,
-            uploadFileName: uploadFile?.name,
-            uploadFileSize: uploadFile?.size
-          }
-        );
-        const matData = await fetchJsonFromApi("/api/gemini/extract-materials", materialsBody);
-        setMaterialsText(
-          stripLeadingMaterialsMetaLines(String(matData.materials ?? "").trim())
-        );
-        setToolsText(
-          stripLeadingMaterialsMetaLines(String(matData.tools ?? "").trim())
-        );
-      }
+      const materialsBody: Record<string, string> =
+        videoSourceTab === "upload" && uploadFile
+          ? { streamVideoId: chapterVideoUrl.trim() }
+          : { youtubeUrl: url };
+      logFillFromVideoRequest(
+        "extract-materials",
+        "/api/gemini/extract-materials",
+        materialsBody,
+        {
+          videoSourceTab,
+          chapterVideoUrl: chapterVideoUrl.trim(),
+          hasUploadFile: !!uploadFile,
+          uploadFileName: uploadFile?.name,
+          uploadFileSize: uploadFile?.size
+        }
+      );
+      const matData = await fetchJsonFromApi("/api/gemini/extract-materials", materialsBody);
+      setMaterialsText(
+        stripLeadingMaterialsMetaLines(String(matData.materials ?? "").trim())
+      );
+      setToolsText(stripLeadingMaterialsMetaLines(String(matData.tools ?? "").trim()));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Auto-fill from video failed.");
     } finally {
@@ -1114,16 +1150,31 @@ export function TutorialCreator({
 
           {videoSourceTab === "youtube" ? (
             <>
-              <label className="text-sm font-medium" htmlFor="chapter-youtube-url">
-                YouTube URL (same video for all steps)
-              </label>
-              <input
-                id="chapter-youtube-url"
-                value={chapterVideoUrl}
-                onChange={(e) => setChapterVideoUrl(e.target.value)}
-                placeholder="https://www.youtube.com/watch?v=…"
-                className="w-full"
-              />
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-0 flex-1">
+                  <label className="text-sm font-medium" htmlFor="chapter-youtube-url">
+                    YouTube URL (same video for all steps)
+                  </label>
+                  <input
+                    id="chapter-youtube-url"
+                    value={chapterVideoUrl}
+                    onChange={(e) => setChapterVideoUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=…"
+                    className="w-full"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm transition hover:bg-zinc-50"
+                  onClick={() => {
+                    setChapterVideoUrl("");
+                    prevResolvedYoutubeIdRef.current = null;
+                    resetTutorialVideoFields();
+                  }}
+                >
+                  Clear all
+                </button>
+              </div>
             </>
           ) : (
             <div className="space-y-3">
@@ -1265,8 +1316,8 @@ export function TutorialCreator({
             </div>
             <p className="text-xs leading-relaxed text-zinc-500">
               <span className="font-medium text-zinc-600">Fill from video:</span> Gemini watches the
-              video (YouTube link or uploaded file) and fills steps, materials, and tools. The full-auto
-              run also fills materials if they were still empty.{" "}
+              video (YouTube link or uploaded file) and replaces steps, materials, and tools from that
+              video.{" "}
               <span className="font-medium text-zinc-600">Split buttons:</span> run one pass at a time.{" "}
               {videoSourceTab === "upload"
                 ? "Uploads: analyze via Cloudflare Stream URL (no Vercel file payload)."
