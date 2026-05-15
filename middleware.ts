@@ -8,6 +8,14 @@ type CookieToSet = {
 };
 
 export async function middleware(req: NextRequest) {
+  if (req.nextUrl.pathname === "/api/stripe/webhook") {
+    return NextResponse.next();
+  }
+
+  if (!req.nextUrl.pathname.startsWith("/dashboard")) {
+    return NextResponse.next();
+  }
+
   const res = NextResponse.next();
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -56,6 +64,6 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"]
+  matcher: ["/dashboard/:path*", "/api/stripe/webhook"]
 };
 

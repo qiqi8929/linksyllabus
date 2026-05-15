@@ -8,7 +8,7 @@ import { activateSkuFromCheckoutSession } from "@/lib/stripe/skuActivation";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Stripe should retry on 5xx; 2xx only when the event is handled or there is nothing to do. */
+/** Reasons that historically indicated a transient infra issue (logged when apply fails). */
 function guideUnlockWebhookShouldRetry(reason: string): boolean {
   return new Set([
     "rpc_failed",
@@ -45,6 +45,8 @@ export async function POST(req: Request) {
     return new NextResponse(`Webhook Error: ${msg}`, { status: 400 });
   }
 
+  console.log("[stripe webhook] received", event.type, event.id);
+
   try {
     if (
       event.type === "checkout.session.completed" ||
@@ -63,11 +65,9 @@ export async function POST(req: Request) {
           const ok = await activateSkuFromCheckoutSession(session);
           if (!ok) {
             console.error("[stripe webhook] sku activation returned false", { sessionId: session.id });
-            return NextResponse.json({ error: "sku_activation_failed" }, { status: 500 });
           }
         } catch (e) {
           console.error("[stripe webhook] sku activation threw", e);
-          return NextResponse.json({ error: "sku_activation_error" }, { status: 500 });
         }
       }
 
@@ -80,17 +80,14 @@ export async function POST(req: Request) {
           console.error("[stripe webhook] guide_unlock apply failed", {
             userId,
             reason: result.reason,
-            sessionId: session.id
+            sessionId: session.id,
+            wouldRetry: guideUnlockWebhookShouldRetry(result.reason)
           });
-          if (guideUnlockWebhookShouldRetry(result.reason)) {
-            return NextResponse.json({ error: result.reason }, { status: 500 });
-          }
         }
       }
     }
   } catch (e) {
     console.error("[stripe webhook] unexpected error after verify", e);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
   return NextResponse.json({ received: true }, { status: 200 });
