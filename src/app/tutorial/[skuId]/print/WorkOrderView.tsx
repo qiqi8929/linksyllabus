@@ -3,7 +3,6 @@ import {
   formatWorkOrderLevelLine,
   formatWorkOrderMaterialsLine,
   formatWorkOrderStepNum,
-  splitStepsForWorkOrderPages,
   workOrderStepTitle,
   type WorkOrderSku,
   type WorkOrderStep
@@ -120,68 +119,49 @@ function WorkOrderFooter({
   );
 }
 
-function WorkOrderPageShell({
+function WorkOrderDocument({
   sku,
   steps,
-  stepPages,
   materialsLine,
   levelLine
 }: {
   sku: WorkOrderSku;
   steps: WorkOrderStep[];
-  stepPages: WorkOrderStep[][];
   materialsLine: string;
   levelLine: string;
 }) {
-  const lastPageIndex = stepPages.length - 1;
-
   return (
-    <>
-      {stepPages.map((pageSteps, pageIndex) => (
-        <article
-          key={pageIndex}
-          className={`wo-page${pageIndex > 0 ? " wo-page-break" : ""}`}
-        >
-          {pageIndex === 0 ? (
-            <>
-              <header className="wo-header">
-                <div className="wo-header-main">
-                  <h1 className="wo-title">{sku.name}</h1>
-                  <p className="wo-level-line">{levelLine}</p>
-                </div>
-                <div className="wo-header-meta">
-                  <BlankField label="Work order #" />
-                  <BlankField label="Date" />
-                </div>
-              </header>
+    <article className="wo-page">
+      <header className="wo-header">
+        <div className="wo-header-main">
+          <h1 className="wo-title">{sku.name}</h1>
+          <p className="wo-level-line">{levelLine}</p>
+        </div>
+        <div className="wo-header-meta">
+          <BlankField label="Work order #" />
+          <BlankField label="Date" />
+        </div>
+      </header>
 
-              <section className="wo-info-grid">
-                <BlankField label="Shop name" />
-                <BlankField label="Apprentice name" />
-                <BlankField label="License plate" />
-                <BlankField label="Vehicle year / make / model" wide />
-                <BlankField label="Master / supervisor" wide />
-              </section>
+      <section className="wo-info-grid">
+        <BlankField label="Shop name" />
+        <BlankField label="Apprentice name" />
+        <BlankField label="License plate" />
+        <BlankField label="Vehicle year / make / model" wide />
+        <BlankField label="Master / supervisor" wide />
+      </section>
 
-              {materialsLine ? (
-                <section className="wo-materials">
-                  <h2 className="wo-section-heading">Materials &amp; tools</h2>
-                  <p className="wo-materials-line">{materialsLine}</p>
-                </section>
-              ) : null}
-            </>
-          ) : null}
+      {materialsLine ? (
+        <section className="wo-materials">
+          <h2 className="wo-section-heading">Materials &amp; tools</h2>
+          <p className="wo-materials-line">{materialsLine}</p>
+        </section>
+      ) : null}
 
-          <WorkOrderStepsBlock steps={pageSteps} />
-          {pageIndex === lastPageIndex ? (
-            <>
-              <WorkOrderSignOff />
-              <WorkOrderFooter stepCount={steps.length} levelLine={levelLine} />
-            </>
-          ) : null}
-        </article>
-      ))}
-    </>
+      <WorkOrderStepsBlock steps={steps} />
+      <WorkOrderSignOff />
+      <WorkOrderFooter stepCount={steps.length} levelLine={levelLine} />
+    </article>
   );
 }
 
@@ -197,7 +177,6 @@ export function WorkOrderView({
     sku.tools_text
   );
   const levelLine = formatWorkOrderLevelLine(sku.display_level, steps.length);
-  const stepPages = splitStepsForWorkOrderPages(steps);
 
   if (steps.length === 0) {
     return (
@@ -211,10 +190,9 @@ export function WorkOrderView({
 
   return (
     <div className="wo-manual" id="wo-manual-root">
-      <WorkOrderPageShell
+      <WorkOrderDocument
         sku={sku}
         steps={steps}
-        stepPages={stepPages}
         materialsLine={materialsLine}
         levelLine={levelLine}
       />

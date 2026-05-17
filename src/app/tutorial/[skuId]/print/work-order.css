@@ -159,8 +159,6 @@
   align-items: stretch;
   padding: 7px 8px;
   border-bottom: 1px solid var(--wo-border);
-  break-inside: avoid;
-  page-break-inside: avoid;
 }
 
 #pm-root .wo-step:nth-child(odd) {
@@ -388,17 +386,19 @@
     margin: 0;
   }
 
-  #pm-root .wo-page-break {
-    page-break-before: always;
-    break-before: page;
+  #pm-root .wo-step {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   #pm-root .wo-signoff {
     break-inside: avoid;
     page-break-inside: avoid;
+    break-before: auto;
+    page-break-before: auto;
   }
 
-  #pm-root .wo-page-break .wo-step {
+  #pm-root .wo-steps-section {
     break-inside: auto;
     page-break-inside: auto;
   }

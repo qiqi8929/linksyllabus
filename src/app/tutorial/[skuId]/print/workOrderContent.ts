@@ -86,18 +86,3 @@ export function workOrderStepTitle(step: WorkOrderStep): string {
   return stripLeadingStepNumberFromTitle(step.step_name);
 }
 
-/**
- * Split steps across A4 pages. Page 1 keeps the header grid (max 4 steps);
- * continuation pages use 3 steps each so sign-off fits without clipping 7–8.
- */
-export function splitStepsForWorkOrderPages<T>(steps: T[]): T[][] {
-  if (steps.length === 0) return [];
-  if (steps.length <= 4) return [steps];
-  const pages: T[][] = [steps.slice(0, 4)];
-  let rest = steps.slice(4);
-  while (rest.length > 0) {
-    pages.push(rest.slice(0, 3));
-    rest = rest.slice(3);
-  }
-  return pages;
-}
