@@ -393,10 +393,14 @@
     break-before: page;
   }
 
-  #pm-root .wo-step,
   #pm-root .wo-signoff {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  #pm-root .wo-page-break .wo-step {
+    break-inside: auto;
+    page-break-inside: auto;
   }
 
   #pm-root .wo-step:nth-child(odd) {

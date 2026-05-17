@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
 import { inferTutorialStepClipsFromTranscript } from "@/lib/gemini";
+import { fillMissingStepClipsAfterAi } from "@/lib/stepTimestamp";
 import { getTranscriptWithFallbacks, type TranscriptCue } from "@/lib/transcript";
 import { extractYouTubeVideoId } from "@/lib/video";
 
@@ -107,7 +108,7 @@ export async function applyAiTranscriptTimestampsForSku(
       continue;
     }
     const transcriptText = buildTranscriptDocument(t.cues);
-    const clips = await inferTutorialStepClipsFromTranscript({
+    const clipsRaw = await inferTutorialStepClipsFromTranscript({
       videoId,
       transcriptText,
       steps: group.map((s) => ({
@@ -115,6 +116,19 @@ export async function applyAiTranscriptTimestampsForSku(
         step_name: s.step_name,
         description: s.description
       }))
+    });
+
+    const lastCueStart = t.cues.reduce((max, c) => Math.max(max, Math.floor(c.start)), 0);
+    const lastCueText = t.cues[t.cues.length - 1];
+    const lastCueDur = lastCueText
+      ? Math.max(30, Math.ceil((lastCueText.start + (lastCueText.duration ?? 8)) as number))
+      : 0;
+    const videoDurationSec = Math.max(lastCueStart + 30, lastCueDur);
+
+    const clips = fillMissingStepClipsAfterAi({
+      steps: group,
+      clips: clipsRaw,
+      videoDurationSec
     });
 
     for (const s of group) {

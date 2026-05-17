@@ -14,7 +14,7 @@ import {
   VoiceMicCluster
 } from "@/app/play/[id]/player";
 import { formatStepNameForDisplay } from "@/lib/stepTitle";
-import { hasStepTimestamp } from "@/lib/stepTimestamp";
+import { hasStepTimestamp, resolvePlaybackClipForStep } from "@/lib/stepTimestamp";
 import {
   buildYouTubeEmbedUrl,
   buildYouTubeWatchUrl
@@ -121,24 +121,30 @@ export function TutorialViewClient({
     fetch(`/api/step/${step.id}/scan`, { method: "POST" }).catch(() => {});
   }, [view, step?.id]);
 
-  const startTime = step?.start_time ?? 0;
-  const endTime = step?.end_time ?? 0;
+  const playbackClip = useMemo(() => {
+    if (!step) return { startTime: 0, endTime: null as number | null };
+    return resolvePlaybackClipForStep(step, steps);
+  }, [step, steps]);
+
+  const startTime = playbackClip.startTime;
+  const endTime = playbackClip.endTime;
+  const hasClipEnd = endTime != null && endTime > startTime;
 
   useEffect(() => {
-    timesRef.current = { start: startTime, end: endTime };
+    timesRef.current = { start: startTime, end: endTime ?? 0 };
   }, [startTime, endTime]);
 
   const embedSrc = useMemo(() => {
     if (!isYoutube || !videoId || !step) return "";
-    if (endTime > startTime) {
+    if (hasClipEnd) {
       return buildYouTubeEmbedUrl(videoId, startTime, {
         ...TUTORIAL_EMBED_BASE,
-        endSec: endTime
+        endSec: endTime!
       });
     }
     /** No valid segment end in DB — still embed from `start` (avoids blank player). */
     return buildYouTubeEmbedUrl(videoId, startTime, { ...TUTORIAL_EMBED_BASE });
-  }, [isYoutube, videoId, step?.id, startTime, endTime]);
+  }, [isYoutube, videoId, step?.id, startTime, endTime, hasClipEnd]);
 
   useEffect(() => {
     if ((!isStorageVideo && !isStreamVideo) || !step) return;
@@ -160,7 +166,7 @@ export function TutorialViewClient({
     const el = htmlVideoRef.current;
     if (!el) return;
     const onTimeUpdate = () => {
-      if (el.currentTime >= endTime) el.pause();
+      if (hasClipEnd && el.currentTime >= endTime!) el.pause();
     };
     const onSeeking = () => {
       if (el.currentTime < startTime) el.currentTime = startTime;
@@ -171,7 +177,7 @@ export function TutorialViewClient({
       el.removeEventListener("timeupdate", onTimeUpdate);
       el.removeEventListener("seeking", onSeeking);
     };
-  }, [isStorageVideo, isStreamVideo, startTime, endTime, step?.id]);
+  }, [isStorageVideo, isStreamVideo, startTime, endTime, hasClipEnd, step?.id]);
 
   const playbackRateRef = useRef(playbackRate);
   playbackRateRef.current = playbackRate;
@@ -223,22 +229,22 @@ export function TutorialViewClient({
       return;
     }
     autoplayFromUrlOnceRef.current = false;
-    el.src =
-      endTime > startTime
-        ? buildYouTubeEmbedUrl(videoId, startTime, {
-            ...TUTORIAL_EMBED_BASE,
-            endSec: endTime,
-            autoplay: true
-          })
-        : buildYouTubeEmbedUrl(videoId, startTime, {
-            ...TUTORIAL_EMBED_BASE,
-            autoplay: true
-          });
+    el.src = hasClipEnd
+      ? buildYouTubeEmbedUrl(videoId, startTime, {
+          ...TUTORIAL_EMBED_BASE,
+          endSec: endTime!,
+          autoplay: true
+        })
+      : buildYouTubeEmbedUrl(videoId, startTime, {
+          ...TUTORIAL_EMBED_BASE,
+          autoplay: true
+        });
   }, [
     embedSrc,
     videoId,
     startTime,
     endTime,
+    hasClipEnd,
     step?.step_number,
     initialStepNumber
   ]);

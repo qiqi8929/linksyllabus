@@ -16,7 +16,7 @@ type YtProps = {
   playbackId: string;
   videoId: string;
   startTime: number;
-  endTime: number;
+  endTime: number | null;
   skuId: string;
   stepNumber: number;
 };
@@ -381,7 +381,7 @@ export function StorageVideoClipPlayer({
 }: {
   stepId: string;
   startTime: number;
-  endTime: number;
+  endTime: number | null;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const src = `/api/video/playback?stepId=${encodeURIComponent(stepId)}`;
@@ -390,7 +390,7 @@ export function StorageVideoClipPlayer({
     const el = ref.current;
     if (!el) return;
     const onTimeUpdate = () => {
-      if (el.currentTime >= endTime) el.pause();
+      if (endTime != null && el.currentTime >= endTime) el.pause();
     };
     const onSeeking = () => {
       if (el.currentTime < startTime) el.currentTime = startTime;
@@ -515,24 +515,26 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime, s
       await loadYouTubeIframeApi();
       if (cancelled) return;
 
+      const playerVars: Record<string, number | string> = {
+        autoplay: 1,
+        start: startTime,
+        rel: 0,
+        modestbranding: 1,
+        controls: 0,
+        disablekb: 1,
+        fs: 0,
+        playsinline: 1,
+        iv_load_policy: 3
+      };
+      if (endTime != null) {
+        playerVars.end = endTime;
+      }
+
       playerRef.current = new window.YT.Player(containerId, {
         width: "100%",
         height: "100%",
         videoId,
-        playerVars: {
-          // Equivalent to:
-          // https://www.youtube.com/embed/{videoId}?start={startTime}&end={endTime}&autoplay=1&rel=0&modestbranding=1
-          autoplay: 1,
-          start: startTime,
-          end: endTime,
-          rel: 0,
-          modestbranding: 1,
-          controls: 0,
-          disablekb: 1,
-          fs: 0,
-          playsinline: 1,
-          iv_load_policy: 3
-        },
+        playerVars,
         events: {
           onReady: () => {
             setReady(true);
@@ -588,6 +590,7 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime, s
   }, [containerId, endTime, startTime, videoId]);
 
   function beginWatchdog() {
+    if (endTime == null) return;
     if (intervalRef.current) window.clearInterval(intervalRef.current);
     intervalRef.current = window.setInterval(() => {
       try {
@@ -704,7 +707,7 @@ type VmProps = {
   playbackId: string;
   vimeoId: string;
   startTime: number;
-  endTime: number;
+  endTime: number | null;
   skuId: string;
   stepNumber: number;
 };
@@ -791,7 +794,7 @@ export function VimeoPlayerClient({
       .catch(() => {});
 
     player.on("timeupdate", (data) => {
-      if (data.seconds >= endTime) {
+      if (endTime != null && data.seconds >= endTime) {
         player.pause().catch(() => {});
         setEndedOverlay(true);
       }

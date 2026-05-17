@@ -123,63 +123,64 @@ function WorkOrderFooter({
 function WorkOrderPageShell({
   sku,
   steps,
-  page1Steps,
-  page2Steps,
+  stepPages,
   materialsLine,
   levelLine
 }: {
   sku: WorkOrderSku;
   steps: WorkOrderStep[];
-  page1Steps: WorkOrderStep[];
-  page2Steps: WorkOrderStep[];
+  stepPages: WorkOrderStep[][];
   materialsLine: string;
   levelLine: string;
 }) {
+  const lastPageIndex = stepPages.length - 1;
+
   return (
     <>
-      <article className="wo-page">
-        <header className="wo-header">
-          <div className="wo-header-main">
-            <h1 className="wo-title">{sku.name}</h1>
-            <p className="wo-level-line">{levelLine}</p>
-          </div>
-          <div className="wo-header-meta">
-            <BlankField label="Work order #" />
-            <BlankField label="Date" />
-          </div>
-        </header>
+      {stepPages.map((pageSteps, pageIndex) => (
+        <article
+          key={pageIndex}
+          className={`wo-page${pageIndex > 0 ? " wo-page-break" : ""}`}
+        >
+          {pageIndex === 0 ? (
+            <>
+              <header className="wo-header">
+                <div className="wo-header-main">
+                  <h1 className="wo-title">{sku.name}</h1>
+                  <p className="wo-level-line">{levelLine}</p>
+                </div>
+                <div className="wo-header-meta">
+                  <BlankField label="Work order #" />
+                  <BlankField label="Date" />
+                </div>
+              </header>
 
-        <section className="wo-info-grid">
-          <BlankField label="Shop name" />
-          <BlankField label="Apprentice name" />
-          <BlankField label="License plate" />
-          <BlankField label="Vehicle year / make / model" wide />
-          <BlankField label="Master / supervisor" wide />
-        </section>
+              <section className="wo-info-grid">
+                <BlankField label="Shop name" />
+                <BlankField label="Apprentice name" />
+                <BlankField label="License plate" />
+                <BlankField label="Vehicle year / make / model" wide />
+                <BlankField label="Master / supervisor" wide />
+              </section>
 
-        {materialsLine ? (
-          <section className="wo-materials">
-            <h2 className="wo-section-heading">Materials &amp; tools</h2>
-            <p className="wo-materials-line">{materialsLine}</p>
-          </section>
-        ) : null}
+              {materialsLine ? (
+                <section className="wo-materials">
+                  <h2 className="wo-section-heading">Materials &amp; tools</h2>
+                  <p className="wo-materials-line">{materialsLine}</p>
+                </section>
+              ) : null}
+            </>
+          ) : null}
 
-        <WorkOrderStepsBlock steps={page1Steps} />
-        {page2Steps.length === 0 ? (
-          <>
-            <WorkOrderSignOff />
-            <WorkOrderFooter stepCount={steps.length} levelLine={levelLine} />
-          </>
-        ) : null}
-      </article>
-
-      {page2Steps.length > 0 ? (
-        <article className="wo-page wo-page-break">
-          <WorkOrderStepsBlock steps={page2Steps} />
-          <WorkOrderSignOff />
-          <WorkOrderFooter stepCount={steps.length} levelLine={levelLine} />
+          <WorkOrderStepsBlock steps={pageSteps} />
+          {pageIndex === lastPageIndex ? (
+            <>
+              <WorkOrderSignOff />
+              <WorkOrderFooter stepCount={steps.length} levelLine={levelLine} />
+            </>
+          ) : null}
         </article>
-      ) : null}
+      ))}
     </>
   );
 }
@@ -196,7 +197,7 @@ export function WorkOrderView({
     sku.tools_text
   );
   const levelLine = formatWorkOrderLevelLine(sku.display_level, steps.length);
-  const [page1Steps, page2Steps] = splitStepsForWorkOrderPages(steps);
+  const stepPages = splitStepsForWorkOrderPages(steps);
 
   if (steps.length === 0) {
     return (
@@ -213,8 +214,7 @@ export function WorkOrderView({
       <WorkOrderPageShell
         sku={sku}
         steps={steps}
-        page1Steps={page1Steps}
-        page2Steps={page2Steps}
+        stepPages={stepPages}
         materialsLine={materialsLine}
         levelLine={levelLine}
       />

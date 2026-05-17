@@ -11,6 +11,7 @@ import {
   VimeoPlayerClient,
   YouTubePlayerClient
 } from "@/app/play/[id]/player";
+import { resolvePlaybackClipForStep } from "@/lib/stepTimestamp";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,14 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
 
   const step = row as StepWithSku | null;
 
+  const { data: siblingRows } = step
+    ? await admin
+        .from("steps")
+        .select("step_number,start_time,end_time")
+        .eq("sku_id", step.sku_id)
+        .order("step_number", { ascending: true })
+    : { data: null };
+
   if (!step) {
     return (
       <main className="container-page py-10">
@@ -66,6 +75,14 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
   const showStorage = kind === "storage";
   const showStream = kind === "stream";
 
+  const siblings =
+    (siblingRows as Array<{
+      step_number: number;
+      start_time: number;
+      end_time: number;
+    }> | null) ?? [];
+  const { startTime, endTime } = resolvePlaybackClipForStep(step, siblings);
+
   return (
     <main className="container-page py-6 md:py-10">
       <div className="space-y-4">
@@ -83,7 +100,8 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
             <div className="mt-3 whitespace-pre-wrap text-sm text-zinc-600">{step.description}</div>
           ) : null}
           <div className="mt-4 text-xs text-zinc-500">
-            Clip: {step.start_time}s → {step.end_time}s
+            Clip: {startTime}s
+            {endTime != null ? ` → ${endTime}s` : " → (end of video)"}
           </div>
         </div>
 
@@ -91,8 +109,8 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
           <YouTubePlayerClient
             playbackId={step.id}
             videoId={youtubeId}
-            startTime={step.start_time}
-            endTime={step.end_time}
+            startTime={startTime}
+            endTime={endTime}
             skuId={step.sku_id}
             stepNumber={step.step_number}
           />
@@ -102,8 +120,8 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
           <VimeoPlayerClient
             playbackId={step.id}
             vimeoId={vimeoId}
-            startTime={step.start_time}
-            endTime={step.end_time}
+            startTime={startTime}
+            endTime={endTime}
             skuId={step.sku_id}
             stepNumber={step.step_number}
           />
@@ -113,8 +131,8 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
           <div className="card aspect-video overflow-hidden rounded-xl border border-zinc-200 bg-black p-0">
             <StorageVideoClipPlayer
               stepId={step.id}
-              startTime={step.start_time}
-              endTime={step.end_time}
+              startTime={startTime}
+              endTime={endTime}
             />
           </div>
         ) : null}
