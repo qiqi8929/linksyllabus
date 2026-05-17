@@ -476,96 +476,6 @@
     #lp-root .how-step p { font-size: 13px; color: var(--ink-2); line-height: 1.65; }
 
     /* ─── CTA ─── */
-    #lp-root .pricing-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-      align-items: stretch;
-    }
-    #lp-root .price-card {
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      background: var(--white);
-      padding: 1.35rem;
-      display: flex;
-      flex-direction: column;
-      min-height: 100%;
-      position: relative;
-    }
-    #lp-root .price-tier {
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--ink);
-      margin-bottom: .35rem;
-    }
-    #lp-root .price-amount {
-      font-family: var(--font-display);
-      font-size: 34px;
-      font-weight: 800;
-      letter-spacing: -1px;
-      line-height: 1.1;
-      margin-bottom: .85rem;
-      color: var(--ink);
-    }
-    #lp-root .price-amount span {
-      font-family: var(--font-body);
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--ink-3);
-      margin-left: 4px;
-    }
-    #lp-root .price-features {
-      list-style: none;
-      display: grid;
-      gap: .45rem;
-      margin-bottom: 1rem;
-      flex: 1;
-    }
-    #lp-root .price-features li {
-      font-size: 14px;
-      color: var(--ink-2);
-      line-height: 1.5;
-      position: relative;
-      padding-left: 1rem;
-    }
-    #lp-root .price-features li::before {
-      content: "•";
-      position: absolute;
-      left: 0;
-      color: var(--brand);
-      font-weight: 800;
-    }
-    #lp-root .price-btn {
-      width: 100%;
-      text-align: center;
-    }
-    #lp-root .price-card.pro {
-      border-color: var(--brand-mid);
-      background: var(--brand-light);
-      box-shadow: 0 10px 26px rgba(192, 86, 33, .12);
-    }
-    #lp-root .price-card.pro .price-tier,
-    #lp-root .price-card.pro .price-amount {
-      color: #7F3419;
-    }
-    #lp-root .price-card.pro .price-amount span,
-    #lp-root .price-card.pro .price-features li {
-      color: #8F4723;
-    }
-    #lp-root .price-badge {
-      position: absolute;
-      top: .75rem;
-      right: .75rem;
-      background: var(--brand);
-      color: #fff;
-      font-size: 11px;
-      font-weight: 700;
-      border-radius: 99px;
-      padding: 3px 9px;
-      letter-spacing: .2px;
-    }
-
-    /* ─── CTA ─── */
     #lp-root .cta-section {
       margin: 0 2.5rem 5rem;
       background: var(--brand-light);
@@ -650,6 +560,5 @@
       #lp-root .section-title { font-size: 26px; }
       #lp-root .flow-diagram { grid-template-columns: 1fr; gap: 8px; }
       #lp-root .flow-arrow { transform: rotate(90deg); font-size: 16px; }
-      #lp-root .pricing-grid { grid-template-columns: 1fr; }
     }
   
