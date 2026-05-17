@@ -22,19 +22,16 @@ function WorkOrderStepRow({ step }: { step: WorkOrderStep }) {
   const bullets = descriptionToWorkOrderBullets(step.description);
   return (
     <div className="wo-step">
-      <div className="wo-step-main">
-        <div className="wo-step-label">
-          Step {formatWorkOrderStepNum(step.step_number)}
-        </div>
-        <h3 className="wo-step-title">{workOrderStepTitle(step)}</h3>
-        <ul className="wo-step-bullets">
-          {bullets.map((b, i) => (
-            <li key={i}>{b}</li>
-          ))}
-        </ul>
+      <div className="wo-step-label">
+        Step {formatWorkOrderStepNum(step.step_number)}
       </div>
-      <div className="wo-step-aside">
-        <span className="wo-step-check" aria-hidden />
+      <h3 className="wo-step-title">{workOrderStepTitle(step)}</h3>
+      <ul className="wo-step-bullets">
+        {bullets.map((b, i) => (
+          <li key={i}>{b}</li>
+        ))}
+      </ul>
+      <div className="wo-step-qr-row">
         <a
           className="wo-step-qr"
           href={`/play/${encodeURIComponent(step.id)}`}
@@ -46,11 +43,11 @@ function WorkOrderStepRow({ step }: { step: WorkOrderStep }) {
           <img
             src={`/api/qr/${encodeURIComponent(step.id)}?surface=work-order&v=play`}
             alt=""
-            width={52}
-            height={52}
+            width={115}
+            height={115}
           />
-          <span className="wo-step-qr-caption">Scan to watch</span>
         </a>
+        <span className="wo-step-qr-caption">SCAN TO WATCH</span>
       </div>
     </div>
   );
