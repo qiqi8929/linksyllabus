@@ -1,5 +1,6 @@
 import { DM_Sans, Playfair_Display } from "next/font/google";
 import type { ReactNode } from "react";
+import "./print-overrides.css";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],

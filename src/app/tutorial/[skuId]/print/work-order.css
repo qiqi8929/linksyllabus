@@ -250,8 +250,6 @@
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-top: 10px;
-  break-inside: avoid;
-  page-break-inside: avoid;
 }
 
 #pm-root .wo-signoff-head {
@@ -357,12 +355,6 @@
     margin: 10mm 9mm;
   }
 
-  html,
-  body {
-    height: auto !important;
-    min-height: 0 !important;
-  }
-
   #pm-root {
     background: #fff;
     padding: 0;
@@ -376,29 +368,52 @@
 
   #pm-root .wo-manual {
     gap: 0;
+    max-width: none;
   }
 
   #pm-root .wo-page {
+    display: block;
     border: none;
     border-radius: 0;
     box-shadow: none;
     padding: 0;
     margin: 0;
+    min-height: 0 !important;
+    height: auto !important;
+    break-inside: auto;
+    page-break-inside: auto;
   }
 
+  /* Let steps break across pages — avoid leaves huge gaps when a step won't fit */
   #pm-root .wo-step {
-    break-inside: avoid;
-    page-break-inside: avoid;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  #pm-root .wo-step-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  #pm-root .wo-step-aside {
+    flex-shrink: 0;
+    align-self: flex-start;
+  }
+
+  #pm-root .wo-step-title {
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   #pm-root .wo-signoff {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    break-before: auto;
-    page-break-before: auto;
+    break-inside: auto;
+    page-break-inside: auto;
   }
 
-  #pm-root .wo-steps-section {
+  #pm-root .wo-signoff-col {
     break-inside: auto;
     page-break-inside: auto;
   }

@@ -1,0 +1,14 @@
+/* Overrides for root layout (min-h-screen / height:100%) — print only */
+@media print {
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  body > div {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+}
