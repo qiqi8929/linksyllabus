@@ -24,6 +24,58 @@ export type StepClipRow = {
   end_time?: number | null;
 };
 
+export type PlaybackClip = {
+  startTime: number;
+  endTime: number | null;
+  /** DB timestamps extend past the real YouTube/video length. */
+  timestampBeyondVideo: boolean;
+  videoDurationSec: number | null;
+};
+
+/** Clamp a clip so start/end never exceed the source video length. */
+export function clampPlaybackClipToDuration(
+  startTime: number,
+  endTime: number | null,
+  videoDurationSec: number | null | undefined
+): PlaybackClip {
+  const rawStart = Math.max(0, Math.floor(startTime));
+  const rawEnd = endTime != null ? Math.floor(endTime) : null;
+
+  if (
+    videoDurationSec == null ||
+    !Number.isFinite(videoDurationSec) ||
+    videoDurationSec <= 0
+  ) {
+    return {
+      startTime: rawStart,
+      endTime: rawEnd != null && rawEnd > rawStart ? rawEnd : null,
+      timestampBeyondVideo: false,
+      videoDurationSec: null
+    };
+  }
+
+  const dur = Math.floor(videoDurationSec);
+  const beyond =
+    rawStart >= dur || (rawEnd != null && rawEnd > dur) || rawStart >= dur - 1;
+
+  let start = Math.min(rawStart, Math.max(0, dur - MIN_CLIP_SEC));
+  let end = rawEnd;
+  if (end != null) {
+    end = Math.min(end, dur);
+    if (end <= start) end = Math.min(dur, start + MIN_CLIP_SEC);
+  } else if (start > dur - MIN_CLIP_SEC) {
+    start = Math.max(0, dur - MIN_CLIP_SEC);
+    end = dur;
+  }
+
+  return {
+    startTime: start,
+    endTime: end != null && end > start ? end : null,
+    timestampBeyondVideo: beyond,
+    videoDurationSec: dur
+  };
+}
+
 /** Normalized clip start and optional end (`null` = no end cap). */
 export function resolveStepClipBounds(step: StepClipRow): {
   start: number;
@@ -42,17 +94,18 @@ export function resolveStepClipBounds(step: StepClipRow): {
  */
 export function resolvePlaybackClipForStep(
   step: StepClipRow,
-  siblingsInOrder: StepClipRow[]
-): { startTime: number; endTime: number | null } {
+  siblingsInOrder: StepClipRow[],
+  videoDurationSec?: number | null
+): PlaybackClip {
   const direct = resolveStepClipBounds(step);
   if (direct.hasClipEnd) {
-    return { startTime: direct.start, endTime: direct.end };
+    return clampPlaybackClipToDuration(direct.start, direct.end, videoDurationSec);
   }
 
   const sorted = [...siblingsInOrder].sort((a, b) => a.step_number - b.step_number);
   const idx = sorted.findIndex((s) => s.step_number === step.step_number);
   if (idx < 0) {
-    return { startTime: direct.start, endTime: null };
+    return clampPlaybackClipToDuration(direct.start, null, videoDurationSec);
   }
 
   let anchorIdx = -1;
@@ -93,7 +146,7 @@ export function resolvePlaybackClipForStep(
   const block = sorted.slice(blockStart, nextAnchorIdx);
   const posInBlock = block.findIndex((s) => s.step_number === step.step_number);
   if (posInBlock < 0) {
-    return { startTime: Math.max(direct.start, anchorEnd), endTime: null };
+    return clampPlaybackClipToDuration(Math.max(direct.start, anchorEnd), null, videoDurationSec);
   }
 
   const regionEnd =
@@ -109,7 +162,31 @@ export function resolvePlaybackClipForStep(
     ? Math.max(regionEnd, startTime + MIN_CLIP_SEC)
     : Math.min(startTime + chunk, regionEnd);
 
-  return { startTime, endTime };
+  return clampPlaybackClipToDuration(startTime, endTime, videoDurationSec);
+}
+
+/** Cap stored step clips to the real video length (fixes AI/transcript overrun). */
+export function clampStepClipsMapToVideoDuration(
+  clips: Map<number, { start_time: number; end_time: number }>,
+  videoDurationSec: number
+): Map<number, { start_time: number; end_time: number }> {
+  const dur = Math.floor(videoDurationSec);
+  if (dur <= 0) return clips;
+
+  const out = new Map<number, { start_time: number; end_time: number }>();
+  const nums = [...clips.keys()].sort((a, b) => a - b);
+  for (const n of nums) {
+    const c = clips.get(n)!;
+    let start_time = Math.max(0, Math.min(Math.floor(c.start_time), dur - MIN_CLIP_SEC));
+    let end_time = Math.min(Math.floor(c.end_time), dur);
+    if (end_time <= start_time) {
+      start_time = Math.max(0, dur - MIN_CLIP_SEC);
+      end_time = dur;
+    }
+    if (start_time >= dur) continue;
+    out.set(n, { start_time, end_time });
+  }
+  return out;
 }
 
 /**
@@ -171,5 +248,8 @@ export function fillMissingStepClipsAfterAi(params: {
     cursor = end_time;
   }
 
+  if (videoDurationSec != null && Number.isFinite(videoDurationSec) && videoDurationSec > 0) {
+    return clampStepClipsMapToVideoDuration(out, videoDurationSec);
+  }
   return out;
 }

@@ -20,6 +20,7 @@ import {
   buildYouTubeWatchUrl
 } from "@/lib/youtubeUrls";
 import { detectVideoKind, extractVimeoVideoId, extractYouTubeVideoId } from "@/lib/video";
+import { formatVideoDurationClock } from "@/lib/youtubeDuration";
 import { stripLeadingMaterialsMetaLines } from "@/lib/stripMaterialsMeta";
 
 export type TutorialStepPayload = {
@@ -84,6 +85,7 @@ export function TutorialViewClient({
   const [view, setView] = useState<"materials" | "step">("step");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [playbackRate, setPlaybackRate] = useState<(typeof SPEEDS)[number]>(1);
+  const [youtubeDurationSec, setYoutubeDurationSec] = useState<number | null>(null);
 
   const step = view === "step" ? steps[currentIndex] ?? steps[0] : undefined;
   const stepHasTimestamp = step ? hasStepTimestamp(step) : false;
@@ -121,14 +123,41 @@ export function TutorialViewClient({
     fetch(`/api/step/${step.id}/scan`, { method: "POST" }).catch(() => {});
   }, [view, step?.id]);
 
+  useEffect(() => {
+    if (!videoId || !isYoutube) {
+      setYoutubeDurationSec(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/youtube/duration?v=${encodeURIComponent(videoId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { durationSec?: number } | null) => {
+        if (cancelled || !data?.durationSec) return;
+        const d = Math.floor(Number(data.durationSec));
+        if (d > 0) setYoutubeDurationSec(d);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [videoId, isYoutube]);
+
   const playbackClip = useMemo(() => {
-    if (!step) return { startTime: 0, endTime: null as number | null };
-    return resolvePlaybackClipForStep(step, steps);
-  }, [step, steps]);
+    if (!step) {
+      return {
+        startTime: 0,
+        endTime: null as number | null,
+        timestampBeyondVideo: false,
+        videoDurationSec: null as number | null
+      };
+    }
+    return resolvePlaybackClipForStep(step, steps, youtubeDurationSec);
+  }, [step, steps, youtubeDurationSec]);
 
   const startTime = playbackClip.startTime;
   const endTime = playbackClip.endTime;
   const hasClipEnd = endTime != null && endTime > startTime;
+  const timestampBeyondVideo = playbackClip.timestampBeyondVideo;
 
   useEffect(() => {
     timesRef.current = { start: startTime, end: endTime ?? 0 };
@@ -809,6 +838,15 @@ export function TutorialViewClient({
                   role="status"
                 >
                   No timestamp available for this step — watching from beginning
+                </p>
+              ) : null}
+              {timestampBeyondVideo ? (
+                <p className="mt-1 text-center text-xs text-amber-700" role="status">
+                  Saved timestamps are past the video end
+                  {playbackClip.videoDurationSec != null
+                    ? ` (${formatVideoDurationClock(playbackClip.videoDurationSec)})`
+                    : ""}
+                  . Update step times in the editor.
                 </p>
               ) : null}
               <a

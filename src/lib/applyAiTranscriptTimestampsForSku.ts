@@ -4,6 +4,7 @@ import { inferTutorialStepClipsFromTranscript } from "@/lib/gemini";
 import { fillMissingStepClipsAfterAi } from "@/lib/stepTimestamp";
 import { getTranscriptWithFallbacks, type TranscriptCue } from "@/lib/transcript";
 import { extractYouTubeVideoId } from "@/lib/video";
+import { fetchYouTubeVideoDurationSec } from "@/lib/youtubeDuration";
 
 const TRANSCRIPT_PROMPT_MAX_CHARS = 95_000;
 
@@ -121,9 +122,11 @@ export async function applyAiTranscriptTimestampsForSku(
     const lastCueStart = t.cues.reduce((max, c) => Math.max(max, Math.floor(c.start)), 0);
     const lastCueText = t.cues[t.cues.length - 1];
     const lastCueDur = lastCueText
-      ? Math.max(30, Math.ceil((lastCueText.start + (lastCueText.duration ?? 8)) as number))
+      ? Math.max(30, Math.ceil(lastCueText.start + (lastCueText.duration ?? 8)))
       : 0;
-    const videoDurationSec = Math.max(lastCueStart + 30, lastCueDur);
+    const transcriptEstimateSec = Math.max(lastCueStart + 30, lastCueDur);
+    const youtubeDurationSec = await fetchYouTubeVideoDurationSec(videoId);
+    const videoDurationSec = youtubeDurationSec ?? transcriptEstimateSec;
 
     const clips = fillMissingStepClipsAfterAi({
       steps: group,

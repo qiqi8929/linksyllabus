@@ -539,8 +539,16 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime, s
           onReady: () => {
             setReady(true);
             try {
-              // Ensure the segment starts exactly at `startTime`.
-              playerRef.current?.seekTo?.(startTime, true);
+              const dur = Number(playerRef.current?.getDuration?.() ?? 0);
+              if (Number.isFinite(dur) && dur > 0) {
+                if (startTime >= dur - 1) {
+                  playerRef.current?.seekTo?.(Math.max(0, dur - 15), true);
+                } else {
+                  playerRef.current?.seekTo?.(startTime, true);
+                }
+              } else {
+                playerRef.current?.seekTo?.(startTime, true);
+              }
             } catch {}
           },
           onStateChange: (event: any) => {
@@ -595,8 +603,13 @@ export function YouTubePlayerClient({ playbackId, videoId, startTime, endTime, s
     intervalRef.current = window.setInterval(() => {
       try {
         const t = Number(playerRef.current?.getCurrentTime?.() ?? 0);
+        const dur = Number(playerRef.current?.getDuration?.() ?? 0);
+        const cap =
+          Number.isFinite(dur) && dur > 0 && endTime != null
+            ? Math.min(endTime, Math.floor(dur))
+            : endTime;
         // YT can be slightly late/early; treat `endTime` as inclusive.
-        if (t >= endTime) {
+        if (cap != null && t >= cap) {
           playerRef.current?.pauseVideo?.();
           window.clearInterval(intervalRef.current!);
           intervalRef.current = null;

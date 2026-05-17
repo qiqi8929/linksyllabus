@@ -12,6 +12,10 @@ import {
   YouTubePlayerClient
 } from "@/app/play/[id]/player";
 import { resolvePlaybackClipForStep } from "@/lib/stepTimestamp";
+import {
+  fetchYouTubeVideoDurationSec,
+  formatVideoDurationClock
+} from "@/lib/youtubeDuration";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +85,10 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
       start_time: number;
       end_time: number;
     }> | null) ?? [];
-  const { startTime, endTime } = resolvePlaybackClipForStep(step, siblings);
+  const videoDurationSec =
+    showYoutube && youtubeId ? await fetchYouTubeVideoDurationSec(youtubeId) : null;
+  const clip = resolvePlaybackClipForStep(step, siblings, videoDurationSec);
+  const { startTime, endTime, timestampBeyondVideo, videoDurationSec: durSec } = clip;
 
   return (
     <main className="container-page py-6 md:py-10">
@@ -102,7 +109,15 @@ export default async function PlayPage({ params }: { params: { id: string } }) {
           <div className="mt-4 text-xs text-zinc-500">
             Clip: {startTime}s
             {endTime != null ? ` → ${endTime}s` : " → (end of video)"}
+            {durSec != null ? ` · Video length ${formatVideoDurationClock(durSec)}` : null}
           </div>
+          {timestampBeyondVideo ? (
+            <p className="mt-2 text-xs text-amber-700">
+              This step&apos;s saved timestamps are past the end of the YouTube video
+              {durSec != null ? ` (${formatVideoDurationClock(durSec)})` : ""}. Playing the
+              nearest available segment — update start/end times in the tutorial editor.
+            </p>
+          ) : null}
         </div>
 
         {showYoutube && youtubeId ? (
