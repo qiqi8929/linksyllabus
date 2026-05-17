@@ -40,8 +40,8 @@ function safeQrTarget(url: string, fallback: string): string {
 
 /**
  * One source of truth for "what URL does a step's QR encode?". Used by the
- * QR API route — work orders use {@link resolveWorkOrderQrTarget}; legacy
- * surfaces use this helper. Pure / no I/O so callers can use it client-side.
+ * QR API route — work orders use {@link resolveWorkOrderQrTarget} (always the
+ * play page). Other surfaces use this helper. Pure / no I/O for client-side use.
  *
  * Behavior:
  *   - timestamped step → `${origin}/play/${stepId}` (LinkSyllabus play page)
@@ -49,35 +49,19 @@ function safeQrTarget(url: string, fallback: string): string {
  *   - no timestamp, Vimeo → `https://vimeo.com/…`
  *   - anything else / unknown → `${origin}/play/${stepId}` (guaranteed valid)
  */
-/** YouTube watch URL at `start_time` (seconds) for work-order QR codes. */
+/** Absolute LinkSyllabus play URL for work-order QR (never YouTube/Vimeo direct). */
 export function resolveWorkOrderQrTarget(
   step: StepLikeForQr | null,
   origin: string
 ): string {
-  const playUrl = `${origin}/play/${step?.id ?? ""}`;
-  if (!step) return safeQrTarget(playUrl, playUrl);
-
-  const ytId = extractYouTubeVideoId(step.youtube_url ?? "");
-  if (ytId) {
-    const startSec = Math.max(0, Math.floor(Number(step.start_time) || 0));
-    const base = `https://www.youtube.com/watch?v=${encodeURIComponent(ytId)}`;
-    if (hasStepTimestamp(step) && startSec > 0) {
-      return `${base}&t=${startSec}`;
-    }
-    return base;
+  const id = (step?.id ?? "").trim();
+  const base = origin.trim().replace(/\/$/, "") || "https://linksyllabus.com";
+  if (!id) return safeQrTarget(base, base);
+  try {
+    return new URL(`/play/${encodeURIComponent(id)}`, `${base}/`).href;
+  } catch {
+    return `${base}/play/${encodeURIComponent(id)}`;
   }
-
-  const vimeoId = extractVimeoVideoId(step.youtube_url ?? "");
-  if (vimeoId) {
-    const startSec = Math.max(0, Math.floor(Number(step.start_time) || 0));
-    const base = `https://vimeo.com/${encodeURIComponent(vimeoId)}`;
-    if (hasStepTimestamp(step) && startSec > 0) {
-      return `${base}#t=${startSec}s`;
-    }
-    return base;
-  }
-
-  return resolveStepQrTarget(step, origin);
 }
 
 export function resolveStepQrTarget(

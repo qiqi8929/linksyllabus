@@ -45,7 +45,7 @@ function WorkOrderStepRow({ step }: { step: WorkOrderStep }) {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={`/api/qr/${encodeURIComponent(step.id)}?surface=work-order`}
+            src={`/api/qr/${encodeURIComponent(step.id)}?surface=work-order&v=play`}
             alt=""
             width={52}
             height={52}

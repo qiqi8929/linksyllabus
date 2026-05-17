@@ -12,8 +12,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Step QR PNGs. `surface=work-order` encodes YouTube (or Vimeo) URLs with timestamps;
- * other surfaces use the play-page target for legacy print layouts.
+ * Step QR PNGs. `surface=work-order` always encodes the LinkSyllabus play page
+ * for that step so scans stay in-app at the right timestamp.
  */
 export async function GET(
   req: Request,
@@ -31,22 +31,25 @@ export async function GET(
           ? "long-image"
           : "unspecified";
 
-  let target = `${origin}/play/${params.id}`;
-  try {
-    const admin = createSupabaseAdminClient();
-    const { data } = await admin
-      .from("steps")
-      .select("id,youtube_url,start_time,end_time")
-      .eq("id", params.id)
-      .maybeSingle();
+  const playTarget = resolveWorkOrderQrTarget(
+    { id: params.id, youtube_url: null, start_time: null, end_time: null },
+    origin
+  );
 
-    const step = data as StepLikeForQr | null;
-    target =
-      surface === "work-order"
-        ? resolveWorkOrderQrTarget(step, origin)
-        : resolveStepQrTarget(step, origin);
-  } catch {
-    /* keep play-page fallback */
+  let target = playTarget;
+  if (surface !== "work-order") {
+    try {
+      const admin = createSupabaseAdminClient();
+      const { data } = await admin
+        .from("steps")
+        .select("id,youtube_url,start_time,end_time")
+        .eq("id", params.id)
+        .maybeSingle();
+
+      target = resolveStepQrTarget(data as StepLikeForQr | null, origin);
+    } catch {
+      target = playTarget;
+    }
   }
 
   const png = await qrPngBuffer(target);
