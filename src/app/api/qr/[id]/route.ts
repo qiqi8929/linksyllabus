@@ -2,17 +2,18 @@ import { NextResponse } from "next/server";
 import { publicSiteOriginFromRequest } from "@/lib/publicOrigin";
 import { qrPngBuffer } from "@/lib/qrPng";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { resolveStepQrTarget, type StepLikeForQr } from "@/lib/stepQrTarget";
+import {
+  resolveStepQrTarget,
+  resolveWorkOrderQrTarget,
+  type StepLikeForQr
+} from "@/lib/stepQrTarget";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Single QR endpoint for both surfaces:
- *   - PDF (rendered by the browser print dialog) — `<img src="/api/qr/{id}?surface=pdf">`
- *   - Long image (html2canvas) — `<img src="/api/qr/{id}?surface=long-image">`
- * The `surface` query param is purely a log label. The encoded URL is the
- * same regardless — it's computed by `resolveStepQrTarget` once, here.
+ * Step QR PNGs. `surface=work-order` encodes YouTube (or Vimeo) URLs with timestamps;
+ * other surfaces use the play-page target for legacy print layouts.
  */
 export async function GET(
   req: Request,
@@ -21,12 +22,14 @@ export async function GET(
   const url = new URL(req.url);
   const origin = publicSiteOriginFromRequest(req);
   const surfaceParam = (url.searchParams.get("surface") ?? "").trim();
-  const surface: "pdf" | "long-image" | "unspecified" =
-    surfaceParam === "pdf"
-      ? "pdf"
-      : surfaceParam === "long-image"
-        ? "long-image"
-        : "unspecified";
+  const surface: "pdf" | "long-image" | "work-order" | "unspecified" =
+    surfaceParam === "work-order"
+      ? "work-order"
+      : surfaceParam === "pdf"
+        ? "pdf"
+        : surfaceParam === "long-image"
+          ? "long-image"
+          : "unspecified";
 
   let target = `${origin}/play/${params.id}`;
   try {
@@ -37,17 +40,13 @@ export async function GET(
       .eq("id", params.id)
       .maybeSingle();
 
-    target = resolveStepQrTarget(data as StepLikeForQr | null, origin);
+    const step = data as StepLikeForQr | null;
+    target =
+      surface === "work-order"
+        ? resolveWorkOrderQrTarget(step, origin)
+        : resolveStepQrTarget(step, origin);
   } catch {
     /* keep play-page fallback */
-  }
-
-  if (surface === "pdf") {
-    console.log("PDF QR URL:", target);
-  } else if (surface === "long-image") {
-    console.log("Long image QR URL:", target);
-  } else {
-    console.log("[QR] target:", target);
   }
 
   const png = await qrPngBuffer(target);

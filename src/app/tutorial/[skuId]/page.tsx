@@ -213,7 +213,7 @@ export default async function TutorialPage({
           rel="noopener noreferrer"
           className="inline-flex shrink-0 items-center justify-center gap-2 self-stretch rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 sm:self-auto"
         >
-          🖨️ Print QR Guide
+          🖨️ Print work order
         </a>
       </div>
 

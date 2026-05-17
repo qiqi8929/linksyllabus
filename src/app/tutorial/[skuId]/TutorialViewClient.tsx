@@ -811,7 +811,7 @@ export function TutorialViewClient({
                 rel="noopener noreferrer"
                 className={`${printQrGuideClassName} mt-4`}
               >
-                🖨️ Print QR Guide
+                🖨️ Print work order
               </a>
             </div>
             <div className="w-full lg:w-[40%] lg:pt-0">{contentPanel}</div>

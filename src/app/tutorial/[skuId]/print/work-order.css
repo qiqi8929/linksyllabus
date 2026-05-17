@@ -1,0 +1,412 @@
+/* Work Order PDF — A4, 2-page max, screen + print */
+#pm-root *,
+#pm-root *::before,
+#pm-root *::after {
+  box-sizing: border-box;
+}
+
+#pm-root {
+  --wo-ink: #1a1a1a;
+  --wo-muted: #6b6560;
+  --wo-border: #ddd8d2;
+  --wo-accent: #c4622d;
+  --wo-fill: #f7f5f2;
+  --wo-master: #2a2a2a;
+  --wo-apprentice: #c4622d;
+
+  font-family: var(--font-pm-dm), "DM Sans", system-ui, sans-serif;
+  color: var(--wo-ink);
+  background: #eceae6;
+  padding: 24px 16px 64px;
+}
+
+#pm-root .wo-manual {
+  max-width: 210mm;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#pm-root .wo-page {
+  background: #fff;
+  border: 1px solid var(--wo-border);
+  border-radius: 8px;
+  padding: 10mm 11mm 9mm;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* ─── Header ─── */
+#pm-root .wo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--wo-border);
+}
+
+#pm-root .wo-title {
+  font-family: var(--font-pm-playfair), "Playfair Display", Georgia, serif;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+#pm-root .wo-level-line {
+  margin: 0;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--wo-accent);
+}
+
+#pm-root .wo-header-meta {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 108px;
+}
+
+/* ─── Blank fields ─── */
+#pm-root .wo-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+}
+
+#pm-root .wo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+#pm-root .wo-field-wide {
+  grid-column: 1 / -1;
+}
+
+#pm-root .wo-field-label {
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wo-muted);
+}
+
+#pm-root .wo-field-line {
+  display: block;
+  height: 14px;
+  border-bottom: 1px solid #bbb6af;
+}
+
+#pm-root .wo-field-yn {
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+#pm-root .wo-yn {
+  font-size: 9px;
+  color: var(--wo-muted);
+  letter-spacing: 0.06em;
+}
+
+/* ─── Materials ─── */
+#pm-root .wo-section-heading {
+  margin: 0 0 4px;
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--wo-muted);
+}
+
+#pm-root .wo-materials {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--wo-border);
+}
+
+#pm-root .wo-materials-line {
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.45;
+  color: var(--wo-ink);
+}
+
+/* ─── Steps ─── */
+#pm-root .wo-steps-section {
+  margin-top: 2px;
+}
+
+#pm-root .wo-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+#pm-root .wo-step {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: stretch;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--wo-border);
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+#pm-root .wo-step:nth-child(odd) {
+  background: var(--wo-fill);
+}
+
+#pm-root .wo-step-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--wo-accent);
+  margin-bottom: 2px;
+}
+
+#pm-root .wo-step-title {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+#pm-root .wo-step-bullets {
+  margin: 0;
+  padding: 0 0 0 14px;
+  font-size: 9px;
+  line-height: 1.4;
+  color: #44403c;
+}
+
+#pm-root .wo-step-bullets li {
+  margin-bottom: 1px;
+}
+
+#pm-root .wo-step-bullets li:last-child {
+  margin-bottom: 0;
+}
+
+#pm-root .wo-step-aside {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding-left: 4px;
+}
+
+#pm-root .wo-step-check {
+  width: 11px;
+  height: 11px;
+  border: 1px solid #999;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+#pm-root .wo-step-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-decoration: none;
+  color: inherit;
+}
+
+#pm-root .wo-step-qr img {
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--wo-border);
+  border-radius: 3px;
+  background: #fff;
+  padding: 2px;
+  object-fit: contain;
+}
+
+#pm-root .wo-step-qr-caption {
+  font-size: 6px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a8a29e;
+  text-align: center;
+  max-width: 56px;
+  line-height: 1.2;
+}
+
+/* ─── Sign-off ─── */
+#pm-root .wo-signoff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+#pm-root .wo-signoff-head {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  padding: 5px 8px;
+  margin-bottom: 6px;
+}
+
+#pm-root .wo-signoff-master .wo-signoff-head {
+  background: var(--wo-master);
+}
+
+#pm-root .wo-signoff-apprentice .wo-signoff-head {
+  background: var(--wo-apprentice);
+}
+
+#pm-root .wo-signoff-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0 4px 4px;
+}
+
+/* ─── Footer ─── */
+#pm-root .wo-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--wo-border);
+  font-size: 7px;
+  color: #a8a29e;
+  flex-wrap: wrap;
+}
+
+#pm-root .wo-footer span:nth-child(2) {
+  flex: 1;
+  text-align: center;
+  min-width: 120px;
+}
+
+/* ─── Print bar (shared) ─── */
+#pm-root .pm-print-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+#pm-root .pm-print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--wo-accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+#pm-root .pm-print-btn:hover {
+  background: #a8501f;
+}
+
+#pm-root .pm-back-btn,
+#pm-root .pm-share-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: transparent;
+  color: var(--wo-muted);
+  border: 1px solid var(--wo-border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+#pm-root .pm-back-btn:hover,
+#pm-root .pm-share-btn:hover {
+  border-color: var(--wo-accent);
+  color: var(--wo-accent);
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 9mm;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  #pm-root {
+    background: #fff;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #pm-root .pm-print-bar {
+    display: none !important;
+  }
+
+  #pm-root .wo-manual {
+    gap: 0;
+  }
+
+  #pm-root .wo-page {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  #pm-root .wo-page-break {
+    page-break-before: always;
+    break-before: page;
+  }
+
+  #pm-root .wo-step,
+  #pm-root .wo-signoff {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  #pm-root .wo-step:nth-child(odd) {
+    background: var(--wo-fill) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #pm-root .wo-signoff-head {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

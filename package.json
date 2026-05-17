@@ -14,7 +14,6 @@
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.49.1",
     "@vimeo/player": "^2.30.3",
-    "html2canvas": "^1.4.1",
     "next": "^14.2.0",
     "nodemailer": "^8.0.7",
     "qrcode": "^1.5.4",

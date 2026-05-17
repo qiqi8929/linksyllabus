@@ -40,9 +40,8 @@ function safeQrTarget(url: string, fallback: string): string {
 
 /**
  * One source of truth for "what URL does a step's QR encode?". Used by the
- * QR API route — both the PDF and the long image hit the same route, so this
- * helper is the single place where the target is decided. Pure / no I/O so
- * callers can also use it client-side for diagnostics.
+ * QR API route — work orders use {@link resolveWorkOrderQrTarget}; legacy
+ * surfaces use this helper. Pure / no I/O so callers can use it client-side.
  *
  * Behavior:
  *   - timestamped step → `${origin}/play/${stepId}` (LinkSyllabus play page)
@@ -50,6 +49,37 @@ function safeQrTarget(url: string, fallback: string): string {
  *   - no timestamp, Vimeo → `https://vimeo.com/…`
  *   - anything else / unknown → `${origin}/play/${stepId}` (guaranteed valid)
  */
+/** YouTube watch URL at `start_time` (seconds) for work-order QR codes. */
+export function resolveWorkOrderQrTarget(
+  step: StepLikeForQr | null,
+  origin: string
+): string {
+  const playUrl = `${origin}/play/${step?.id ?? ""}`;
+  if (!step) return safeQrTarget(playUrl, playUrl);
+
+  const ytId = extractYouTubeVideoId(step.youtube_url ?? "");
+  if (ytId) {
+    const startSec = Math.max(0, Math.floor(Number(step.start_time) || 0));
+    const base = `https://www.youtube.com/watch?v=${encodeURIComponent(ytId)}`;
+    if (hasStepTimestamp(step) && startSec > 0) {
+      return `${base}&t=${startSec}`;
+    }
+    return base;
+  }
+
+  const vimeoId = extractVimeoVideoId(step.youtube_url ?? "");
+  if (vimeoId) {
+    const startSec = Math.max(0, Math.floor(Number(step.start_time) || 0));
+    const base = `https://vimeo.com/${encodeURIComponent(vimeoId)}`;
+    if (hasStepTimestamp(step) && startSec > 0) {
+      return `${base}#t=${startSec}s`;
+    }
+    return base;
+  }
+
+  return resolveStepQrTarget(step, origin);
+}
+
 export function resolveStepQrTarget(
   step: StepLikeForQr | null,
   origin: string

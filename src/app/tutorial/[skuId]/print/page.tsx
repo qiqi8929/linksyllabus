@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { extractYouTubeVideoId } from "@/lib/video";
 import { fetchSkuVisibleToViewer, fetchTutorialSteps } from "../tutorialAccess";
-import { LongImageView } from "./LongImageView";
 import { PrintBar } from "./PrintBar";
-import { PrintManualView, type SkuPrint } from "./PrintManualView";
+import { WorkOrderView } from "./WorkOrderView";
 import { resolvePrintBranding } from "./resolvePrintBranding";
 
 export const dynamic = "force-dynamic";
@@ -18,21 +16,6 @@ async function resolveParams(
   return Promise.resolve(params);
 }
 
-/** Filename stem for long-PNG download (no extension, filesystem-safe). */
-function pngDownloadBasename(name: string, id: string): string {
-  const cleaned = name
-    .trim()
-    .replace(/[<>:"/\\|?*\u0000-\u001f]+/g, " ")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 72);
-  if (cleaned.length > 0) {
-    return cleaned;
-  }
-  return `tutorial-${id.slice(0, 8)}`;
-}
-
 type SkuRow = {
   id: string;
   name: string;
@@ -40,19 +23,10 @@ type SkuRow = {
   user_id: string;
   creator_name?: string | null;
   author?: string | null;
-  creator_site?: string | null;
-  creator_logo?: string | null;
   level?: string | null;
   materials_text?: string | null;
   tools_text?: string | null;
 };
-
-/** YouTube still frame for print cover when the first step uses a YouTube URL. */
-function coverHeroImageFromFirstStep(youtubeUrl: string | undefined): string | null {
-  if (!youtubeUrl?.trim()) return null;
-  const vid = extractYouTubeVideoId(youtubeUrl.trim());
-  return vid ? `https://img.youtube.com/vi/${vid}/hqdefault.jpg` : null;
-}
 
 export async function generateMetadata({
   params
@@ -62,11 +36,12 @@ export async function generateMetadata({
   const { skuId } = await resolveParams(params);
   const { sku } = await fetchSkuVisibleToViewer(skuId);
   const title = sku?.name?.trim()
-    ? `${sku.name} · Print manual`
-    : "Print manual";
+    ? `${sku.name} · Work order`
+    : "Work order";
   return {
     title,
-    description: "Printable step guide with QR codes to watch each clip."
+    description:
+      "Printable work order with step checklist and QR codes linked to each video timestamp."
   };
 }
 
@@ -92,7 +67,6 @@ export default async function TutorialPrintPage({
   }
 
   const steps = stepRows ?? [];
-
   const row = sku as SkuRow;
   const { displayLevel } = resolvePrintBranding({
     creator_name: row.creator_name,
@@ -100,60 +74,22 @@ export default async function TutorialPrintPage({
     level: row.level
   });
 
-  const record = row as Record<string, unknown>;
-  const customCover =
-    typeof record.cover_image_url === "string"
-      ? record.cover_image_url.trim()
-      : typeof record.coverImageUrl === "string"
-        ? record.coverImageUrl.trim()
-        : "";
-  const coverHeroImageUrl =
-    customCover ||
-    coverHeroImageFromFirstStep(steps[0]?.youtube_url) ||
-    null;
-
-  const skuPrint: SkuPrint = {
-    id: row.id,
-    name: row.name,
-    description: row.description ?? "",
-    creator_logo: row.creator_logo ?? null,
-    level: row.level ?? null,
-    materials_text: row.materials_text ?? null,
-    tools_text: row.tools_text ?? null,
-    display_level: displayLevel,
-    cover_hero_image_url: coverHeroImageUrl
-  };
-
   return (
     <div id="pm-root">
       <PrintBar
         tutorialHref={`/tutorial/${encodeURIComponent(sku.id)}`}
         tutorialTitle={row.name}
-        pngDownloadBasename={pngDownloadBasename(row.name, row.id)}
       />
-      <PrintManualView sku={skuPrint} steps={steps} />
-      {/*
-        Off-screen render used only by the "Download as long image" button.
-        Hidden from screen and from @media print (see long-image.css .pmli-host),
-        so it never alters the PDF output. html2canvas targets #pm-long-image-root.
-      */}
-      <div className="pmli-host" aria-hidden>
-        <LongImageView
-          sku={{
-            id: row.id,
-            name: row.name,
-            description: row.description ?? "",
-            level: row.level ?? null,
-            materials_text: row.materials_text ?? null,
-            tools_text: row.tools_text ?? null,
-            display_level: displayLevel,
-            creator_name: row.creator_name ?? null,
-            author: row.author ?? null,
-            cover_hero_image_url: coverHeroImageUrl
-          }}
-          steps={steps}
-        />
-      </div>
+      <WorkOrderView
+        sku={{
+          id: row.id,
+          name: row.name,
+          display_level: displayLevel,
+          materials_text: row.materials_text ?? null,
+          tools_text: row.tools_text ?? null
+        }}
+        steps={steps}
+      />
     </div>
   );
 }
