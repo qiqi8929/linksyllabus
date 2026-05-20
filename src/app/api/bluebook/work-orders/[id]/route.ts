@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
+import { persistBluebookPlaySteps } from "@/lib/bluebook/persistPlaySteps";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import type { BluebookWorkOrder } from "@/lib/bluebook/types";
+import type {
+  BluebookAiStep,
+  BluebookVideoRef,
+  BluebookWorkOrder
+} from "@/lib/bluebook/types";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +29,31 @@ export async function GET(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const videoUrls = (data.video_urls ?? []) as BluebookVideoRef[];
+  const video = videoUrls[0];
+  let aiSteps = (data.ai_steps ?? []) as BluebookAiStep[];
+  if (
+    data.include_video &&
+    video?.url &&
+    aiSteps.length > 0 &&
+    !aiSteps.every((s) => s.id)
+  ) {
+    aiSteps = await persistBluebookPlaySteps(supabase, {
+      userId: user.id,
+      workOrderId: data.id as string,
+      competenceName: String(data.competence_name),
+      steps: aiSteps,
+      youtubeUrl: video.url,
+      durationSec: video.durationSec
+    });
+    await supabase
+      .from("bluebook_work_orders")
+      .update({ ai_steps: aiSteps })
+      .eq("id", params.id)
+      .eq("user_id", user.id);
+    data.ai_steps = aiSteps;
+  }
 
   const { data: profile } = await supabase
     .from("users")

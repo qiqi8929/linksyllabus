@@ -2,6 +2,8 @@ export type CompetenceType = "mandatory" | "optional";
 export type WorkOrderStatus = "draft" | "completed" | "signed";
 
 export type BluebookAiStep = {
+  /** Row id in `steps` — used for /play/[id] and work-order QR codes. */
+  id?: string;
   step_number: number;
   title: string;
   description: string;

@@ -14,29 +14,6 @@ import type {
 
 type Tab = "bluebook" | "learning";
 
-function youtubeUrlAt(url: string, startSec: number): string {
-  try {
-    const u = new URL(url);
-    u.searchParams.set("t", String(Math.max(0, Math.floor(startSec))));
-    return u.toString();
-  } catch {
-    return url;
-  }
-}
-
-function stepStartSec(
-  step: BluebookAiStep,
-  index: number,
-  steps: BluebookAiStep[],
-  durationSec?: number
-): number {
-  if (step.start_time != null) return step.start_time;
-  if (durationSec && durationSec > 0 && steps.length > 0) {
-    return Math.floor((durationSec / steps.length) * index);
-  }
-  return index * 30;
-}
-
 export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("bluebook");
@@ -240,23 +217,17 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
               {video.channel ? ` · ${video.channel}` : ""}
             </p>
           ) : null}
-          {steps.map((step, i) => {
-            const start = stepStartSec(step, i, steps, video?.durationSec);
-            const watchUrl =
-              video?.url && workOrder.include_video
-                ? youtubeUrlAt(video.url, start)
-                : null;
-            return (
-              <article key={step.step_number} className="learning-step-card">
+          {steps.map((step) => (
+              <article key={step.id ?? step.step_number} className="learning-step-card">
                 <h3 className="text-sm font-semibold">
                   Step {step.step_number}: {step.title}
                 </h3>
                 <p className="mt-1 text-sm text-zinc-700">{step.description}</p>
-                {watchUrl ? (
+                {step.id && workOrder.include_video ? (
                   <p className="mt-3 flex items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={`/api/bluebook/qr?url=${encodeURIComponent(watchUrl)}`}
+                      src={`/api/qr/${encodeURIComponent(step.id)}?surface=work-order&v=play`}
                       alt={`QR for step ${step.step_number}`}
                       width={96}
                       height={96}
@@ -268,8 +239,7 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
                   </p>
                 ) : null}
               </article>
-            );
-          })}
+            ))}
         </section>
       ) : null}
 

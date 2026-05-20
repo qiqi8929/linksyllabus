@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { persistBluebookPlaySteps } from "@/lib/bluebook/persistPlaySteps";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import type { BluebookAiStep, BluebookVideoRef, CompetenceType } from "@/lib/bluebook/types";
 
@@ -31,6 +32,10 @@ export async function POST(req: Request) {
     body.competenceType === "optional" ? "optional" : "mandatory";
   const period = Math.max(1, Math.min(4, Math.floor(Number(body.period ?? 1))));
 
+  const videoUrls = (body.videoUrls ?? []) as BluebookVideoRef[];
+  const video = videoUrls[0];
+  let aiSteps = (body.aiSteps ?? []) as BluebookAiStep[];
+
   const { data, error } = await supabase
     .from("bluebook_work_orders")
     .insert({
@@ -39,8 +44,8 @@ export async function POST(req: Request) {
       competence_name,
       competence_type,
       period,
-      ai_steps: body.aiSteps ?? [],
-      video_urls: body.videoUrls ?? [],
+      ai_steps: aiSteps,
+      video_urls: videoUrls,
       include_video: body.includeVideo !== false,
       status: "draft"
     })
@@ -49,6 +54,22 @@ export async function POST(req: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (video?.url && aiSteps.length > 0 && body.includeVideo !== false) {
+    aiSteps = await persistBluebookPlaySteps(supabase, {
+      userId: user.id,
+      workOrderId: data.id,
+      competenceName: competence_name,
+      steps: aiSteps,
+      youtubeUrl: video.url,
+      durationSec: video.durationSec
+    });
+    await supabase
+      .from("bluebook_work_orders")
+      .update({ ai_steps: aiSteps })
+      .eq("id", data.id)
+      .eq("user_id", user.id);
   }
 
   return NextResponse.json({ id: data.id });
