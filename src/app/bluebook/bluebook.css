@@ -1,0 +1,73 @@
+.bluebook-root .ait-sheet {
+  border: 4px solid #1e4b8f;
+  padding: 16px 18px 20px;
+  background: #fff;
+  position: relative;
+}
+
+.bluebook-root .ait-submit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #1e4b8f;
+}
+
+.bluebook-root .ait-submit-btn {
+  border: 2px solid #1e4b8f;
+  border-radius: 999px;
+  padding: 4px 14px;
+  background: #eef4fc;
+}
+
+.bluebook-root .ait-body p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #1a1a1a;
+}
+
+.bluebook-root .ait-body strong {
+  font-weight: 700;
+}
+
+.bluebook-root .ait-sign-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+  font-size: 11px;
+}
+
+.bluebook-root .ait-field-label {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.bluebook-root .ait-line {
+  display: block;
+  border-bottom: 1px dashed #666;
+  min-height: 18px;
+  margin-bottom: 8px;
+}
+
+.bluebook-root .learning-step-card {
+  border: 1px solid #ddd8d2;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.bluebook-root .signature-canvas {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+  touch-action: none;
+  width: 100%;
+  max-width: 400px;
+  height: 120px;
+}

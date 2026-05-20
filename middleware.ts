@@ -12,7 +12,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!req.nextUrl.pathname.startsWith("/dashboard")) {
+  const isProtected =
+    req.nextUrl.pathname.startsWith("/dashboard") ||
+    req.nextUrl.pathname.startsWith("/bluebook");
+
+  if (!isProtected) {
     return NextResponse.next();
   }
 
@@ -52,8 +56,7 @@ export async function middleware(req: NextRequest) {
     data: { user }
   } = await supabase.auth.getUser();
 
-  const isDashboard = req.nextUrl.pathname.startsWith("/dashboard");
-  if (isDashboard && !user) {
+  if (!user) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("next", req.nextUrl.pathname);
@@ -64,6 +67,6 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/api/stripe/webhook"]
+  matcher: ["/dashboard/:path*", "/bluebook/:path*", "/api/stripe/webhook"]
 };
 

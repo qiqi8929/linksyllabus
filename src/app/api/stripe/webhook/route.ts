@@ -4,6 +4,8 @@ import { getStripe } from "@/lib/stripe/server";
 import { env } from "@/lib/env";
 import { applyGuideUnlockFromPaidCheckoutSession } from "@/lib/stripe/guideUnlock";
 import { activateSkuFromCheckoutSession } from "@/lib/stripe/skuActivation";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { handleBluebookCheckoutCompleted } from "@/lib/stripe/bluebookSubscription";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,6 +85,40 @@ export async function POST(req: Request) {
             sessionId: session.id,
             wouldRetry: guideUnlockWebhookShouldRetry(result.reason)
           });
+        }
+      }
+
+      if (type === "bluebook_subscription" && userId) {
+        try {
+          const admin = createSupabaseAdminClient();
+          await handleBluebookCheckoutCompleted(admin, session);
+        } catch (e) {
+          console.error("[stripe webhook] bluebook_subscription failed", e);
+        }
+      }
+    }
+
+    if (
+      event.type === "customer.subscription.updated" ||
+      event.type === "customer.subscription.deleted"
+    ) {
+      const sub = event.data.object as Stripe.Subscription;
+      const userId = sub.metadata?.user_id;
+      if (userId) {
+        try {
+          const admin = createSupabaseAdminClient();
+          const status =
+            sub.status === "active" || sub.status === "trialing"
+              ? "active"
+              : sub.status;
+          await admin.from("subscriptions").upsert({
+            user_id: userId,
+            status,
+            stripe_customer_id:
+              typeof sub.customer === "string" ? sub.customer : sub.customer?.id ?? null
+          });
+        } catch (e) {
+          console.error("[stripe webhook] subscription status update failed", e);
         }
       }
     }

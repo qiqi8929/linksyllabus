@@ -36,7 +36,10 @@ export const env = {
       process.env.STRIPE_PRICE_ID_SKU_ACTIVATION as string | undefined,
     /** One-time payment per additional tutorial guide after free tier ($9.99). */
     priceIdGuideUnlock: () =>
-      process.env.STRIPE_PRICE_ID_GUIDE_UNLOCK as string | undefined
+      process.env.STRIPE_PRICE_ID_GUIDE_UNLOCK as string | undefined,
+    /** Bluebook subscription ($19.99/mo after trial). */
+    priceIdBluebookMonthly: () =>
+      process.env.STRIPE_PRICE_ID_BLUEBOOK_MONTHLY as string | undefined
   },
 
   /** Server-only. Step description generation via Gemini; omit in env to disable AI. */
