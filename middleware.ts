@@ -12,9 +12,15 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  if (req.nextUrl.pathname.startsWith("/bluebook")) {
+    const dest = req.nextUrl.clone();
+    dest.pathname = dest.pathname.replace(/^\/bluebook/, "/magiclog");
+    return NextResponse.redirect(dest);
+  }
+
   const isProtected =
     req.nextUrl.pathname.startsWith("/dashboard") ||
-    req.nextUrl.pathname.startsWith("/bluebook");
+    req.nextUrl.pathname.startsWith("/magiclog");
 
   if (!isProtected) {
     return NextResponse.next();
@@ -67,6 +73,11 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/bluebook/:path*", "/api/stripe/webhook"]
+  matcher: [
+    "/dashboard/:path*",
+    "/magiclog/:path*",
+    "/bluebook/:path*",
+    "/api/stripe/webhook"
+  ]
 };
 

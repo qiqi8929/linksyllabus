@@ -5,7 +5,7 @@ import { env } from "@/lib/env";
 import { applyGuideUnlockFromPaidCheckoutSession } from "@/lib/stripe/guideUnlock";
 import { activateSkuFromCheckoutSession } from "@/lib/stripe/skuActivation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { handleBluebookCheckoutCompleted } from "@/lib/stripe/bluebookSubscription";
+import { handleBluebookCheckoutCompleted } from "@/lib/stripe/magiclogSubscription";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

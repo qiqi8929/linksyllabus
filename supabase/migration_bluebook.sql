@@ -126,7 +126,7 @@ using (
   and auth.uid()::text = (storage.foldername(name))[1]
 );
 
--- Email reminder deduplication (cron: /api/bluebook/reminders)
+-- Email reminder deduplication (cron: /api/magiclog/reminders)
 create table if not exists public.bluebook_reminder_logs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
