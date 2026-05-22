@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SignaturePad } from "@/components/bluebook/SignaturePad";
 import { FormError } from "@/components/FormError";
+import {
+  isQuickLogWorkOrder,
+  quickLogWorkedDate
+} from "@/lib/bluebook/workOrderMode";
 import type {
   BluebookAiStep,
   BluebookUserProfile,
@@ -39,6 +43,10 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
       setSignaturePath(j.workOrder.mentor_signature_url);
     }
     if (j.workOrder.mentor_name) setMentorName(j.workOrder.mentor_name);
+    const wo = j.workOrder as BluebookWorkOrder;
+    if (isQuickLogWorkOrder(wo) && wo.hours != null) {
+      setHours(String(wo.hours));
+    }
   }, [workOrderId]);
 
   useEffect(() => {
@@ -54,30 +62,7 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
 
   const steps = (workOrder?.ai_steps ?? []) as BluebookAiStep[];
 
-  async function uploadSignature(file: File | Blob) {
-    setError(null);
-    setLoading(true);
-    try {
-      const form = new FormData();
-      form.append("file", file, "signature.png");
-      const res = await fetch(`/api/bluebook/work-orders/${workOrderId}/signature`, {
-        method: "POST",
-        body: form
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error ?? "Upload failed");
-      setSignaturePath(j.path);
-      setSignatureUrl(j.signedUrl ?? null);
-      setShowHoursPrompt(true);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Upload failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function completeSign() {
-    const h = Number(hours);
+  async function submitSignOff(h: number, sigPath: string | null) {
     if (!Number.isFinite(h) || h <= 0) {
       setError("Enter valid hours for this task");
       return;
@@ -90,7 +75,7 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           hours: h,
-          mentorSignatureUrl: signaturePath,
+          mentorSignatureUrl: sigPath,
           mentorName: mentorName.trim() || undefined
         })
       });
@@ -106,6 +91,38 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
     }
   }
 
+  async function uploadSignature(file: File | Blob) {
+    setError(null);
+    setLoading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file, "signature.png");
+      const res = await fetch(`/api/bluebook/work-orders/${workOrderId}/signature`, {
+        method: "POST",
+        body: form
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error ?? "Upload failed");
+      setSignaturePath(j.path);
+      setSignatureUrl(j.signedUrl ?? null);
+      const order = workOrder;
+      if (order && isQuickLogWorkOrder(order) && order.hours != null) {
+        setHours(String(order.hours));
+        await submitSignOff(Number(order.hours), j.path as string);
+        return;
+      }
+      setShowHoursPrompt(true);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function completeSign() {
+    await submitSignOff(Number(hours), signaturePath);
+  }
+
   if (!workOrder) {
     return (
       <section>
@@ -118,6 +135,9 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
   const period = workOrder.period;
   const signed = workOrder.status === "signed";
   const competenceLabel = workOrder.competence_name || workOrder.task_name || "Task";
+  const quickLog = isQuickLogWorkOrder(workOrder);
+  const workedDate = quickLogWorkedDate(workOrder);
+  const hasLearning = !quickLog && steps.length > 0;
 
   return (
     <section className="space-y-6">
@@ -131,22 +151,24 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
             Period {period} · {workOrder.competence_type} · {workOrder.status}
           </p>
         </section>
-        <nav className="flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
-          <button
-            type="button"
-            className={`rounded-md px-3 py-1.5 ${tab === "bluebook" ? "bg-orange-500 text-white" : ""}`}
-            onClick={() => setTab("bluebook")}
-          >
-            My Bluebook
-          </button>
-          <button
-            type="button"
-            className={`rounded-md px-3 py-1.5 ${tab === "learning" ? "bg-orange-500 text-white" : ""}`}
-            onClick={() => setTab("learning")}
-          >
-            My Learning
-          </button>
-        </nav>
+        {hasLearning ? (
+          <nav className="flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
+            <button
+              type="button"
+              className={`rounded-md px-3 py-1.5 ${tab === "bluebook" ? "bg-orange-500 text-white" : ""}`}
+              onClick={() => setTab("bluebook")}
+            >
+              My Bluebook
+            </button>
+            <button
+              type="button"
+              className={`rounded-md px-3 py-1.5 ${tab === "learning" ? "bg-orange-500 text-white" : ""}`}
+              onClick={() => setTab("learning")}
+            >
+              My Learning
+            </button>
+          </nav>
+        ) : null}
       </header>
 
       {tab === "bluebook" ? (
@@ -162,6 +184,14 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
             <p>
               Competence: <strong>{competenceLabel}</strong> ({workOrder.competence_type})
             </p>
+            {quickLog ? (
+              <p>
+                Quick log · {workOrder.hours ?? "—"} hours
+                {workedDate
+                  ? ` · worked ${new Date(workedDate).toLocaleDateString("en-CA")}`
+                  : ""}
+              </p>
+            ) : null}
             <p>
               I am satisfied that (a) qualified mentor(s) has assessed competence for the
               apprentice and that the mentor(s) has determined that the apprentice has
@@ -209,7 +239,7 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
         </section>
       ) : null}
 
-      {tab === "learning" ? (
+      {tab === "learning" && hasLearning ? (
         <section className="space-y-4">
           {video ? (
             <p className="text-sm text-zinc-600">
@@ -284,7 +314,7 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
         </p>
       )}
 
-      {showHoursPrompt && !signed ? (
+      {showHoursPrompt && !signed && !quickLog ? (
         <section className="card space-y-3 p-5">
           <p className="text-sm font-medium">How many hours did this task take?</p>
           <input

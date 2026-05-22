@@ -25,6 +25,8 @@ export function OnboardingWizard() {
   const [startDate, setStartDate] = useState("");
   const [sponsorName, setSponsorName] = useState("");
   const [sponsorPhone, setSponsorPhone] = useState("");
+  const [scannedName, setScannedName] = useState<string | null>(null);
+  const [scanLoading, setScanLoading] = useState(false);
 
   async function saveProfile(partial: Record<string, unknown>) {
     const res = await fetch("/api/bluebook/profile", {
@@ -35,6 +37,35 @@ export function OnboardingWizard() {
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
       throw new Error(j.error ?? "Failed to save profile");
+    }
+  }
+
+  async function scanCover(file: File) {
+    setError(null);
+    setScanLoading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/bluebook/scan-cover", {
+        method: "POST",
+        body: form
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error ?? "Scan failed");
+      const f = j.fields as {
+        name?: string | null;
+        ait_id?: string | null;
+        trade?: string | null;
+        start_date?: string | null;
+      };
+      if (f.ait_id) setAitId(f.ait_id);
+      if (f.trade) setTrade(f.trade);
+      if (f.start_date) setStartDate(f.start_date);
+      if (f.name) setScannedName(f.name);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Cover scan failed");
+    } finally {
+      setScanLoading(false);
     }
   }
 
@@ -131,6 +162,34 @@ export function OnboardingWizard() {
 
       {step === 2 ? (
         <div className="mt-6 space-y-3">
+          <section className="bb-scan-box">
+            <p className="text-sm font-medium text-[#1e4b8f]">
+              Scan your blue book cover to auto-fill
+            </p>
+            <p className="mt-1 text-xs text-zinc-600">
+              Upload a photo of your Alberta AIT apprentice record book cover.
+            </p>
+            <label className="btn-ghost mt-3 inline-flex cursor-pointer text-sm">
+              {scanLoading ? "Scanning…" : "Upload photo or take picture"}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                disabled={scanLoading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void scanCover(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {scannedName ? (
+              <p className="mt-2 text-xs text-green-700">
+                Detected apprentice: {scannedName}
+              </p>
+            ) : null}
+          </section>
           <div className="space-y-1">
             <label className="text-sm font-medium">AIT ID number</label>
             <input value={aitId} onChange={(e) => setAitId(e.target.value)} required />

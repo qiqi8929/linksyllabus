@@ -2,24 +2,69 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { BluebookAiStep, BluebookVideoRef, CompetenceType } from "@/lib/bluebook/types";
+import type {
+  BluebookAiStep,
+  BluebookCreationMode,
+  BluebookVideoRef,
+  CompetenceType
+} from "@/lib/bluebook/types";
 import { formatDurationClock } from "@/lib/youtubeSearch";
 import { FormError } from "@/components/FormError";
 
-type Phase = "task" | "video" | "steps" | "options";
+type Phase = "mode" | "task" | "video" | "steps" | "options" | "quick_log";
+
+const MODES: Array<{
+  id: BluebookCreationMode;
+  title: string;
+  description: string;
+  icon: string;
+}> = [
+  {
+    id: "learn",
+    title: "Learn & Record",
+    description: "Find a video and generate step-by-step instructions",
+    icon: "▶"
+  },
+  {
+    id: "steps_only",
+    title: "Steps Only",
+    description: "Generate steps without video",
+    icon: "☑"
+  },
+  {
+    id: "quick_log",
+    title: "Quick Log",
+    description: "Just log hours and get mentor signature",
+    icon: "⏱"
+  }
+];
 
 export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number }) {
   const router = useRouter();
-  const [phase, setPhase] = useState<Phase>("task");
+  const [mode, setMode] = useState<BluebookCreationMode | null>(null);
+  const [phase, setPhase] = useState<Phase>("mode");
   const [taskName, setTaskName] = useState("");
   const [videos, setVideos] = useState<BluebookVideoRef[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<BluebookVideoRef | null>(null);
   const [steps, setSteps] = useState<BluebookAiStep[]>([]);
-  const [includeVideo, setIncludeVideo] = useState(true);
   const [competenceType, setCompetenceType] = useState<CompetenceType>("mandatory");
   const [period, setPeriod] = useState(defaultPeriod);
+  const [quickHours, setQuickHours] = useState("");
+  const [workedDate, setWorkedDate] = useState(
+    () => new Date().toISOString().slice(0, 10)
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function selectMode(next: BluebookCreationMode) {
+    setMode(next);
+    setError(null);
+    if (next === "quick_log") {
+      setPhase("quick_log");
+    } else {
+      setPhase("task");
+    }
+  }
 
   async function searchVideos() {
     setError(null);
@@ -41,8 +86,7 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
     }
   }
 
-  async function generateSteps() {
-    if (!selectedVideo) return;
+  async function generateSteps(withVideo: boolean) {
     setError(null);
     setLoading(true);
     try {
@@ -51,7 +95,7 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           taskName,
-          youtubeUrl: selectedVideo.url
+          youtubeUrl: withVideo && selectedVideo ? selectedVideo.url : undefined
         })
       });
       const j = await res.json();
@@ -65,22 +109,14 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
     }
   }
 
-  async function saveDraft() {
+  async function saveWorkOrder(payload: Record<string, unknown>) {
     setError(null);
     setLoading(true);
     try {
       const res = await fetch("/api/bluebook/work-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskName,
-          competenceName: taskName,
-          competenceType,
-          period,
-          aiSteps: steps,
-          videoUrls: selectedVideo ? [selectedVideo] : [],
-          includeVideo
-        })
+        body: JSON.stringify(payload)
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error ?? "Save failed");
@@ -92,12 +128,83 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">New work order</h1>
+  function saveLearnOrSteps() {
+    if (!mode) return;
+    void saveWorkOrder({
+      taskName,
+      competenceName: taskName,
+      competenceType,
+      period,
+      aiSteps: steps,
+      videoUrls: mode === "learn" && selectedVideo ? [selectedVideo] : [],
+      includeVideo: mode === "learn",
+      creationMode: mode
+    });
+  }
 
-      {phase === "task" ? (
-        <div className="card space-y-4 p-5">
+  function saveQuickLog() {
+    const h = Number(quickHours);
+    if (!Number.isFinite(h) || h <= 0) {
+      setError("Enter valid hours");
+      return;
+    }
+    if (!workedDate.trim()) {
+      setError("Select the date you worked");
+      return;
+    }
+    void saveWorkOrder({
+      taskName,
+      competenceName: taskName,
+      competenceType,
+      period,
+      hours: h,
+      workedDate,
+      creationMode: "quick_log",
+      includeVideo: false,
+      aiSteps: []
+    });
+  }
+
+  return (
+    <section className="space-y-6">
+      <header>
+        <h1 className="text-2xl font-semibold">New work order</h1>
+        {phase !== "mode" && mode ? (
+          <button
+            type="button"
+            className="mt-2 text-xs text-zinc-500 hover:text-zinc-800"
+            onClick={() => {
+              setMode(null);
+              setPhase("mode");
+              setError(null);
+            }}
+          >
+            ← Change mode
+          </button>
+        ) : null}
+      </header>
+
+      {phase === "mode" ? (
+        <section className="bb-mode-grid">
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className="bb-mode-card"
+              onClick={() => selectMode(m.id)}
+            >
+              <span className="bb-mode-icon" aria-hidden>
+                {m.icon}
+              </span>
+              <span className="bb-mode-title">{m.title}</span>
+              <span className="bb-mode-desc">{m.description}</span>
+            </button>
+          ))}
+        </section>
+      ) : null}
+
+      {phase === "task" && mode === "learn" ? (
+        <section className="card space-y-4 p-5">
           <label className="block text-sm font-medium">
             What task did you work on today?
           </label>
@@ -114,11 +221,32 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
           >
             {loading ? "Searching…" : "Find YouTube videos"}
           </button>
-        </div>
+        </section>
       ) : null}
 
-      {phase === "video" ? (
-        <div className="card space-y-4 p-5">
+      {phase === "task" && mode === "steps_only" ? (
+        <section className="card space-y-4 p-5">
+          <label className="block text-sm font-medium">
+            What task did you work on today?
+          </label>
+          <input
+            value={taskName}
+            onChange={(e) => setTaskName(e.target.value)}
+            placeholder="Install electrical branch circuits"
+          />
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={loading || !taskName.trim()}
+            onClick={() => generateSteps(false)}
+          >
+            {loading ? "Generating steps…" : "Generate steps with AI"}
+          </button>
+        </section>
+      ) : null}
+
+      {phase === "video" && mode === "learn" ? (
+        <section className="card space-y-4 p-5">
           <p className="text-sm font-medium">Select a video</p>
           <ul className="space-y-3">
             {videos.map((v) => (
@@ -154,19 +282,20 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
             type="button"
             className="btn-primary"
             disabled={!selectedVideo || loading}
-            onClick={generateSteps}
+            onClick={() => generateSteps(true)}
           >
             {loading ? "Generating steps…" : "Generate steps with AI"}
           </button>
-        </div>
+        </section>
       ) : null}
 
-      {phase === "steps" || phase === "options" ? (
-        <div className="space-y-4">
-          <div className="card space-y-3 p-5">
+      {(phase === "steps" || phase === "options") &&
+      (mode === "learn" || mode === "steps_only") ? (
+        <section className="space-y-4">
+          <section className="card space-y-3 p-5">
             <p className="text-sm font-medium">Review steps</p>
             {steps.map((s, i) => (
-              <div key={s.step_number} className="space-y-1 border-b border-zinc-100 pb-3">
+              <section key={s.step_number} className="space-y-1 border-b border-zinc-100 pb-3">
                 <input
                   className="font-medium"
                   value={s.title}
@@ -185,24 +314,16 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
                     setSteps(next);
                   }}
                 />
-              </div>
+              </section>
             ))}
             <button type="button" className="btn-ghost" onClick={() => setPhase("options")}>
               Continue to options
             </button>
-          </div>
+          </section>
 
           {phase === "options" ? (
-            <div className="card space-y-4 p-5">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={includeVideo}
-                  onChange={(e) => setIncludeVideo(e.target.checked)}
-                />
-                Include video QR codes
-              </label>
-              <div className="space-y-1">
+            <section className="card space-y-4 p-5">
+              <section className="space-y-1">
                 <span className="text-sm font-medium">Competence type</span>
                 <select
                   value={competenceType}
@@ -214,8 +335,8 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
                   <option value="mandatory">Mandatory</option>
                   <option value="optional">Optional</option>
                 </select>
-              </div>
-              <div className="space-y-1">
+              </section>
+              <section className="space-y-1">
                 <span className="text-sm font-medium">Period</span>
                 <select
                   value={period}
@@ -228,24 +349,93 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
                     </option>
                   ))}
                 </select>
-              </div>
+              </section>
               <button
                 type="button"
                 className="btn-primary"
                 disabled={loading}
-                onClick={saveDraft}
+                onClick={saveLearnOrSteps}
               >
                 {loading ? "Saving…" : "Save work order"}
               </button>
-            </div>
+            </section>
           ) : null}
-        </div>
+        </section>
+      ) : null}
+
+      {phase === "quick_log" && mode === "quick_log" ? (
+        <section className="card space-y-4 p-5">
+          <p className="text-sm text-zinc-600">
+            Log your work and collect a mentor signature on your My Bluebook page (no learning
+            steps or video).
+          </p>
+          <label className="block text-sm font-medium">
+            What task did you work on?
+            <input
+              className="mt-1 w-full"
+              value={taskName}
+              onChange={(e) => setTaskName(e.target.value)}
+              placeholder="Rough-in commercial branch circuits"
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Hours worked
+            <input
+              type="number"
+              min={0.25}
+              step={0.25}
+              className="mt-1 w-full"
+              value={quickHours}
+              onChange={(e) => setQuickHours(e.target.value)}
+              placeholder="e.g. 4"
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Date worked
+            <input
+              type="date"
+              className="mt-1 w-full"
+              value={workedDate}
+              onChange={(e) => setWorkedDate(e.target.value)}
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Competence type
+            <select
+              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              value={competenceType}
+              onChange={(e) => setCompetenceType(e.target.value as CompetenceType)}
+            >
+              <option value="mandatory">Mandatory</option>
+              <option value="optional">Optional</option>
+            </select>
+          </label>
+          <label className="block text-sm font-medium">
+            Period
+            <select
+              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              value={period}
+              onChange={(e) => setPeriod(Number(e.target.value))}
+            >
+              {[1, 2, 3, 4].map((n) => (
+                <option key={n} value={n}>
+                  Period {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={loading || !taskName.trim()}
+            onClick={saveQuickLog}
+          >
+            {loading ? "Saving…" : "Create work order"}
+          </button>
+        </section>
       ) : null}
 
       <FormError message={error} />
-    </div>
+    </section>
   );
 }
-
-
-

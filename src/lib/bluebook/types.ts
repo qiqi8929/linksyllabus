@@ -11,6 +11,8 @@ export type BluebookAiStep = {
   end_time?: number;
 };
 
+export type BluebookCreationMode = "learn" | "steps_only" | "quick_log";
+
 export type BluebookVideoRef = {
   videoId: string;
   url: string;
@@ -18,6 +20,10 @@ export type BluebookVideoRef = {
   channel?: string;
   thumbnailUrl?: string;
   durationSec?: number;
+  /** Set on quick-log work orders (metadata, not a real video). */
+  quickLog?: boolean;
+  workedDate?: string;
+  creationMode?: BluebookCreationMode;
 };
 
 export type BluebookUserProfile = {

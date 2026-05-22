@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { persistBluebookPlaySteps } from "@/lib/bluebook/persistPlaySteps";
+import { buildQuickLogVideoMeta } from "@/lib/bluebook/workOrderMode";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
-import type { BluebookAiStep, BluebookVideoRef, CompetenceType } from "@/lib/bluebook/types";
+import type {
+  BluebookAiStep,
+  BluebookCreationMode,
+  BluebookVideoRef,
+  CompetenceType
+} from "@/lib/bluebook/types";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +26,9 @@ export async function POST(req: Request) {
     aiSteps?: BluebookAiStep[];
     videoUrls?: BluebookVideoRef[];
     includeVideo?: boolean;
+    creationMode?: BluebookCreationMode;
+    hours?: number;
+    workedDate?: string;
   };
 
   const task_name = String(body.taskName ?? body.competenceName ?? "").trim();
@@ -32,9 +41,30 @@ export async function POST(req: Request) {
     body.competenceType === "optional" ? "optional" : "mandatory";
   const period = Math.max(1, Math.min(4, Math.floor(Number(body.period ?? 1))));
 
-  const videoUrls = (body.videoUrls ?? []) as BluebookVideoRef[];
-  const video = videoUrls[0];
+  const creationMode = body.creationMode ?? "learn";
+  const isQuickLog = creationMode === "quick_log";
+
+  let videoUrls = (body.videoUrls ?? []) as BluebookVideoRef[];
+  const video = videoUrls.find((v) => v.url?.trim()) ?? null;
   let aiSteps = (body.aiSteps ?? []) as BluebookAiStep[];
+
+  const includeVideo =
+    !isQuickLog && creationMode !== "steps_only" && body.includeVideo !== false;
+
+  if (isQuickLog) {
+    const workedDate = String(body.workedDate ?? "").trim();
+    if (!workedDate) {
+      return NextResponse.json({ error: "workedDate is required for quick log" }, { status: 400 });
+    }
+    const hours = Number(body.hours);
+    if (!Number.isFinite(hours) || hours <= 0) {
+      return NextResponse.json({ error: "Valid hours required for quick log" }, { status: 400 });
+    }
+    videoUrls = buildQuickLogVideoMeta(workedDate);
+    aiSteps = [];
+  }
+
+  const draftHours = isQuickLog ? Number(body.hours) : null;
 
   const { data, error } = await supabase
     .from("bluebook_work_orders")
@@ -46,7 +76,8 @@ export async function POST(req: Request) {
       period,
       ai_steps: aiSteps,
       video_urls: videoUrls,
-      include_video: body.includeVideo !== false,
+      include_video: includeVideo,
+      hours: draftHours,
       status: "draft"
     })
     .select("id")

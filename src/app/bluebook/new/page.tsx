@@ -19,5 +19,13 @@ export default async function BluebookNewWorkOrderPage() {
     redirect("/bluebook/onboarding");
   }
 
-  return <NewWorkOrderClient defaultPeriod={profile.current_period ?? 1} />;
+  return (
+    <section>
+      <p className="mb-4 text-sm text-zinc-600">
+        Choose how you want to record this competence — learn with video, checklist only, or
+        quick hour log.
+      </p>
+      <NewWorkOrderClient defaultPeriod={profile.current_period ?? 1} />
+    </section>
+  );
 }
