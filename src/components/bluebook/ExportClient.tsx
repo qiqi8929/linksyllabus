@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { SubmitToAitButton } from "@/components/bluebook/export/SubmitToAitButton";
 import { FormError } from "@/components/FormError";
 
 type ExportMeta = {
@@ -62,22 +63,23 @@ export function ExportClient() {
       </label>
 
       <section className="grid gap-4 md:grid-cols-1">
-        <article className="card p-5">
+        <article className="card flex flex-col p-5">
           <h2 className="text-base font-semibold text-[#1e4b8f]">
             1. End of period submission package
           </h2>
           <p className="mt-2 text-sm text-zinc-600">
-            Two AIT pages: sponsor competence endorsement + hours verification. Print, have your
-            sponsor sign, then submit via MyTradesecrets.
+            Two AIT pages: sponsor competence endorsement + hours verification. Print or save as
+            PDF, have your sponsor sign, then submit through MyTradesecrets.
           </p>
           <a
             href={printUrl("ait-submission")}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-primary mt-4 inline-flex"
+            className="btn-primary mt-4 inline-flex w-fit"
           >
             Open for print
           </a>
+          <SubmitToAitButton printHref={printUrl("ait-submission")} />
         </article>
 
         <article className="card p-5">

@@ -12,7 +12,7 @@ const VALID_TYPES = new Set(["ait-submission", "personal-record", "progress-summ
 export default async function BluebookExportPrintPage({
   searchParams
 }: {
-  searchParams: { type?: string; period?: string };
+  searchParams: { type?: string; period?: string; autoprint?: string };
 }) {
   const type = searchParams.type ?? "";
   if (!VALID_TYPES.has(type)) notFound();
@@ -29,10 +29,11 @@ export default async function BluebookExportPrintPage({
   if (!bundle) notFound();
 
   const backHref = `/bluebook/export`;
+  const autoPrint = searchParams.autoprint === "1";
 
   return (
     <>
-      <ExportPrintBar backHref={backHref} />
+      <ExportPrintBar backHref={backHref} autoPrint={autoPrint} />
       {type === "ait-submission" ? (
         <AitSubmissionPrint
           apprenticeName={bundle.apprenticeName}

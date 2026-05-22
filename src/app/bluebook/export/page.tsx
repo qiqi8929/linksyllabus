@@ -19,5 +19,13 @@ export default async function BluebookExportPage() {
     redirect("/bluebook/onboarding");
   }
 
-  return <ExportClient />;
+  return (
+    <section>
+      <p className="mb-4 text-sm text-zinc-600">
+        Export your period-end AIT submission package, then use Submit to AIT to save the PDF and
+        open MyTradesecrets.
+      </p>
+      <ExportClient />
+    </section>
+  );
 }

@@ -35,3 +35,7 @@ export const BLUEBOOK_SUBSCRIPTION = {
   trialDays: 30,
   monthlyUsd: 19.99
 } as const;
+
+/** Alberta apprentice portal for period-end document upload. */
+export const AIT_MYTRADESECRETS_URL =
+  "https://tradesecrets.alberta.ca/mytradesecrets/";
