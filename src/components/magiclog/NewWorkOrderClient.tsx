@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import type {
   MagicLogAiStep,
   MagicLogCreationMode,
@@ -11,7 +12,30 @@ import type {
 import { formatDurationClock } from "@/lib/youtubeSearch";
 import { FormError } from "@/components/FormError";
 
-type Phase = "mode" | "task" | "video" | "steps" | "options" | "quick_log";
+type Phase =
+  | "mode"
+  | "voice"
+  | "photo"
+  | "task"
+  | "video"
+  | "steps"
+  | "options"
+  | "quick_log";
+
+type DashboardEntryMode = "voice" | "photo" | "quick" | "learn";
+
+type BrowserSpeechRecognition = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: {
+    results: { length: number; [index: number]: { isFinal: boolean; 0?: { transcript?: string } } };
+  }) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+};
 
 const MODES: Array<{
   id: MagicLogCreationMode;
@@ -39,10 +63,35 @@ const MODES: Array<{
   }
 ];
 
+function parseEntryMode(raw: string | null): DashboardEntryMode | null {
+  if (raw === "voice" || raw === "photo" || raw === "quick" || raw === "learn") {
+    return raw;
+  }
+  return null;
+}
+
+function initialPhase(entry: DashboardEntryMode | null): Phase {
+  if (entry === "voice") return "voice";
+  if (entry === "photo") return "photo";
+  if (entry === "quick") return "quick_log";
+  if (entry === "learn") return "mode";
+  return "mode";
+}
+
+function initialCreationMode(entry: DashboardEntryMode | null): MagicLogCreationMode | null {
+  if (entry === "quick") return "quick_log";
+  return null;
+}
+
 export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number }) {
   const router = useRouter();
-  const [mode, setMode] = useState<MagicLogCreationMode | null>(null);
-  const [phase, setPhase] = useState<Phase>("mode");
+  const searchParams = useSearchParams();
+  const entryMode = parseEntryMode(searchParams.get("mode"));
+
+  const [mode, setMode] = useState<MagicLogCreationMode | null>(() =>
+    initialCreationMode(entryMode)
+  );
+  const [phase, setPhase] = useState<Phase>(() => initialPhase(entryMode));
   const [taskName, setTaskName] = useState("");
   const [videos, setVideos] = useState<MagicLogVideoRef[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<MagicLogVideoRef | null>(null);
@@ -55,6 +104,20 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [voiceHint, setVoiceHint] = useState("Press and hold the microphone, then release.");
+
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  const transcriptRef = useRef("");
+  const voiceHandledRef = useRef(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMode(initialCreationMode(entryMode));
+    setPhase(initialPhase(entryMode));
+    setError(null);
+  }, [entryMode]);
 
   function selectMode(next: MagicLogCreationMode) {
     setMode(next);
@@ -64,6 +127,179 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
     } else {
       setPhase("task");
     }
+  }
+
+  async function saveWorkOrder(payload: Record<string, unknown>) {
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/magiclog/work-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error ?? "Save failed");
+      router.push(`/magiclog/work-order/${j.id}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const generateStepsForTask = useCallback(async (name: string) => {
+    const res = await fetch("/api/magiclog/generate-steps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskName: name })
+    });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error ?? "AI step generation failed");
+    return (j.steps ?? []) as MagicLogAiStep[];
+  }, []);
+
+  const createStepsOnlyWorkOrder = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("Enter a task name");
+      const aiSteps = await generateStepsForTask(trimmed);
+      await saveWorkOrder({
+        taskName: trimmed,
+        competenceName: trimmed,
+        competenceType,
+        period,
+        aiSteps,
+        videoUrls: [],
+        includeVideo: false,
+        creationMode: "steps_only"
+      });
+    },
+    [competenceType, generateStepsForTask, period]
+  );
+
+  const processVoiceTranscript = useCallback(
+    async (transcript: string) => {
+      setError(null);
+      setLoading(true);
+      setVoiceHint("Processing with AI…");
+      try {
+        await createStepsOnlyWorkOrder(transcript);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Voice processing failed");
+        setVoiceHint("Press and hold the microphone, then release.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [createStepsOnlyWorkOrder]
+  );
+
+  const getSpeechRecognition = useCallback((): BrowserSpeechRecognition | null => {
+    if (typeof window === "undefined") return null;
+    const win = window as Window & {
+      SpeechRecognition?: new () => BrowserSpeechRecognition;
+      webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
+    };
+    const Ctor = win.SpeechRecognition ?? win.webkitSpeechRecognition;
+    if (!Ctor) return null;
+    const rec = new Ctor();
+    rec.lang = "en-CA";
+    rec.continuous = true;
+    rec.interimResults = true;
+    return rec;
+  }, []);
+
+  const stopVoiceListening = useCallback(() => {
+    const rec = recognitionRef.current;
+    if (rec) {
+      try {
+        rec.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
+    setListening(false);
+  }, []);
+
+  const startVoiceListening = useCallback(() => {
+    if (loading) return;
+    setError(null);
+    const rec = getSpeechRecognition();
+    if (!rec) {
+      setError("Voice input is not supported in this browser. Try Chrome or Edge.");
+      return;
+    }
+
+    transcriptRef.current = "";
+    recognitionRef.current = rec;
+
+    rec.onresult = (event) => {
+      let text = "";
+      for (let i = 0; i < event.results.length; i++) {
+        text += event.results[i][0]?.transcript ?? "";
+      }
+      transcriptRef.current = text.trim();
+      if (event.results[event.results.length - 1]?.isFinal) {
+        setVoiceHint(`Heard: “${transcriptRef.current.slice(0, 80)}${transcriptRef.current.length > 80 ? "…" : ""}”`);
+      }
+    };
+
+    rec.onerror = (event) => {
+      if (event.error === "aborted" || event.error === "no-speech") return;
+      setError(`Voice error: ${event.error}`);
+      setListening(false);
+    };
+
+    rec.onend = () => {
+      setListening(false);
+      if (voiceHandledRef.current) return;
+      const text = transcriptRef.current.trim();
+      if (!text) {
+        setError("No speech detected. Hold the button while you speak.");
+        setVoiceHint("Press and hold the microphone, then release.");
+        return;
+      }
+      voiceHandledRef.current = true;
+      void processVoiceTranscript(text).finally(() => {
+        voiceHandledRef.current = false;
+      });
+    };
+
+    try {
+      rec.start();
+      setListening(true);
+      setVoiceHint("Listening… release when done.");
+    } catch {
+      setError("Could not start microphone. Check browser permissions.");
+    }
+  }, [getSpeechRecognition, loading, processVoiceTranscript]);
+
+  async function scanPhotoAndCreate(file: File) {
+    setError(null);
+    setLoading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/magiclog/scan-task", { method: "POST", body: form });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error ?? "Photo scan failed");
+      const scanned = String(j.fields?.taskName ?? "").trim();
+      if (!scanned) {
+        throw new Error("Could not identify a task from this photo. Try another angle.");
+      }
+      setTaskName(scanned);
+      await createStepsOnlyWorkOrder(scanned);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Photo processing failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function onPhotoFile(file: File | undefined) {
+    if (!file) return;
+    void scanPhotoAndCreate(file);
   }
 
   async function searchVideos() {
@@ -109,25 +345,6 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
     }
   }
 
-  async function saveWorkOrder(payload: Record<string, unknown>) {
-    setError(null);
-    setLoading(true);
-    try {
-      const res = await fetch("/api/magiclog/work-orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error ?? "Save failed");
-      router.push(`/magiclog/work-order/${j.id}`);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Save failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function saveLearnOrSteps() {
     if (!mode) return;
     void saveWorkOrder({
@@ -165,11 +382,34 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
     });
   }
 
+  const backHref =
+    entryMode === "voice" || entryMode === "photo" || entryMode === "quick"
+      ? "/magiclog/dashboard"
+      : null;
+
+  const pageTitle =
+    entryMode === "voice"
+      ? "Record voice"
+      : entryMode === "photo"
+        ? "Take photo"
+        : entryMode === "quick"
+          ? "Type it"
+          : entryMode === "learn"
+            ? "Learn with steps"
+            : "New work order";
+
   return (
     <section className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">New work order</h1>
-        {phase !== "mode" && mode ? (
+        <h1 className="text-2xl font-semibold">{pageTitle}</h1>
+        {backHref ? (
+          <Link
+            href={backHref}
+            className="mt-2 inline-block text-xs text-zinc-500 hover:text-zinc-800"
+          >
+            ← Back to dashboard
+          </Link>
+        ) : phase !== "mode" && mode && entryMode === "learn" ? (
           <button
             type="button"
             className="mt-2 text-xs text-zinc-500 hover:text-zinc-800"
@@ -183,6 +423,83 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
           </button>
         ) : null}
       </header>
+
+      {phase === "voice" ? (
+        <section className="card space-y-5 p-5 text-center">
+          <p className="text-sm text-zinc-600">
+            Say what you worked on in one sentence. We will turn it into a work order with AI
+            steps.
+          </p>
+          <button
+            type="button"
+            className={`bb-voice-mic ${listening ? "bb-voice-mic--active" : ""}`}
+            disabled={loading}
+            aria-pressed={listening}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              startVoiceListening();
+            }}
+            onPointerUp={(e) => {
+              e.preventDefault();
+              stopVoiceListening();
+            }}
+            onPointerLeave={(e) => {
+              if (listening) {
+                e.preventDefault();
+                stopVoiceListening();
+              }
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <span className="bb-voice-mic-icon" aria-hidden>
+              🎤
+            </span>
+          </button>
+          <p className="text-sm text-zinc-500">{voiceHint}</p>
+        </section>
+      ) : null}
+
+      {phase === "photo" ? (
+        <section className="card space-y-4 p-5">
+          <p className="text-sm text-zinc-600">
+            Upload a photo or use your camera. AI will identify the task and create your work
+            order.
+          </p>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => onPhotoFile(e.target.files?.[0])}
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => onPhotoFile(e.target.files?.[0])}
+          />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              className="btn-primary flex-1"
+              disabled={loading}
+              onClick={() => photoInputRef.current?.click()}
+            >
+              {loading ? "Processing…" : "Upload photo"}
+            </button>
+            <button
+              type="button"
+              className="btn-ghost flex-1"
+              disabled={loading}
+              onClick={() => cameraInputRef.current?.click()}
+            >
+              Take picture
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       {phase === "mode" ? (
         <section className="bb-mode-grid">

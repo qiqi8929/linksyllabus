@@ -174,26 +174,26 @@ function IconChevron() {
 
 const INPUT_METHODS = [
   {
-    href: "/magiclog/new",
+    href: "/magiclog/new?mode=voice",
     primary: true,
     title: "Record voice",
     subtitle: "Say it in one sentence",
     Icon: IconMic
   },
   {
-    href: "/magiclog/new",
+    href: "/magiclog/new?mode=photo",
     title: "Take photo",
     subtitle: "Snap your work",
     Icon: IconCamera
   },
   {
-    href: "/magiclog/new",
+    href: "/magiclog/new?mode=quick",
     title: "Type it",
     subtitle: "Enter task manually",
     Icon: IconType
   },
   {
-    href: "/magiclog/new",
+    href: "/magiclog/new?mode=learn",
     title: "Learn with steps",
     subtitle: "Video + QR guide",
     Icon: IconSteps
