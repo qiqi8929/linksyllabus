@@ -1,0 +1,307 @@
+/* Magic Log marketing homepage — Coconote-style minimal, matches app #f0f0f0 / #1D9E75 */
+
+#ml-landing {
+  --ml-green: #1d9e75;
+  --ml-green-dark: #178564;
+  --ml-green-light: #e8f7f1;
+  --ml-page: #f0f0f0;
+  --ml-card: #ffffff;
+  --ml-text: #1a1a1a;
+  --ml-muted: #6b6b6b;
+  --ml-border: #e8e8e8;
+  min-height: 100vh;
+  color: var(--ml-text);
+  background: var(--ml-page);
+}
+
+#ml-landing .ml-landing-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--ml-border);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+}
+
+#ml-landing .ml-landing-nav-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+}
+
+#ml-landing .ml-landing-logo {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ml-text);
+  text-decoration: none;
+  letter-spacing: -0.02em;
+}
+
+#ml-landing .ml-landing-logo em {
+  font-style: normal;
+  color: var(--ml-green);
+}
+
+#ml-landing .ml-landing-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 0.8125rem;
+}
+
+#ml-landing .ml-landing-nav-links a {
+  color: var(--ml-muted);
+  text-decoration: none;
+}
+
+#ml-landing .ml-landing-nav-links a:hover {
+  color: var(--ml-text);
+}
+
+#ml-landing .ml-landing-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--ml-green);
+  text-decoration: none;
+  transition: background 0.15s, transform 0.1s;
+}
+
+#ml-landing .ml-landing-btn-primary:hover {
+  background: var(--ml-green-dark);
+}
+
+#ml-landing .ml-landing-btn-lg {
+  padding: 14px 28px;
+  font-size: 0.9375rem;
+  border-radius: 14px;
+}
+
+#ml-landing .ml-landing-hero {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 72px 20px 64px;
+  text-align: center;
+}
+
+#ml-landing .ml-landing-hero h1 {
+  margin: 0 0 16px;
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: clamp(1.85rem, 5.5vw, 2.75rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: var(--ml-text);
+}
+
+#ml-landing .ml-landing-hero-tagline {
+  margin: 0 0 36px;
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ml-green);
+}
+
+#ml-landing .ml-landing-hero-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+#ml-landing .ml-landing-link-secondary {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ml-muted);
+  text-decoration: none;
+}
+
+#ml-landing .ml-landing-link-secondary:hover {
+  color: var(--ml-green-dark);
+}
+
+#ml-landing .ml-landing-section {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 56px 20px;
+}
+
+#ml-landing .ml-landing-section--alt {
+  background: var(--ml-card);
+  border-top: 1px solid var(--ml-border);
+  border-bottom: 1px solid var(--ml-border);
+  max-width: none;
+  padding-left: max(20px, calc(50% - 360px));
+  padding-right: max(20px, calc(50% - 360px));
+}
+
+#ml-landing .ml-landing-section-title {
+  margin: 0 0 28px;
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-align: center;
+  color: var(--ml-text);
+}
+
+#ml-landing .ml-landing-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+#ml-landing .ml-landing-step {
+  border-radius: 16px;
+  border: 1px solid var(--ml-border);
+  background: var(--ml-card);
+  padding: 22px 22px 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+#ml-landing .ml-landing-step-index {
+  display: inline-block;
+  margin-bottom: 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ml-green);
+}
+
+#ml-landing .ml-landing-step h3 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.35;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+#ml-landing .ml-landing-step p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--ml-muted);
+}
+
+#ml-landing .ml-landing-feature-list {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#ml-landing .ml-landing-feature-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--ml-text);
+}
+
+#ml-landing .ml-landing-feature-check {
+  flex-shrink: 0;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--ml-green-light);
+  color: var(--ml-green-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+#ml-landing .ml-landing-pricing {
+  border-radius: 20px;
+  border: 1px solid var(--ml-border);
+  background: var(--ml-card);
+  padding: 36px 28px;
+  text-align: center;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+}
+
+#ml-landing .ml-landing-pricing-trial {
+  margin: 0 0 8px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--ml-text);
+}
+
+#ml-landing .ml-landing-pricing-price {
+  margin: 0 0 8px;
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--ml-green-dark);
+}
+
+#ml-landing .ml-landing-pricing-price span {
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--ml-muted);
+}
+
+#ml-landing .ml-landing-pricing-note {
+  margin: 0 0 24px;
+  font-size: 0.875rem;
+  color: var(--ml-muted);
+}
+
+#ml-landing .ml-landing-footer {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 20px 56px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+#ml-landing .ml-landing-footer-meta {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ml-muted);
+}
+
+#ml-landing .ml-landing-footer-meta a {
+  color: var(--ml-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+#ml-landing .ml-landing-footer-meta a:hover {
+  color: var(--ml-text);
+}
+
+@media (min-width: 768px) {
+  #ml-landing .ml-landing-steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+
+  #ml-landing .ml-landing-step h3 {
+    font-size: 0.95rem;
+  }
+}

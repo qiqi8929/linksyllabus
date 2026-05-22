@@ -20,6 +20,7 @@ export async function middleware(req: NextRequest) {
 
   const isProtected =
     req.nextUrl.pathname.startsWith("/dashboard") ||
+    req.nextUrl.pathname.startsWith("/guides") ||
     req.nextUrl.pathname.startsWith("/magiclog");
 
   if (!isProtected) {
@@ -32,7 +33,10 @@ export async function middleware(req: NextRequest) {
   const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!supabaseUrl || !supabaseAnon) {
     console.error("[middleware] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
-    if (req.nextUrl.pathname.startsWith("/dashboard")) {
+    if (
+      req.nextUrl.pathname.startsWith("/dashboard") ||
+      req.nextUrl.pathname.startsWith("/guides")
+    ) {
       const dest = req.nextUrl.clone();
       dest.pathname = "/login";
       dest.searchParams.set("error", "server_config");
@@ -75,6 +79,8 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     "/dashboard/:path*",
+    "/guides",
+    "/guides/:path*",
     "/magiclog/:path*",
     "/bluebook/:path*",
     "/api/stripe/webhook"

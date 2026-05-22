@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: "%s · LinkSyllabus"
   },
   description:
-    "Turn a long tutorial video into guided steps with QR codes, print sheets, and voice control."
+    "Magic Log — log Alberta apprentice hours and competences by voice, photo, or quick entry, with mentor sign-off and AIT exports."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

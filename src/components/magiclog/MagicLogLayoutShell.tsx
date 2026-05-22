@@ -32,9 +32,6 @@ export function MagicLogLayoutShell({ children }: { children: React.ReactNode })
             <Link href="/magiclog/export" className="text-zinc-600 hover:text-zinc-900">
               Export
             </Link>
-            <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-800">
-              Guides
-            </Link>
           </nav>
         </div>
       </header>
