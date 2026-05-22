@@ -142,6 +142,39 @@
   line-height: 1;
 }
 
+.magiclog-root .bb-locked-banner {
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  background: #f0fdf4;
+  padding: 14px 16px;
+}
+
+.magiclog-root .bb-locked-banner-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #166534;
+}
+
+.magiclog-root .bb-locked-banner-desc {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #15803d;
+}
+
+.magiclog-root .bb-field-locked {
+  margin-top: 4px;
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #e4e4e7;
+  background: #f4f4f5;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  color: #52525b;
+  cursor: not-allowed;
+}
+
 .magiclog-root .bb-ait-submit-card {
   border: 4px solid #1e4b8f;
   background: linear-gradient(180deg, #f8fbff 0%, #fff 100%);

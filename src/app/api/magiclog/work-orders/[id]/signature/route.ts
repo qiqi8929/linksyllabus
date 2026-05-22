@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { signatureBucketForUpload } from "@/lib/magiclog/signatureStorage";
+import { isWorkOrderLocked } from "@/lib/magiclog/workOrderStatus";
+import type { WorkOrderStatus } from "@/lib/magiclog/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +17,23 @@ export async function POST(
     data: { user }
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { data: order } = await supabase
+    .from("bluebook_work_orders")
+    .select("status")
+    .eq("id", params.id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!order) {
+    return NextResponse.json({ error: "Work order not found" }, { status: 404 });
+  }
+  if (isWorkOrderLocked(order.status as WorkOrderStatus)) {
+    return NextResponse.json(
+      { error: "Signed and locked — signature cannot be changed." },
+      { status: 403 }
+    );
+  }
 
   const form = await req.formData();
   const file = form.get("file");

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
 import { applySignedWorkOrderToProgress } from "@/lib/magiclog/periodProgress";
-import type { CompetenceType } from "@/lib/magiclog/types";
+import { isWorkOrderLocked } from "@/lib/magiclog/workOrderStatus";
+import type { CompetenceType, WorkOrderStatus } from "@/lib/magiclog/types";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,13 @@ export async function POST(
 
   if (loadErr || !order) {
     return NextResponse.json({ error: "Work order not found" }, { status: 404 });
+  }
+
+  if (isWorkOrderLocked(order.status as WorkOrderStatus)) {
+    return NextResponse.json(
+      { error: "Signed and locked — this work order cannot be changed." },
+      { status: 403 }
+    );
   }
 
   const signedAt = new Date().toISOString();

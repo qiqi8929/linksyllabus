@@ -21,6 +21,34 @@ export function quickLogWorkedDate(order: Pick<MagicLogWorkOrder, "video_urls">)
   return d?.trim() || null;
 }
 
+/** Work start date/time: quick-log worked date, otherwise record created_at. */
+export function formatWorkOrderStartDate(
+  order: Pick<MagicLogWorkOrder, "video_urls" | "created_at">
+): string {
+  const worked = quickLogWorkedDate(order);
+  if (worked) {
+    return new Date(`${worked}T12:00:00`).toLocaleDateString("en-CA", {
+      dateStyle: "medium"
+    });
+  }
+  if (order.created_at) {
+    return new Date(order.created_at).toLocaleString("en-CA", {
+      dateStyle: "medium",
+      timeStyle: "short"
+    });
+  }
+  return "—";
+}
+
+export function workOrderStartDateIso(
+  order: Pick<MagicLogWorkOrder, "video_urls" | "created_at">
+): string {
+  const worked = quickLogWorkedDate(order);
+  if (worked) return worked;
+  if (order.created_at) return order.created_at.slice(0, 10);
+  return "";
+}
+
 export function buildQuickLogVideoMeta(workedDate: string): MagicLogQuickLogMeta[] {
   return [
     {
