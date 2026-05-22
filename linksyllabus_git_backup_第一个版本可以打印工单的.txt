@@ -1,0 +1,70 @@
+LinkSyllabus Git Backup Reference
+===================================
+Created: May 19, 2026
+
+CLEAN VERSION (before My Bluebook feature)
+-------------------------------------------
+Commit hash: 326c827
+Commit message: "Redesign work order steps as two-column grid cards"
+
+This is the last clean version of LinkSyllabus before 
+the My Bluebook / Alberta apprentice tracking feature was added.
+
+HOW TO RESTORE THIS VERSION:
+------------------------------
+Option A — View the code without changing anything:
+  git checkout 326c827
+
+Option B — Restore completely to this version:
+  git checkout main
+  git reset --hard 326c827
+  git push origin main --force
+  (WARNING: This will delete all bluebook work permanently)
+
+Option C — Create a new branch from this clean version:
+  git checkout -b clean-backup 326c827
+  (Safe: keeps both versions)
+
+
+BLUEBOOK FEATURE VERSION
+--------------------------
+After running: git commit -m "bluebook steps 1-6 complete"
+Check hash with: git log --oneline -1
+
+Files modified by Cursor (existing files):
+  - middleware.ts
+  - src/app/api/stripe/webhook/route.ts
+  - src/lib/env.ts
+  - src/lib/stripe/prices.ts
+
+New files added (bluebook only):
+  - src/app/api/bluebook/
+  - src/app/bluebook/
+  - src/components/bluebook/
+  - src/lib/bluebook/
+  - src/lib/stripe/bluebookSubscription.ts
+  - src/lib/youtubeSearch.ts
+  - supabase/migration_bluebook.sql
+
+
+USEFUL GIT COMMANDS
+--------------------
+See last 10 commits:
+  git log --oneline -10
+
+See what changed in a commit:
+  git show 326c827
+
+Compare two versions:
+  git diff 326c827 HEAD
+
+Go back to clean version temporarily:
+  git checkout 326c827
+
+Come back to latest:
+  git checkout main
+
+
+PROJECT LOCATION
+-----------------
+c:\Users\Ysabe\Desktop\Linksyllabus

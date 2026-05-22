@@ -1,0 +1,83 @@
+LinkSyllabus Git Backup Reference
+===================================
+Created: May 19, 2026
+
+VERSION 2 — Magic Log (rebrand + Bluebook v2 features)
+-------------------------------------------------------
+Commit hash: 63cfe07
+Commit message: "Rename My Bluebook to Magic Log in UI and routes."
+
+This is the current production-ready Magic Log build:
+  - UI brand: Magic Log (nav, onboarding, emails)
+  - Routes: /magiclog/* and /api/magiclog/*
+  - Legacy /bluebook/* URLs redirect via middleware
+  - AIT work-order tab still says "My Bluebook" / "My Bluebook page"
+  - Database tables unchanged (bluebook_work_orders, etc.)
+
+Includes prior Bluebook v2 work (commit 72fa481):
+  - Three work-order modes, cover scan, Submit to AIT export
+  - Trade-aware YouTube search, email reminders cron
+  - Stripe: BLUEBOOK_STRIPE_PRICE_ID env
+
+HOW TO RESTORE THIS VERSION:
+------------------------------
+Option A — View the code without changing anything:
+  git checkout 63cfe07
+
+Option B — Restore completely to this version:
+  git checkout main
+  git reset --hard 63cfe07
+  git push origin main --force
+  (WARNING: Deletes any commits after 63cfe07)
+
+Option C — Create a branch from this version (safe):
+  git checkout -b magiclog-v2-backup 63cfe07
+
+
+VERSION 1 — First backup (pre–Magic Log name, printable work orders)
+--------------------------------------------------------------------
+See: linksyllabus_git_backup_第一个版本可以打印工单的.txt
+  - Clean pre-Bluebook: 326c827
+  - First Bluebook MVP: c5c4057 ("bluebook steps 1-6 complete")
+
+
+KEY PATHS (Magic Log — renamed from bluebook/)
+-----------------------------------------------
+  - middleware.ts (protects /magiclog, redirects /bluebook)
+  - src/app/magiclog/
+  - src/app/api/magiclog/
+  - src/components/magiclog/
+  - src/lib/magiclog/
+  - src/lib/stripe/magiclogSubscription.ts
+  - supabase/migration_bluebook.sql (schema name unchanged)
+
+
+CRON / HOSTING NOTES
+--------------------
+  - Reminders: POST /api/magiclog/reminders
+  - Header: x-bluebook-cron-secret (unchanged)
+  - Env: BLUEBOOK_CRON_SECRET, BLUEBOOK_STRIPE_PRICE_ID, GEMINI_API_KEY, YOUTUBE_API_KEY
+
+
+USEFUL GIT COMMANDS
+--------------------
+See last 10 commits:
+  git log --oneline -10
+
+See what changed in Magic Log rebrand:
+  git show 63cfe07
+
+Compare Bluebook v2 vs Magic Log:
+  git diff 72fa481 63cfe07
+
+Go back to Bluebook v2 (before rebrand):
+  git checkout 72fa481
+
+Come back to latest:
+  git checkout main
+
+
+PROJECT LOCATION
+-----------------
+c:\Users\Ysabe\Desktop\Linksyllabus
+Remote: https://github.com/qiqi8929/linksyllabus.git
