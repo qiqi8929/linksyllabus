@@ -10,6 +10,21 @@ export type YouTubeSearchResult = {
   url: string;
 };
 
+/**
+ * Bluebook / trade-aware YouTube search query.
+ * Example: "install branch circuits" + Electrician → "install branch circuits electrician how to"
+ */
+export function buildTradeAwareYouTubeSearchQuery(
+  taskName: string,
+  trade?: string | null
+): string {
+  const task = taskName.trim();
+  const tradeLabel = trade?.trim();
+  if (!task) return "how to";
+  if (!tradeLabel) return `${task} how to`;
+  return `${task} ${tradeLabel} how to`;
+}
+
 export async function searchYouTubeVideos(
   query: string,
   maxResults = 5

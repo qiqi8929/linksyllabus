@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
-import { searchYouTubeVideos } from "@/lib/youtubeSearch";
+import {
+  buildTradeAwareYouTubeSearchQuery,
+  searchYouTubeVideos
+} from "@/lib/youtubeSearch";
 import { fetchBluebookProfile } from "@/lib/bluebook/profile";
 
 export const runtime = "nodejs";
@@ -20,12 +23,12 @@ export async function POST(req: Request) {
   }
 
   const profile = await fetchBluebookProfile(supabase, user.id);
-  const trade = profile?.trade?.trim() || "trades";
-  const query = `${taskName} ${trade} tutorial`;
+  const trade = profile?.trade?.trim() || "";
+  const query = buildTradeAwareYouTubeSearchQuery(taskName, trade);
 
   try {
     const results = await searchYouTubeVideos(query, 5);
-    return NextResponse.json({ results });
+    return NextResponse.json({ results, query });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "YouTube search failed";
     return NextResponse.json({ error: message }, { status: 503 });

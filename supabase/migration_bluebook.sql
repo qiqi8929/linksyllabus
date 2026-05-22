@@ -125,3 +125,23 @@ using (
   bucket_id = 'bluebook-signatures'
   and auth.uid()::text = (storage.foldername(name))[1]
 );
+
+-- Email reminder deduplication (cron: /api/bluebook/reminders)
+create table if not exists public.bluebook_reminder_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  reminder_type text not null check (
+    reminder_type in ('no_work_order_3d', 'unsigned_work_order_2d', 'period_completion_30d')
+  ),
+  sent_at timestamptz not null default now()
+);
+
+create index if not exists bluebook_reminder_logs_user_type_idx
+  on public.bluebook_reminder_logs(user_id, reminder_type, sent_at desc);
+
+alter table public.bluebook_reminder_logs enable row level security;
+
+create policy "bluebook_reminder_logs service only"
+on public.bluebook_reminder_logs for all
+using (false)
+with check (false);

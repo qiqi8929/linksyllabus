@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe/server";
-import { STRIPE_PRICES } from "@/lib/stripe/prices";
+import { getBluebookStripePriceId } from "@/lib/stripe/bluebookSubscription";
 import { env } from "@/lib/env";
 import { BLUEBOOK_SUBSCRIPTION } from "@/lib/bluebook/constants";
 
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     mode: "subscription",
     customer: customerId,
     allow_promotion_codes: true,
-    line_items: [{ price: STRIPE_PRICES.bluebookMonthlyUsd1999, quantity: 1 }],
+    line_items: [{ price: getBluebookStripePriceId(), quantity: 1 }],
     subscription_data: {
       trial_period_days: BLUEBOOK_SUBSCRIPTION.trialDays,
       metadata: { user_id: user.id }
