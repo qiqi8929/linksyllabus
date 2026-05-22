@@ -4,7 +4,7 @@ import {
   buildTradeAwareYouTubeSearchQuery,
   searchYouTubeVideos
 } from "@/lib/youtubeSearch";
-import { fetchBluebookProfile } from "@/lib/magiclog/profile";
+import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "taskName is required" }, { status: 400 });
   }
 
-  const profile = await fetchBluebookProfile(supabase, user.id);
+  const profile = await fetchMagicLogProfile(supabase, user.id);
   const trade = profile?.trade?.trim() || "";
   const query = buildTradeAwareYouTubeSearchQuery(taskName, trade);
 

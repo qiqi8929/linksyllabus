@@ -168,3 +168,367 @@
   max-width: 400px;
   height: 120px;
 }
+
+/* —— Magic Log dashboard (mockup layout) —— */
+.magiclog-root.ml-dashboard-app {
+  --ml-green: #1d9e75;
+  --ml-green-light: #e8f7f1;
+  --ml-green-muted: #b8e6d4;
+  --ml-orange: #e8a04c;
+  --ml-orange-bg: #fef6eb;
+  --ml-page: #f0f0f0;
+  --ml-card: #ffffff;
+  --ml-text: #1a1a1a;
+  --ml-muted: #6b6b6b;
+  --ml-border: #e8e8e8;
+}
+
+.magiclog-root .ml-dashboard {
+  display: flex;
+  min-height: 100vh;
+}
+
+.magiclog-root .ml-dashboard-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 72px;
+  height: 100vh;
+  padding: 16px 0;
+  background: var(--ml-card);
+  border-right: 1px solid var(--ml-border);
+}
+
+.magiclog-root .ml-sidebar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: #9ca3af;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.magiclog-root .ml-sidebar-icon:hover {
+  color: var(--ml-green);
+  background: var(--ml-green-light);
+}
+
+.magiclog-root .ml-sidebar-icon--active {
+  color: #fff;
+  background: var(--ml-green);
+}
+
+.magiclog-root .ml-sidebar-icon--active:hover {
+  color: #fff;
+  background: var(--ml-green);
+}
+
+.magiclog-root .ml-sidebar-icon--bottom {
+  margin-top: auto;
+}
+
+.magiclog-root .ml-dashboard-main {
+  flex: 1;
+  margin-left: 72px;
+  max-width: 720px;
+  padding: 28px 24px 48px;
+}
+
+.magiclog-root .ml-dashboard-loading {
+  font-size: 0.875rem;
+  color: var(--ml-muted);
+}
+
+.magiclog-root .ml-dashboard-hero {
+  margin-bottom: 20px;
+}
+
+.magiclog-root .ml-dashboard-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ml-text);
+}
+
+.magiclog-root .ml-dashboard-subtitle {
+  margin: 6px 0 0;
+  font-size: 0.875rem;
+  color: var(--ml-muted);
+}
+
+.magiclog-root .ml-input-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.magiclog-root .ml-input-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--ml-border);
+  border-radius: 16px;
+  background: var(--ml-card);
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.magiclog-root .ml-input-card:hover {
+  border-color: var(--ml-green-muted);
+  box-shadow: 0 4px 14px rgba(29, 158, 117, 0.08);
+}
+
+.magiclog-root .ml-input-card--primary {
+  border-color: var(--ml-green);
+  background: var(--ml-green-light);
+}
+
+.magiclog-root .ml-input-card--primary .ml-input-card-icon {
+  background: var(--ml-green);
+  color: #fff;
+}
+
+.magiclog-root .ml-input-card--primary .ml-input-card-title {
+  color: var(--ml-green);
+}
+
+.magiclog-root .ml-input-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.magiclog-root .ml-input-card-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ml-text);
+}
+
+.magiclog-root .ml-input-card-sub {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--ml-muted);
+}
+
+.magiclog-root .ml-progress-card {
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  border-radius: 16px;
+  background: var(--ml-card);
+  border: 1px solid var(--ml-border);
+}
+
+.magiclog-root .ml-progress-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+}
+
+.magiclog-root .ml-progress-label {
+  font-weight: 600;
+  color: var(--ml-text);
+}
+
+.magiclog-root .ml-progress-hours {
+  font-weight: 600;
+  color: var(--ml-text);
+}
+
+.magiclog-root .ml-progress-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: visible;
+}
+
+.magiclog-root .ml-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ml-green);
+  transition: width 0.35s ease;
+}
+
+.magiclog-root .ml-progress-dot {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ef4444;
+  transform: translate(50%, -50%);
+  box-shadow: 0 0 0 2px var(--ml-card);
+}
+
+.magiclog-root .ml-progress-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 0.75rem;
+  color: var(--ml-muted);
+}
+
+.magiclog-root .ml-orders-section {
+  margin-top: 4px;
+}
+
+.magiclog-root .ml-orders-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.magiclog-root .ml-orders-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ml-text);
+}
+
+.magiclog-root .ml-orders-filter {
+  min-width: 140px;
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  border: 1px solid var(--ml-border);
+  border-radius: 10px;
+  background: var(--ml-card);
+  color: var(--ml-text);
+}
+
+.magiclog-root .ml-orders-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.magiclog-root .ml-order-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--ml-card);
+  border: 1px solid var(--ml-border);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.magiclog-root .ml-order-card:hover {
+  border-color: var(--ml-green-muted);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.magiclog-root .ml-order-card--empty {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--ml-muted);
+}
+
+.magiclog-root .ml-order-card--empty p {
+  margin: 0;
+}
+
+.magiclog-root .ml-order-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.magiclog-root .ml-order-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.magiclog-root .ml-order-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ml-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.magiclog-root .ml-order-meta {
+  font-size: 0.75rem;
+  color: var(--ml-muted);
+}
+
+.magiclog-root .ml-order-badge {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border-radius: 999px;
+}
+
+.magiclog-root .ml-order-badge--signed {
+  color: var(--ml-green);
+  background: var(--ml-green-light);
+}
+
+.magiclog-root .ml-order-badge--pending {
+  color: #b45309;
+  background: var(--ml-orange-bg);
+}
+
+.magiclog-root .ml-order-chevron {
+  flex-shrink: 0;
+  color: #c4c4c4;
+}
+
+@media (max-width: 520px) {
+  .magiclog-root .ml-dashboard-main {
+    padding: 20px 16px 40px;
+  }
+
+  .magiclog-root .ml-progress-meta {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .magiclog-root .ml-orders-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .magiclog-root .ml-orders-filter {
+    width: 100%;
+  }
+}

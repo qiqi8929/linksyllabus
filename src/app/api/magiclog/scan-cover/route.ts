@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { extractBluebookCoverFields } from "@/lib/magiclog/scanCover";
+import { extractMagicLogCoverFields } from "@/lib/magiclog/scanCover";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   const imageBase64 = buffer.toString("base64");
 
   try {
-    const fields = await extractBluebookCoverFields(imageBase64, mimeType);
+    const fields = await extractMagicLogCoverFields(imageBase64, mimeType);
     return NextResponse.json({ fields });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Cover scan failed";

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { persistBluebookPlaySteps } from "@/lib/magiclog/persistPlaySteps";
+import { persistMagicLogPlaySteps } from "@/lib/magiclog/persistPlaySteps";
 import { buildQuickLogVideoMeta } from "@/lib/magiclog/workOrderMode";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import type {
-  BluebookAiStep,
-  BluebookCreationMode,
-  BluebookVideoRef,
+  MagicLogAiStep,
+  MagicLogCreationMode,
+  MagicLogVideoRef,
   CompetenceType
 } from "@/lib/magiclog/types";
 
@@ -23,10 +23,10 @@ export async function POST(req: Request) {
     competenceName?: string;
     competenceType?: CompetenceType;
     period?: number;
-    aiSteps?: BluebookAiStep[];
-    videoUrls?: BluebookVideoRef[];
+    aiSteps?: MagicLogAiStep[];
+    videoUrls?: MagicLogVideoRef[];
     includeVideo?: boolean;
-    creationMode?: BluebookCreationMode;
+    creationMode?: MagicLogCreationMode;
     hours?: number;
     workedDate?: string;
   };
@@ -44,9 +44,9 @@ export async function POST(req: Request) {
   const creationMode = body.creationMode ?? "learn";
   const isQuickLog = creationMode === "quick_log";
 
-  let videoUrls = (body.videoUrls ?? []) as BluebookVideoRef[];
+  let videoUrls = (body.videoUrls ?? []) as MagicLogVideoRef[];
   const video = videoUrls.find((v) => v.url?.trim()) ?? null;
-  let aiSteps = (body.aiSteps ?? []) as BluebookAiStep[];
+  let aiSteps = (body.aiSteps ?? []) as MagicLogAiStep[];
 
   const includeVideo =
     !isQuickLog && creationMode !== "steps_only" && body.includeVideo !== false;
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
   const draftHours = isQuickLog ? Number(body.hours) : null;
 
   const { data, error } = await supabase
-    .from("bluebook_work_orders")
+    .from("magiclog_work_orders")
     .insert({
       user_id: user.id,
       task_name: task_name || competence_name,
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
   }
 
   if (video?.url && aiSteps.length > 0 && body.includeVideo !== false) {
-    aiSteps = await persistBluebookPlaySteps(supabase, {
+    aiSteps = await persistMagicLogPlaySteps(supabase, {
       userId: user.id,
       workOrderId: data.id,
       competenceName: competence_name,
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       durationSec: video.durationSec
     });
     await supabase
-      .from("bluebook_work_orders")
+      .from("magiclog_work_orders")
       .update({ ai_steps: aiSteps })
       .eq("id", data.id)
       .eq("user_id", user.id);

@@ -1,27 +1,27 @@
-import type { BluebookVideoRef, BluebookWorkOrder } from "@/lib/magiclog/types";
+import type { MagicLogVideoRef, MagicLogWorkOrder } from "@/lib/magiclog/types";
 
-export type BluebookCreationMode = "learn" | "steps_only" | "quick_log";
+export type MagicLogCreationMode = "learn" | "steps_only" | "quick_log";
 
-export type BluebookQuickLogMeta = BluebookVideoRef & {
+export type MagicLogQuickLogMeta = MagicLogVideoRef & {
   quickLog?: boolean;
   workedDate?: string;
-  creationMode?: BluebookCreationMode;
+  creationMode?: MagicLogCreationMode;
 };
 
 export function isQuickLogWorkOrder(
-  order: Pick<BluebookWorkOrder, "video_urls">
+  order: Pick<MagicLogWorkOrder, "video_urls">
 ): boolean {
-  const urls = order.video_urls as BluebookQuickLogMeta[] | null;
+  const urls = order.video_urls as MagicLogQuickLogMeta[] | null;
   return Boolean(urls?.some((u) => u.quickLog || u.creationMode === "quick_log"));
 }
 
-export function quickLogWorkedDate(order: Pick<BluebookWorkOrder, "video_urls">): string | null {
-  const urls = order.video_urls as BluebookQuickLogMeta[] | null;
+export function quickLogWorkedDate(order: Pick<MagicLogWorkOrder, "video_urls">): string | null {
+  const urls = order.video_urls as MagicLogQuickLogMeta[] | null;
   const d = urls?.find((u) => u.workedDate)?.workedDate;
   return d?.trim() || null;
 }
 
-export function buildQuickLogVideoMeta(workedDate: string): BluebookQuickLogMeta[] {
+export function buildQuickLogVideoMeta(workedDate: string): MagicLogQuickLogMeta[] {
   return [
     {
       videoId: "quick-log",

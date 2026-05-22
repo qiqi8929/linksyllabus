@@ -3,7 +3,7 @@ import { AitSubmissionPrint } from "@/components/magiclog/export/AitSubmissionPr
 import { ExportPrintBar } from "@/components/magiclog/export/ExportPrintBar";
 import { PersonalRecordPrint } from "@/components/magiclog/export/PersonalRecordPrint";
 import { ProgressSummaryPrint } from "@/components/magiclog/export/ProgressSummaryPrint";
-import { fetchBluebookExportBundle } from "@/lib/magiclog/exportData";
+import { fetchMagicLogExportBundle } from "@/lib/magiclog/exportData";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import "../export-print.css";
 
@@ -25,7 +25,7 @@ export default async function BluebookExportPrintPage({
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/magiclog/export/print?type=${type}&period=${period}`);
 
-  const bundle = await fetchBluebookExportBundle(supabase, user.id, period);
+  const bundle = await fetchMagicLogExportBundle(supabase, user.id, period);
   if (!bundle) notFound();
 
   const backHref = `/magiclog/export`;

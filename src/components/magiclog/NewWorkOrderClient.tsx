@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
-  BluebookAiStep,
-  BluebookCreationMode,
-  BluebookVideoRef,
+  MagicLogAiStep,
+  MagicLogCreationMode,
+  MagicLogVideoRef,
   CompetenceType
 } from "@/lib/magiclog/types";
 import { formatDurationClock } from "@/lib/youtubeSearch";
@@ -14,7 +14,7 @@ import { FormError } from "@/components/FormError";
 type Phase = "mode" | "task" | "video" | "steps" | "options" | "quick_log";
 
 const MODES: Array<{
-  id: BluebookCreationMode;
+  id: MagicLogCreationMode;
   title: string;
   description: string;
   icon: string;
@@ -41,12 +41,12 @@ const MODES: Array<{
 
 export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number }) {
   const router = useRouter();
-  const [mode, setMode] = useState<BluebookCreationMode | null>(null);
+  const [mode, setMode] = useState<MagicLogCreationMode | null>(null);
   const [phase, setPhase] = useState<Phase>("mode");
   const [taskName, setTaskName] = useState("");
-  const [videos, setVideos] = useState<BluebookVideoRef[]>([]);
-  const [selectedVideo, setSelectedVideo] = useState<BluebookVideoRef | null>(null);
-  const [steps, setSteps] = useState<BluebookAiStep[]>([]);
+  const [videos, setVideos] = useState<MagicLogVideoRef[]>([]);
+  const [selectedVideo, setSelectedVideo] = useState<MagicLogVideoRef | null>(null);
+  const [steps, setSteps] = useState<MagicLogAiStep[]>([]);
   const [competenceType, setCompetenceType] = useState<CompetenceType>("mandatory");
   const [period, setPeriod] = useState(defaultPeriod);
   const [quickHours, setQuickHours] = useState("");
@@ -56,7 +56,7 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function selectMode(next: BluebookCreationMode) {
+  function selectMode(next: MagicLogCreationMode) {
     setMode(next);
     setError(null);
     if (next === "quick_log") {

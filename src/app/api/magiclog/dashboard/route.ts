@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
-import { fetchBluebookProfile } from "@/lib/magiclog/profile";
+import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
 import { syncPeriodProgress } from "@/lib/magiclog/computeProgress";
 import { estimatePeriodCompletionDate } from "@/lib/magiclog/periodProgress";
 
@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const profile = await fetchBluebookProfile(supabase, user.id);
+  const profile = await fetchMagicLogProfile(supabase, user.id);
   if (!profile) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
   const reqPeriod = computed.requirements;
 
   const { data: recentOrders } = await supabase
-    .from("bluebook_work_orders")
+    .from("magiclog_work_orders")
     .select("id,task_name,competence_name,hours,status,created_at,period")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })

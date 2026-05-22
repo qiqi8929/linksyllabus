@@ -5,7 +5,7 @@ import { env } from "@/lib/env";
 import { applyGuideUnlockFromPaidCheckoutSession } from "@/lib/stripe/guideUnlock";
 import { activateSkuFromCheckoutSession } from "@/lib/stripe/skuActivation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { handleBluebookCheckoutCompleted } from "@/lib/stripe/magiclogSubscription";
+import { handleMagicLogCheckoutCompleted } from "@/lib/stripe/magiclogSubscription";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,12 +88,15 @@ export async function POST(req: Request) {
         }
       }
 
-      if (type === "bluebook_subscription" && userId) {
+      if (
+        (type === "magiclog_subscription" || type === "bluebook_subscription") &&
+        userId
+      ) {
         try {
           const admin = createSupabaseAdminClient();
-          await handleBluebookCheckoutCompleted(admin, session);
+          await handleMagicLogCheckoutCompleted(admin, session);
         } catch (e) {
-          console.error("[stripe webhook] bluebook_subscription failed", e);
+          console.error("[stripe webhook] magiclog_subscription failed", e);
         }
       }
     }

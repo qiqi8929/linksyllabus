@@ -7,7 +7,7 @@ function parseSmtpPort(raw: string | undefined): number {
   return p;
 }
 
-export async function sendBluebookReminderEmail(params: {
+export async function sendMagicLogReminderEmail(params: {
   to: string;
   subject: string;
   text: string;

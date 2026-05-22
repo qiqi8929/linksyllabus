@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PERIOD_REQUIREMENTS, type PeriodRequirements } from "@/lib/magiclog/constants";
-import type { BluebookUserProfile, CompetenceType } from "@/lib/magiclog/types";
+import type { MagicLogUserProfile, CompetenceType } from "@/lib/magiclog/types";
 
 export type ComputedPeriodProgress = {
   period: number;
@@ -15,7 +15,7 @@ export type ComputedPeriodProgress = {
 /** MVP placeholder — trade-specific hour targets will replace this later. */
 export function getPeriodRequirements(
   period: number,
-  _profile?: Pick<BluebookUserProfile, "trade" | "province"> | null
+  _profile?: Pick<MagicLogUserProfile, "trade" | "province"> | null
 ): PeriodRequirements {
   return PERIOD_REQUIREMENTS[period] ?? PERIOD_REQUIREMENTS[1];
 }
@@ -29,12 +29,12 @@ export async function computePeriodProgress(
   supabase: SupabaseClient,
   userId: string,
   period: number,
-  profile?: Pick<BluebookUserProfile, "trade" | "province"> | null
+  profile?: Pick<MagicLogUserProfile, "trade" | "province"> | null
 ): Promise<ComputedPeriodProgress> {
   const requirements = getPeriodRequirements(period, profile);
 
   const { data: signedOrders } = await supabase
-    .from("bluebook_work_orders")
+    .from("magiclog_work_orders")
     .select("id,competence_type,hours")
     .eq("user_id", userId)
     .eq("period", period)
@@ -79,7 +79,7 @@ export async function syncPeriodProgress(
   supabase: SupabaseClient,
   userId: string,
   period: number,
-  profile?: Pick<BluebookUserProfile, "trade" | "province"> | null
+  profile?: Pick<MagicLogUserProfile, "trade" | "province"> | null
 ): Promise<ComputedPeriodProgress> {
   const computed = await computePeriodProgress(supabase, userId, period, profile);
 

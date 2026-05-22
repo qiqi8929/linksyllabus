@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncPeriodProgress } from "@/lib/magiclog/computeProgress";
-import { fetchBluebookProfile } from "@/lib/magiclog/profile";
+import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     Math.min(4, Math.floor(Number(new URL(req.url).searchParams.get("period") ?? 1)))
   );
 
-  const profile = await fetchBluebookProfile(supabase, user.id);
+  const profile = await fetchMagicLogProfile(supabase, user.id);
   if (!profile) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }

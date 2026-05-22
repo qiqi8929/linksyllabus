@@ -1,9 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { syncPeriodProgress } from "@/lib/magiclog/computeProgress";
-import { fetchBluebookProfile } from "@/lib/magiclog/profile";
-import { sendBluebookReminderEmail } from "@/lib/magiclog/sendEmail";
+import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
+import { sendMagicLogReminderEmail } from "@/lib/magiclog/sendEmail";
 
-export type BluebookReminderType =
+export type MagicLogReminderType =
   | "no_work_order_3d"
   | "unsigned_work_order_2d"
   | "period_completion_30d";
@@ -29,11 +29,11 @@ function periodEndDate(
 async function wasReminderSentRecently(
   admin: SupabaseClient,
   userId: string,
-  type: BluebookReminderType
+  type: MagicLogReminderType
 ): Promise<boolean> {
   const since = new Date(Date.now() - DEDUP_HOURS * 60 * 60 * 1000).toISOString();
   const { data } = await admin
-    .from("bluebook_reminder_logs")
+    .from("magiclog_reminder_logs")
     .select("id")
     .eq("user_id", userId)
     .eq("reminder_type", type)
@@ -45,9 +45,9 @@ async function wasReminderSentRecently(
 async function logReminderSent(
   admin: SupabaseClient,
   userId: string,
-  type: BluebookReminderType
+  type: MagicLogReminderType
 ) {
-  await admin.from("bluebook_reminder_logs").insert({
+  await admin.from("magiclog_reminder_logs").insert({
     user_id: userId,
     reminder_type: type
   });
@@ -57,32 +57,32 @@ async function sendReminder(
   admin: SupabaseClient,
   userId: string,
   email: string,
-  type: BluebookReminderType,
+  type: MagicLogReminderType,
   subject: string,
   text: string
 ): Promise<"sent" | "skipped_dedup" | "skipped_smtp" | "failed"> {
   if (await wasReminderSentRecently(admin, userId, type)) {
     return "skipped_dedup";
   }
-  const result = await sendBluebookReminderEmail({ to: email, subject, text });
+  const result = await sendMagicLogReminderEmail({ to: email, subject, text });
   if (result.skipped) return "skipped_smtp";
   if (!result.ok) return "failed";
   await logReminderSent(admin, userId, type);
   return "sent";
 }
 
-export async function runBluebookReminders(admin: SupabaseClient): Promise<{
+export async function runMagicLogReminders(admin: SupabaseClient): Promise<{
   processed: number;
   sent: number;
-  results: Array<{ userId: string; type: BluebookReminderType; status: string }>;
+  results: Array<{ userId: string; type: MagicLogReminderType; status: string }>;
 }> {
   const { data: users } = await admin
     .from("users")
-    .select("id,email,bluebook_onboarding_complete,created_at")
-    .eq("bluebook_onboarding_complete", true);
+    .select("id,email,magiclog_onboarding_complete,created_at")
+    .eq("magiclog_onboarding_complete", true);
 
   const now = new Date();
-  const results: Array<{ userId: string; type: BluebookReminderType; status: string }> =
+  const results: Array<{ userId: string; type: MagicLogReminderType; status: string }> =
     [];
   let sent = 0;
 
@@ -91,13 +91,13 @@ export async function runBluebookReminders(admin: SupabaseClient): Promise<{
     const email = (row.email as string | null)?.trim();
     if (!email) continue;
 
-    const profile = await fetchBluebookProfile(admin, userId);
+    const profile = await fetchMagicLogProfile(admin, userId);
     if (!profile) continue;
 
     const period = profile.current_period ?? 1;
 
     const { data: latestOrder } = await admin
-      .from("bluebook_work_orders")
+      .from("magiclog_work_orders")
       .select("created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
@@ -138,7 +138,7 @@ export async function runBluebookReminders(admin: SupabaseClient): Promise<{
     }
 
     const { data: staleUnsigned } = await admin
-      .from("bluebook_work_orders")
+      .from("magiclog_work_orders")
       .select("id,task_name,competence_name,created_at")
       .eq("user_id", userId)
       .neq("status", "signed")

@@ -1,6 +1,6 @@
 import type { ComputedPeriodProgress } from "@/lib/magiclog/computeProgress";
 import type { PeriodRequirements } from "@/lib/magiclog/constants";
-import type { BluebookUserProfile } from "@/lib/magiclog/types";
+import type { MagicLogUserProfile } from "@/lib/magiclog/types";
 
 export function ProgressSummaryPrint({
   apprenticeName,
@@ -11,7 +11,7 @@ export function ProgressSummaryPrint({
   estimatedCompletion
 }: {
   apprenticeName: string;
-  profile: BluebookUserProfile;
+  profile: MagicLogUserProfile;
   period: number;
   progress: ComputedPeriodProgress;
   requirements: PeriodRequirements;

@@ -55,8 +55,11 @@ KEY PATHS (Magic Log — renamed from bluebook/)
 CRON / HOSTING NOTES
 --------------------
   - Reminders: POST /api/magiclog/reminders
-  - Header: x-bluebook-cron-secret (unchanged)
-  - Env: BLUEBOOK_CRON_SECRET, BLUEBOOK_STRIPE_PRICE_ID, GEMINI_API_KEY, YOUTUBE_API_KEY
+  - Header: x-magiclog-cron-secret (legacy: x-bluebook-cron-secret)
+  - Env: MAGICLOG_CRON_SECRET (legacy: BLUEBOOK_CRON_SECRET)
+  - Stripe: MAGICLOG_STRIPE_PRICE_ID (legacy: BLUEBOOK_STRIPE_PRICE_ID)
+  - DB tables: magiclog_work_orders, magiclog_reminder_logs, magiclog-signatures bucket
+  - users.magiclog_onboarding_complete (run migration_rename_bluebook_to_magiclog.sql if upgrading)
 
 
 USEFUL GIT COMMANDS

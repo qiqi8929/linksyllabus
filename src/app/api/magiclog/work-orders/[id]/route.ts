@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { persistBluebookPlaySteps } from "@/lib/magiclog/persistPlaySteps";
+import { persistMagicLogPlaySteps } from "@/lib/magiclog/persistPlaySteps";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type {
-  BluebookAiStep,
-  BluebookVideoRef,
-  BluebookWorkOrder
+  MagicLogAiStep,
+  MagicLogVideoRef,
+  MagicLogWorkOrder
 } from "@/lib/magiclog/types";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export async function GET(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data, error } = await supabase
-    .from("bluebook_work_orders")
+    .from("magiclog_work_orders")
     .select("*")
     .eq("id", params.id)
     .eq("user_id", user.id)
@@ -30,16 +30,16 @@ export async function GET(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const videoUrls = (data.video_urls ?? []) as BluebookVideoRef[];
+  const videoUrls = (data.video_urls ?? []) as MagicLogVideoRef[];
   const video = videoUrls[0];
-  let aiSteps = (data.ai_steps ?? []) as BluebookAiStep[];
+  let aiSteps = (data.ai_steps ?? []) as MagicLogAiStep[];
   if (
     data.include_video &&
     video?.url &&
     aiSteps.length > 0 &&
     !aiSteps.every((s) => s.id)
   ) {
-    aiSteps = await persistBluebookPlaySteps(supabase, {
+    aiSteps = await persistMagicLogPlaySteps(supabase, {
       userId: user.id,
       workOrderId: data.id as string,
       competenceName: String(data.competence_name),
@@ -48,7 +48,7 @@ export async function GET(
       durationSec: video.durationSec
     });
     await supabase
-      .from("bluebook_work_orders")
+      .from("magiclog_work_orders")
       .update({ ai_steps: aiSteps })
       .eq("id", params.id)
       .eq("user_id", user.id);
@@ -68,7 +68,7 @@ export async function GET(
   if (sigPath && !sigPath.startsWith("http")) {
     const admin = createSupabaseAdminClient();
     const { data: signed } = await admin.storage
-      .from("bluebook-signatures")
+      .from("magiclog-signatures")
       .createSignedUrl(sigPath, 60 * 60);
     mentorSignatureSignedUrl = signed?.signedUrl ?? null;
   } else if (sigPath) {
@@ -76,7 +76,7 @@ export async function GET(
   }
 
   return NextResponse.json({
-    workOrder: data as BluebookWorkOrder,
+    workOrder: data as MagicLogWorkOrder,
     profile,
     mentorSignatureSignedUrl
   });
@@ -99,7 +99,7 @@ export async function PATCH(
   if (body.status != null) patch.status = body.status;
 
   const { error } = await supabase
-    .from("bluebook_work_orders")
+    .from("magiclog_work_orders")
     .update(patch)
     .eq("id", params.id)
     .eq("user_id", user.id);

@@ -27,7 +27,7 @@ export async function POST(
 
   const admin = createSupabaseAdminClient();
   const { error: uploadErr } = await admin.storage
-    .from("bluebook-signatures")
+    .from("magiclog-signatures")
     .upload(path, buffer, {
       contentType: file.type || "image/png",
       upsert: true
@@ -38,13 +38,13 @@ export async function POST(
   }
 
   const { data: signed } = await admin.storage
-    .from("bluebook-signatures")
+    .from("magiclog-signatures")
     .createSignedUrl(path, 60 * 60 * 24 * 365);
 
   const publicUrl = signed?.signedUrl ?? null;
 
   await supabase
-    .from("bluebook_work_orders")
+    .from("magiclog_work_orders")
     .update({ mentor_signature_url: path })
     .eq("id", params.id)
     .eq("user_id", user.id);

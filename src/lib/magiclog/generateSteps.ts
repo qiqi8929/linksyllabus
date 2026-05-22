@@ -2,9 +2,9 @@ import { generateContentWithYouTubeWatchUrl } from "@/lib/geminiVideoFileApi";
 import { env } from "@/lib/env";
 import { getTranscriptWithFallbacks } from "@/lib/transcript";
 import { extractYouTubeVideoId } from "@/lib/video";
-import type { BluebookAiStep } from "@/lib/magiclog/types";
+import type { MagicLogAiStep } from "@/lib/magiclog/types";
 
-function parseStepsJson(raw: string): BluebookAiStep[] {
+function parseStepsJson(raw: string): MagicLogAiStep[] {
   let s = raw.trim();
   s = s.replace(/^```(?:json)?\s*\r?\n?/i, "");
   s = s.replace(/\r?\n?```\s*$/i, "");
@@ -15,7 +15,7 @@ function parseStepsJson(raw: string): BluebookAiStep[] {
   const arr = JSON.parse(s) as unknown[];
   if (!Array.isArray(arr)) throw new Error("Expected JSON array of steps");
 
-  const out: BluebookAiStep[] = [];
+  const out: MagicLogAiStep[] = [];
   for (let i = 0; i < arr.length; i++) {
     const o = arr[i] as Record<string, unknown>;
     const step_number = Math.floor(Number(o.step_number ?? i + 1));
@@ -31,11 +31,11 @@ function parseStepsJson(raw: string): BluebookAiStep[] {
   return out.slice(0, 8);
 }
 
-export async function generateBluebookSteps(params: {
+export async function generateMagicLogSteps(params: {
   taskName: string;
   trade: string;
   youtubeUrl?: string;
-}): Promise<BluebookAiStep[]> {
+}): Promise<MagicLogAiStep[]> {
   if (!env.geminiApiKey()) {
     throw new Error("AI is not configured (missing GEMINI_API_KEY).");
   }

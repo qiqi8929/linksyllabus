@@ -1,4 +1,4 @@
-import { BLUEBOOK_TRADES } from "@/lib/magiclog/constants";
+import { MAGICLOG_TRADES } from "@/lib/magiclog/constants";
 import { env } from "@/lib/env";
 
 export type ScannedCoverFields = {
@@ -21,7 +21,7 @@ function parseJsonObject(raw: string): Record<string, unknown> {
 function matchTrade(extracted: string | null): string | null {
   if (!extracted?.trim()) return null;
   const lower = extracted.toLowerCase();
-  for (const t of BLUEBOOK_TRADES) {
+  for (const t of MAGICLOG_TRADES) {
     if (lower.includes(t.toLowerCase())) return t;
   }
   if (lower.includes("electric")) return "Electrician";
@@ -43,7 +43,7 @@ function normalizeDate(value: unknown): string | null {
   return d.toISOString().slice(0, 10);
 }
 
-export async function extractBluebookCoverFields(
+export async function extractMagicLogCoverFields(
   imageBase64: string,
   mimeType: string
 ): Promise<ScannedCoverFields> {

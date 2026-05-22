@@ -1,6 +1,6 @@
 import { WorkOrderClient } from "@/components/magiclog/WorkOrderClient";
 
-export default function BluebookWorkOrderPage({
+export default function MagicLogWorkOrderPage({
   params
 }: {
   params: { id: string };

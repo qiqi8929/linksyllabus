@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { syncPeriodProgress } from "@/lib/magiclog/computeProgress";
-import type { BluebookUserProfile, CompetenceType } from "@/lib/magiclog/types";
+import type { MagicLogUserProfile, CompetenceType } from "@/lib/magiclog/types";
 
 export async function ensurePeriodProgressRow(
   supabase: SupabaseClient,
@@ -24,7 +24,7 @@ export async function applySignedWorkOrderToProgress(
     period: number;
     hours: number;
     competenceType: CompetenceType;
-    profile?: Pick<BluebookUserProfile, "trade" | "province"> | null;
+    profile?: Pick<MagicLogUserProfile, "trade" | "province"> | null;
   }
 ) {
   const { userId, period } = params;

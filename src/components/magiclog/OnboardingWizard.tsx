@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  BLUEBOOK_PROVINCES,
-  BLUEBOOK_SUBSCRIPTION,
-  BLUEBOOK_TRADES
+  MAGICLOG_PROVINCES,
+  magiclog_subscription,
+  MAGICLOG_TRADES
 } from "@/lib/magiclog/constants";
 import { FormError } from "@/components/FormError";
 
@@ -20,7 +20,7 @@ export function OnboardingWizard() {
 
   const [province, setProvince] = useState("alberta");
   const [aitId, setAitId] = useState("");
-  const [trade, setTrade] = useState<string>(BLUEBOOK_TRADES[0]);
+  const [trade, setTrade] = useState<string>(MAGICLOG_TRADES[0]);
   const [currentPeriod, setCurrentPeriod] = useState(1);
   const [startDate, setStartDate] = useState("");
   const [sponsorName, setSponsorName] = useState("");
@@ -119,7 +119,7 @@ export function OnboardingWizard() {
   async function finishWithoutCheckout() {
     setLoading(true);
     try {
-      await saveProfile({ bluebook_onboarding_complete: true });
+      await saveProfile({ magiclog_onboarding_complete: true });
       router.replace("/magiclog/dashboard");
       router.refresh();
     } catch (e: unknown) {
@@ -141,7 +141,7 @@ export function OnboardingWizard() {
       {step === 1 ? (
         <div className="mt-6 space-y-3">
           <p className="text-sm font-medium">Select your province</p>
-          {BLUEBOOK_PROVINCES.map((p) => (
+          {MAGICLOG_PROVINCES.map((p) => (
             <label key={p.id} className="flex items-center gap-2 text-sm">
               <input
                 type="radio"
@@ -201,7 +201,7 @@ export function OnboardingWizard() {
               onChange={(e) => setTrade(e.target.value)}
               className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
             >
-              {BLUEBOOK_TRADES.map((t) => (
+              {MAGICLOG_TRADES.map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>
@@ -257,8 +257,8 @@ export function OnboardingWizard() {
       {step === 4 ? (
         <div className="mt-6 space-y-4">
           <p className="text-sm text-zinc-700">
-            <strong>{BLUEBOOK_SUBSCRIPTION.trialDays}-day free trial</strong>, then $
-            {BLUEBOOK_SUBSCRIPTION.monthlyUsd}/month. Cancel anytime.
+            <strong>{magiclog_subscription.trialDays}-day free trial</strong>, then $
+            {magiclog_subscription.monthlyUsd}/month. Cancel anytime.
           </p>
           <button
             type="button"

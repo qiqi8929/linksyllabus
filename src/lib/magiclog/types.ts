@@ -1,7 +1,7 @@
 export type CompetenceType = "mandatory" | "optional";
 export type WorkOrderStatus = "draft" | "completed" | "signed";
 
-export type BluebookAiStep = {
+export type MagicLogAiStep = {
   /** Row id in `steps` — used for /play/[id] and work-order QR codes. */
   id?: string;
   step_number: number;
@@ -11,9 +11,9 @@ export type BluebookAiStep = {
   end_time?: number;
 };
 
-export type BluebookCreationMode = "learn" | "steps_only" | "quick_log";
+export type MagicLogCreationMode = "learn" | "steps_only" | "quick_log";
 
-export type BluebookVideoRef = {
+export type MagicLogVideoRef = {
   videoId: string;
   url: string;
   title: string;
@@ -23,10 +23,10 @@ export type BluebookVideoRef = {
   /** Set on quick-log work orders (metadata, not a real video). */
   quickLog?: boolean;
   workedDate?: string;
-  creationMode?: BluebookCreationMode;
+  creationMode?: MagicLogCreationMode;
 };
 
-export type BluebookUserProfile = {
+export type MagicLogUserProfile = {
   id: string;
   email: string | null;
   ait_id: string | null;
@@ -36,18 +36,18 @@ export type BluebookUserProfile = {
   sponsor_name: string | null;
   sponsor_phone: string | null;
   province: string;
-  bluebook_onboarding_complete: boolean;
+  magiclog_onboarding_complete: boolean;
 };
 
-export type BluebookWorkOrder = {
+export type MagicLogWorkOrder = {
   id: string;
   user_id: string;
   competence_name: string;
   competence_type: CompetenceType;
   period: number;
   task_name: string | null;
-  ai_steps: BluebookAiStep[] | null;
-  video_urls: BluebookVideoRef[] | null;
+  ai_steps: MagicLogAiStep[] | null;
+  video_urls: MagicLogVideoRef[] | null;
   include_video: boolean;
   mentor_name: string | null;
   mentor_signature_url: string | null;

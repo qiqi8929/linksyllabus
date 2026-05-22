@@ -1,5 +1,5 @@
 import type { HourLogRow, SignedWorkOrderExport } from "@/lib/magiclog/exportData";
-import type { BluebookUserProfile } from "@/lib/magiclog/types";
+import type { MagicLogUserProfile } from "@/lib/magiclog/types";
 import type { ComputedPeriodProgress } from "@/lib/magiclog/computeProgress";
 import type { PeriodRequirements } from "@/lib/magiclog/constants";
 
@@ -22,7 +22,7 @@ export function AitSubmissionPrint({
   hourLogs
 }: {
   apprenticeName: string;
-  profile: BluebookUserProfile;
+  profile: MagicLogUserProfile;
   period: number;
   progress: ComputedPeriodProgress;
   requirements: PeriodRequirements;

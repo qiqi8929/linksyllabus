@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe/server";
-import { getBluebookStripePriceId } from "@/lib/stripe/magiclogSubscription";
+import { getMagicLogStripePriceId } from "@/lib/stripe/magiclogSubscription";
 import { env } from "@/lib/env";
-import { BLUEBOOK_SUBSCRIPTION } from "@/lib/magiclog/constants";
+import { magiclog_subscription } from "@/lib/magiclog/constants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,15 +45,15 @@ export async function POST(req: Request) {
     mode: "subscription",
     customer: customerId,
     allow_promotion_codes: true,
-    line_items: [{ price: getBluebookStripePriceId(), quantity: 1 }],
+    line_items: [{ price: getMagicLogStripePriceId(), quantity: 1 }],
     subscription_data: {
-      trial_period_days: BLUEBOOK_SUBSCRIPTION.trialDays,
+      trial_period_days: magiclog_subscription.trialDays,
       metadata: { user_id: user.id }
     },
     success_url: `${appUrl}/magiclog/onboarding?checkout=success`,
     cancel_url: `${appUrl}/magiclog/onboarding?checkout=cancel`,
     metadata: {
-      type: "bluebook_subscription",
+      type: "magiclog_subscription",
       user_id: user.id
     }
   });

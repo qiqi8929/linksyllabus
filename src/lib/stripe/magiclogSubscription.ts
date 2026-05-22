@@ -3,42 +3,46 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
 import { STRIPE_PRICES } from "@/lib/stripe/prices";
 
-const FALLBACK_PLACEHOLDER = "price_REPLACE_ME_BLUEBOOK_1999";
+const FALLBACK_PLACEHOLDER = "price_REPLACE_ME_MAGICLOG_1999";
 
 /**
- * Bluebook Stripe Price ID from hosting env.
- * Primary: BLUEBOOK_STRIPE_PRICE_ID
- * Legacy: STRIPE_PRICE_ID_BLUEBOOK_MONTHLY
+ * Magic Log Stripe Price ID from hosting env.
+ * Primary: MAGICLOG_STRIPE_PRICE_ID
+ * Legacy: BLUEBOOK_STRIPE_PRICE_ID, STRIPE_PRICE_ID_BLUEBOOK_MONTHLY
  */
-export function getBluebookStripePriceId(): string {
+export function getMagicLogStripePriceId(): string {
   return (
+    process.env.MAGICLOG_STRIPE_PRICE_ID?.trim() ||
     process.env.BLUEBOOK_STRIPE_PRICE_ID?.trim() ||
     process.env.STRIPE_PRICE_ID_BLUEBOOK_MONTHLY?.trim() ||
-    env.stripe.priceIdBluebookMonthly()?.trim() ||
-    STRIPE_PRICES.bluebookMonthlyUsd1999 ||
+    env.stripe.priceIdMagicLogMonthly()?.trim() ||
+    STRIPE_PRICES.magiclogMonthlyUsd1999 ||
     FALLBACK_PLACEHOLDER
   );
 }
 
 /** What the app resolves at runtime (for ops / debugging). */
-export function describeBluebookStripePriceConfig(): {
+export function describeMagicLogStripePriceConfig(): {
   resolvedPriceId: string;
-  envBluebookStripePriceId: string | null;
+  envMagicLogStripePriceId: string | null;
   envLegacyPriceId: string | null;
   isPlaceholder: boolean;
 } {
-  const resolved = getBluebookStripePriceId();
-  const envBluebook = process.env.BLUEBOOK_STRIPE_PRICE_ID?.trim() || null;
-  const envLegacy = process.env.STRIPE_PRICE_ID_BLUEBOOK_MONTHLY?.trim() || null;
+  const resolved = getMagicLogStripePriceId();
+  const envMagicLog = process.env.MAGICLOG_STRIPE_PRICE_ID?.trim() || null;
+  const envLegacy =
+    process.env.BLUEBOOK_STRIPE_PRICE_ID?.trim() ||
+    process.env.STRIPE_PRICE_ID_BLUEBOOK_MONTHLY?.trim() ||
+    null;
   return {
     resolvedPriceId: resolved,
-    envBluebookStripePriceId: envBluebook,
+    envMagicLogStripePriceId: envMagicLog,
     envLegacyPriceId: envLegacy,
     isPlaceholder: resolved === FALLBACK_PLACEHOLDER
   };
 }
 
-export async function activateBluebookSubscription(
+export async function activateMagicLogSubscription(
   admin: SupabaseClient,
   params: { userId: string; stripeCustomerId?: string; status?: string }
 ) {
@@ -50,7 +54,7 @@ export async function activateBluebookSubscription(
   });
 }
 
-export async function handleBluebookCheckoutCompleted(
+export async function handleMagicLogCheckoutCompleted(
   admin: SupabaseClient,
   session: Stripe.Checkout.Session
 ) {
@@ -59,7 +63,7 @@ export async function handleBluebookCheckoutCompleted(
 
   await admin
     .from("users")
-    .update({ bluebook_onboarding_complete: true })
+    .update({ magiclog_onboarding_complete: true })
     .eq("id", userId);
 
   const customerId =
@@ -67,7 +71,7 @@ export async function handleBluebookCheckoutCompleted(
       ? session.customer
       : session.customer?.id ?? null;
 
-  await activateBluebookSubscription(admin, {
+  await activateMagicLogSubscription(admin, {
     userId,
     stripeCustomerId: customerId ?? undefined,
     status: "active"

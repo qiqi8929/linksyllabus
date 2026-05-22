@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
-import { generateBluebookSteps } from "@/lib/magiclog/generateSteps";
-import { fetchBluebookProfile } from "@/lib/magiclog/profile";
+import { generateMagicLogSteps } from "@/lib/magiclog/generateSteps";
+import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,11 +21,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "taskName is required" }, { status: 400 });
   }
 
-  const profile = await fetchBluebookProfile(supabase, user.id);
+  const profile = await fetchMagicLogProfile(supabase, user.id);
   const trade = profile?.trade?.trim() || "Trades";
 
   try {
-    const steps = await generateBluebookSteps({
+    const steps = await generateMagicLogSteps({
       taskName,
       trade,
       youtubeUrl: youtubeUrl || undefined

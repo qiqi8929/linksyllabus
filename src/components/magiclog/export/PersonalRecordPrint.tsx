@@ -1,6 +1,6 @@
 import { parseAiSteps } from "@/lib/magiclog/exportData";
 import type { SignedWorkOrderExport } from "@/lib/magiclog/exportData";
-import type { BluebookUserProfile } from "@/lib/magiclog/types";
+import type { MagicLogUserProfile } from "@/lib/magiclog/types";
 
 export function PersonalRecordPrint({
   apprenticeName,
@@ -8,7 +8,7 @@ export function PersonalRecordPrint({
   orders
 }: {
   apprenticeName: string;
-  profile: BluebookUserProfile;
+  profile: MagicLogUserProfile;
   orders: SignedWorkOrderExport[];
 }) {
   return (

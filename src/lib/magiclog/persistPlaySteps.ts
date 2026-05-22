@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BluebookAiStep } from "@/lib/magiclog/types";
+import type { MagicLogAiStep } from "@/lib/magiclog/types";
 
 function clipBounds(
-  steps: BluebookAiStep[],
+  steps: MagicLogAiStep[],
   index: number,
   durationSec?: number
 ): { start_time: number; end_time: number } {
@@ -32,18 +32,18 @@ function clipBounds(
   };
 }
 
-/** Create `steps` rows so /play/[step_id] and work-order QRs work for Bluebook learning pages. */
-export async function persistBluebookPlaySteps(
+/** Create `steps` rows so /play/[step_id] and work-order QRs work for Magic Log learning pages. */
+export async function persistMagicLogPlaySteps(
   supabase: SupabaseClient,
   params: {
     userId: string;
     workOrderId: string;
     competenceName: string;
-    steps: BluebookAiStep[];
+    steps: MagicLogAiStep[];
     youtubeUrl: string;
     durationSec?: number;
   }
-): Promise<BluebookAiStep[]> {
+): Promise<MagicLogAiStep[]> {
   const { steps, youtubeUrl } = params;
   if (!youtubeUrl.trim() || steps.length === 0) return steps;
   if (steps.every((s) => s.id)) return steps;

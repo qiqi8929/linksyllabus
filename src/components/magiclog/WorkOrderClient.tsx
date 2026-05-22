@@ -10,19 +10,19 @@ import {
   quickLogWorkedDate
 } from "@/lib/magiclog/workOrderMode";
 import type {
-  BluebookAiStep,
-  BluebookUserProfile,
-  BluebookVideoRef,
-  BluebookWorkOrder
+  MagicLogAiStep,
+  MagicLogUserProfile,
+  MagicLogVideoRef,
+  MagicLogWorkOrder
 } from "@/lib/magiclog/types";
 
-type Tab = "bluebook" | "learning";
+type Tab = "ait" | "learning";
 
 export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("bluebook");
-  const [workOrder, setWorkOrder] = useState<BluebookWorkOrder | null>(null);
-  const [profile, setProfile] = useState<Partial<BluebookUserProfile> | null>(null);
+  const [tab, setTab] = useState<Tab>("ait");
+  const [workOrder, setWorkOrder] = useState<MagicLogWorkOrder | null>(null);
+  const [profile, setProfile] = useState<Partial<MagicLogUserProfile> | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [signaturePath, setSignaturePath] = useState<string | null>(null);
   const [mentorName, setMentorName] = useState("");
@@ -43,7 +43,7 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
       setSignaturePath(j.workOrder.mentor_signature_url);
     }
     if (j.workOrder.mentor_name) setMentorName(j.workOrder.mentor_name);
-    const wo = j.workOrder as BluebookWorkOrder;
+    const wo = j.workOrder as MagicLogWorkOrder;
     if (isQuickLogWorkOrder(wo) && wo.hours != null) {
       setHours(String(wo.hours));
     }
@@ -56,11 +56,11 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
   }, [load]);
 
   const video = useMemo(() => {
-    const urls = workOrder?.video_urls as BluebookVideoRef[] | null;
+    const urls = workOrder?.video_urls as MagicLogVideoRef[] | null;
     return urls?.[0] ?? null;
   }, [workOrder]);
 
-  const steps = (workOrder?.ai_steps ?? []) as BluebookAiStep[];
+  const steps = (workOrder?.ai_steps ?? []) as MagicLogAiStep[];
 
   async function submitSignOff(h: number, sigPath: string | null) {
     if (!Number.isFinite(h) || h <= 0) {
@@ -155,8 +155,8 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
           <nav className="flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
             <button
               type="button"
-              className={`rounded-md px-3 py-1.5 ${tab === "bluebook" ? "bg-orange-500 text-white" : ""}`}
-              onClick={() => setTab("bluebook")}
+              className={`rounded-md px-3 py-1.5 ${tab === "ait" ? "bg-orange-500 text-white" : ""}`}
+              onClick={() => setTab("ait")}
             >
               My Bluebook
             </button>
@@ -171,7 +171,7 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
         ) : null}
       </header>
 
-      {tab === "bluebook" ? (
+      {tab === "ait" ? (
         <section className="ait-sheet">
           <p className="ait-submit-badge">
             <span aria-hidden>👇</span>

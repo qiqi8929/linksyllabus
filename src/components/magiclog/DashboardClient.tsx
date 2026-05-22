@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { FormError } from "@/components/FormError";
 
 type DashboardData = {
@@ -11,7 +11,7 @@ type DashboardData = {
     trade: string | null;
     current_period: number;
     province: string;
-    bluebook_onboarding_complete: boolean;
+    magiclog_onboarding_complete: boolean;
   };
   period: number;
   requirements: {
@@ -33,20 +33,185 @@ type DashboardData = {
     competence_name: string;
     hours: number | null;
     status: string;
+    period: number;
     created_at: string;
   }>;
 };
 
+function formatHours(n: number): string {
+  return Number(n).toLocaleString("en-CA", { maximumFractionDigits: 0 });
+}
+
+function formatEstCompletion(raw: string | null): string | null {
+  if (!raw) return null;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) {
+    const m = raw.match(/([A-Za-z]{3,})\s+(\d{4})/);
+    return m ? `${m[1]} ${m[2]}` : raw;
+  }
+  return d.toLocaleDateString("en-CA", { month: "short", year: "numeric" });
+}
+
+function formatOrderDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function IconHome({ active }: { active?: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+        fill={active ? "currentColor" : "none"}
+      />
+    </svg>
+  );
+}
+
+function IconChart() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M5 19V11M10 19V7M15 19v-5M20 19V5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function IconExport() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 3v10m0 0 4-4m-4 4-4M5 21h14"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconSettings() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.75" />
+      <path
+        d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function IconMic() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M6 11a6 6 0 0 0 12 0M12 17v4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconCamera() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 8h3l2-2h6l2 2h3v12H4V8Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="13" r="3.25" stroke="currentColor" strokeWidth="1.75" />
+    </svg>
+  );
+}
+
+function IconType() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M5 6h14M5 12h10M5 18h6"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function IconSteps() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function IconChevron() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M10 6l6 6-6 6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+const INPUT_METHODS = [
+  {
+    href: "/magiclog/new",
+    primary: true,
+    title: "Record voice",
+    subtitle: "Say it in one sentence",
+    Icon: IconMic
+  },
+  {
+    href: "/magiclog/new",
+    title: "Take photo",
+    subtitle: "Snap your work",
+    Icon: IconCamera
+  },
+  {
+    href: "/magiclog/new",
+    title: "Type it",
+    subtitle: "Enter task manually",
+    Icon: IconType
+  },
+  {
+    href: "/magiclog/new",
+    title: "Learn with steps",
+    subtitle: "Video + QR guide",
+    Icon: IconSteps
+  }
+] as const;
+
 export function DashboardClient() {
   const router = useRouter();
+  const pathname = usePathname();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [periodFilter, setPeriodFilter] = useState<string>("all");
 
   useEffect(() => {
     fetch("/api/magiclog/dashboard")
       .then((r) => r.json())
       .then((j) => {
-        if (j.profile && !j.profile.bluebook_onboarding_complete) {
+        if (j.profile && !j.profile.magiclog_onboarding_complete) {
           router.replace("/magiclog/onboarding");
           return;
         }
@@ -58,11 +223,25 @@ export function DashboardClient() {
       });
   }, [router]);
 
+  const filteredOrders = useMemo(() => {
+    if (!data) return [];
+    if (periodFilter === "all") return data.recentWorkOrders;
+    const p = Number(periodFilter);
+    return data.recentWorkOrders.filter((w) => w.period === p);
+  }, [data, periodFilter]);
+
   if (!data) {
     return (
-      <div>
-        <FormError message={error} />
-        {!error ? <p className="text-sm text-zinc-600">Loading dashboard…</p> : null}
+      <div className="ml-dashboard">
+        <aside className="ml-dashboard-sidebar" aria-label="Main navigation">
+          <div className="ml-sidebar-icon ml-sidebar-icon--active">
+            <IconHome active />
+          </div>
+        </aside>
+        <div className="ml-dashboard-main">
+          <FormError message={error} />
+          {!error ? <p className="ml-dashboard-loading">Loading…</p> : null}
+        </div>
       </div>
     );
   }
@@ -71,91 +250,136 @@ export function DashboardClient() {
     100,
     Math.round((data.progress.total_hours / data.requirements.hoursRequired) * 100)
   );
+  const estCompletion = formatEstCompletion(data.estimatedCompletion);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">
-          Hi{" "}
-          {data.profile.email?.split("@")[0] ?? "there"} 👋
-        </h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          {data.profile.trade ?? "Trade"} · Period {data.period} ·{" "}
-          {data.profile.province === "alberta" ? "Alberta" : data.profile.province}
-        </p>
-      </div>
+    <div className="ml-dashboard">
+      <aside className="ml-dashboard-sidebar" aria-label="Main navigation">
+        <Link
+          href="/magiclog/dashboard"
+          className={`ml-sidebar-icon ${pathname === "/magiclog/dashboard" ? "ml-sidebar-icon--active" : ""}`}
+          aria-label="Home"
+          aria-current={pathname === "/magiclog/dashboard" ? "page" : undefined}
+        >
+          <IconHome active={pathname === "/magiclog/dashboard"} />
+        </Link>
+        <a href="#ml-period-progress" className="ml-sidebar-icon" aria-label="Progress">
+          <IconChart />
+        </a>
+        <Link href="/magiclog/export" className="ml-sidebar-icon" aria-label="Export">
+          <IconExport />
+        </Link>
+        <Link
+          href="/magiclog/onboarding"
+          className="ml-sidebar-icon ml-sidebar-icon--bottom"
+          aria-label="Settings"
+        >
+          <IconSettings />
+        </Link>
+      </aside>
 
-      <section className="card p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-          Period {data.period} progress
-        </h2>
-        <p className="mt-3 text-sm">
-          Hours: {data.progress.total_hours} / {data.requirements.hoursRequired}
-        </p>
-        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-200">
-          <div
-            className="h-full rounded-full bg-orange-500"
-            style={{ width: `${hoursPct}%` }}
-          />
+      <div className="ml-dashboard-main">
+        <header className="ml-dashboard-hero">
+          <h1 className="ml-dashboard-title">What did you work on today?</h1>
+          <p className="ml-dashboard-subtitle">Log your hours — speak, snap, or type</p>
+        </header>
+
+        <div className="ml-input-grid">
+          {INPUT_METHODS.map((item) => (
+            <Link
+              key={item.title}
+              href={item.href}
+              className={`ml-input-card ${"primary" in item && item.primary ? "ml-input-card--primary" : ""}`}
+            >
+              <span className="ml-input-card-icon" aria-hidden>
+                <item.Icon />
+              </span>
+              <span className="ml-input-card-title">{item.title}</span>
+              <span className="ml-input-card-sub">{item.subtitle}</span>
+            </Link>
+          ))}
         </div>
-        <p className="mt-3 text-sm">
-          Mandatory: {data.progress.mandatory_completed} / {data.requirements.mandatoryRequired}
-          {data.progress.mandatory_completed >= data.requirements.mandatoryRequired
-            ? " ✓"
-            : ""}
-        </p>
-        <p className="text-sm">
-          Optional: {data.progress.optional_completed} / {data.requirements.optionalRequired}
-        </p>
-        {data.progress.total_competences != null ? (
-          <p className="mt-1 text-xs text-zinc-500">
-            {data.progress.total_competences} signed competence
-            {data.progress.total_competences === 1 ? "" : "s"} this period
-          </p>
-        ) : null}
-        {data.estimatedCompletion ? (
-          <p className="mt-2 text-xs text-zinc-500">
-            Est. completion: {data.estimatedCompletion}
-          </p>
-        ) : null}
-      </section>
 
-      <section className="card p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-          Recent work orders
-        </h2>
-        <ul className="mt-3 space-y-2 text-sm">
-          {data.recentWorkOrders.length === 0 ? (
-            <li className="text-zinc-500">No work orders yet.</li>
-          ) : (
-            data.recentWorkOrders.map((w) => (
-              <li key={w.id}>
-                <Link
-                  href={`/magiclog/work-order/${w.id}`}
-                  className="text-zinc-800 hover:text-orange-600"
-                >
-                  {w.task_name || w.competence_name} —{" "}
-                  {new Date(w.created_at).toLocaleDateString()}{" "}
-                  {w.hours != null ? `— ${w.hours}hrs` : ""}{" "}
-                  {w.status === "signed" ? "✓" : "pending sig"}
-                </Link>
+        <section id="ml-period-progress" className="ml-progress-card">
+          <div className="ml-progress-card-head">
+            <span className="ml-progress-label">Period {data.period} progress</span>
+            <span className="ml-progress-hours">
+              {formatHours(data.progress.total_hours)} /{" "}
+              {formatHours(data.requirements.hoursRequired)} hrs
+            </span>
+          </div>
+          <div className="ml-progress-track" role="progressbar" aria-valuenow={hoursPct} aria-valuemin={0} aria-valuemax={100}>
+            <div className="ml-progress-fill" style={{ width: `${hoursPct}%` }} />
+            <span className="ml-progress-dot" aria-hidden />
+          </div>
+          <div className="ml-progress-meta">
+            <span>
+              Mandatory {data.progress.mandatory_completed}/{data.requirements.mandatoryRequired}
+            </span>
+            <span>
+              Optional {data.progress.optional_completed}/{data.requirements.optionalRequired}
+            </span>
+            {estCompletion ? <span>Est. completion {estCompletion}</span> : <span />}
+          </div>
+        </section>
+
+        <section className="ml-orders-section">
+          <div className="ml-orders-head">
+            <h2 className="ml-orders-title">My work orders</h2>
+            <select
+              className="ml-orders-filter"
+              value={periodFilter}
+              onChange={(e) => setPeriodFilter(e.target.value)}
+              aria-label="Filter by period"
+            >
+              <option value="all">All periods</option>
+              {[1, 2, 3, 4].map((n) => (
+                <option key={n} value={String(n)}>
+                  Period {n}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <ul className="ml-orders-list">
+            {filteredOrders.length === 0 ? (
+              <li className="ml-order-card ml-order-card--empty">
+                <p>No work orders yet. Start with Record voice or Type it above.</p>
               </li>
-            ))
-          )}
-        </ul>
-      </section>
+            ) : (
+              filteredOrders.map((w) => {
+                const signed = w.status === "signed";
+                return (
+                  <li key={w.id}>
+                    <Link href={`/magiclog/work-order/${w.id}`} className="ml-order-card">
+                      <span className="ml-order-icon" aria-hidden>
+                        <IconSteps />
+                      </span>
+                      <span className="ml-order-body">
+                        <span className="ml-order-name">{w.task_name || w.competence_name}</span>
+                        <span className="ml-order-meta">
+                          Period {w.period}
+                          {w.hours != null ? ` · ${w.hours} hrs` : ""} · {formatOrderDate(w.created_at)}
+                        </span>
+                      </span>
+                      <span
+                        className={`ml-order-badge ${signed ? "ml-order-badge--signed" : "ml-order-badge--pending"}`}
+                      >
+                        {signed ? "Signed" : "Pending"}
+                      </span>
+                      <span className="ml-order-chevron" aria-hidden>
+                        <IconChevron />
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </section>
 
-      <section className="flex flex-wrap gap-3">
-        <Link href="/magiclog/new" className="btn-primary inline-flex">
-          + New work order
-        </Link>
-        <Link href="/magiclog/export" className="btn-ghost inline-flex">
-          Export &amp; print
-        </Link>
-      </section>
-
-      <FormError message={error} />
+        <FormError message={error} />
+      </div>
     </div>
   );
 }
-

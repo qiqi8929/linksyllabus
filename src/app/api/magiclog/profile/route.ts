@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
-import { fetchBluebookProfile } from "@/lib/magiclog/profile";
+import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const profile = await fetchBluebookProfile(supabase, user.id);
+  const profile = await fetchMagicLogProfile(supabase, user.id);
   return NextResponse.json({ profile });
 }
 
@@ -36,8 +36,8 @@ export async function PATCH(req: Request) {
   if (body.sponsor_name != null) patch.sponsor_name = String(body.sponsor_name).trim();
   if (body.sponsor_phone != null) patch.sponsor_phone = String(body.sponsor_phone).trim();
   if (body.province != null) patch.province = String(body.province).trim() || "alberta";
-  if (body.bluebook_onboarding_complete === true) {
-    patch.bluebook_onboarding_complete = true;
+  if (body.magiclog_onboarding_complete === true || body.bluebook_onboarding_complete === true) {
+    patch.magiclog_onboarding_complete = true;
   }
 
   const { error } = await supabase.from("users").update(patch).eq("id", user.id);
@@ -45,6 +45,6 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const profile = await fetchBluebookProfile(supabase, user.id);
+  const profile = await fetchMagicLogProfile(supabase, user.id);
   return NextResponse.json({ profile });
 }

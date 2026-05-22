@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
-import { fetchBluebookProfile } from "@/lib/magiclog/profile";
+import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
 import { applySignedWorkOrderToProgress } from "@/lib/magiclog/periodProgress";
 import type { CompetenceType } from "@/lib/magiclog/types";
 
@@ -28,7 +28,7 @@ export async function POST(
   }
 
   const { data: order, error: loadErr } = await supabase
-    .from("bluebook_work_orders")
+    .from("magiclog_work_orders")
     .select("id,period,competence_type,status")
     .eq("id", params.id)
     .eq("user_id", user.id)
@@ -40,7 +40,7 @@ export async function POST(
 
   const signedAt = new Date().toISOString();
   const { error: upErr } = await supabase
-    .from("bluebook_work_orders")
+    .from("magiclog_work_orders")
     .update({
       status: "signed",
       signed_at: signedAt,
@@ -62,7 +62,7 @@ export async function POST(
     period: order.period
   });
 
-  const profile = await fetchBluebookProfile(supabase, user.id);
+  const profile = await fetchMagicLogProfile(supabase, user.id);
   await applySignedWorkOrderToProgress(supabase, {
     userId: user.id,
     period: order.period,

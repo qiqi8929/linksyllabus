@@ -5,8 +5,8 @@ import {
   syncPeriodProgress
 } from "@/lib/magiclog/computeProgress";
 import { estimatePeriodCompletionDate } from "@/lib/magiclog/periodProgress";
-import { fetchBluebookProfile } from "@/lib/magiclog/profile";
-import type { BluebookAiStep, BluebookUserProfile, BluebookWorkOrder } from "@/lib/magiclog/types";
+import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
+import type { MagicLogAiStep, MagicLogUserProfile, MagicLogWorkOrder } from "@/lib/magiclog/types";
 
 export type HourLogRow = {
   id: string;
@@ -20,7 +20,7 @@ export type HourLogRow = {
   } | null;
 };
 
-export type SignedWorkOrderExport = BluebookWorkOrder & {
+export type SignedWorkOrderExport = MagicLogWorkOrder & {
   mentorSignatureSignedUrl: string | null;
 };
 
@@ -29,7 +29,7 @@ async function signStoragePath(path: string | null): Promise<string | null> {
   if (path.startsWith("http")) return path;
   const admin = createSupabaseAdminClient();
   const { data } = await admin.storage
-    .from("bluebook-signatures")
+    .from("magiclog-signatures")
     .createSignedUrl(path, 60 * 60);
   return data?.signedUrl ?? null;
 }
@@ -40,14 +40,14 @@ export async function fetchSignedWorkOrdersForPeriod(
   period: number
 ): Promise<SignedWorkOrderExport[]> {
   const { data } = await supabase
-    .from("bluebook_work_orders")
+    .from("magiclog_work_orders")
     .select("*")
     .eq("user_id", userId)
     .eq("period", period)
     .eq("status", "signed")
     .order("signed_at", { ascending: true });
 
-  const rows = (data ?? []) as BluebookWorkOrder[];
+  const rows = (data ?? []) as MagicLogWorkOrder[];
   return Promise.all(
     rows.map(async (row) => ({
       ...row,
@@ -83,7 +83,7 @@ export async function fetchHourLogsForPeriod(
 
   if (workOrderIds.length > 0) {
     const { data: orders } = await supabase
-      .from("bluebook_work_orders")
+      .from("magiclog_work_orders")
       .select("id,competence_name,task_name,competence_type")
       .in("id", workOrderIds);
 
@@ -107,7 +107,7 @@ export async function fetchHourLogsForPeriod(
   }));
 }
 
-export function displayName(profile: BluebookUserProfile): string {
+export function displayName(profile: MagicLogUserProfile): string {
   if (profile.email) {
     const local = profile.email.split("@")[0];
     return local.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -115,12 +115,12 @@ export function displayName(profile: BluebookUserProfile): string {
   return "Apprentice";
 }
 
-export async function fetchBluebookExportBundle(
+export async function fetchMagicLogExportBundle(
   supabase: SupabaseClient,
   userId: string,
   period: number
 ) {
-  const profile = await fetchBluebookProfile(supabase, userId);
+  const profile = await fetchMagicLogProfile(supabase, userId);
   if (!profile) return null;
 
   const progress = await syncPeriodProgress(supabase, userId, period, profile);
@@ -129,7 +129,7 @@ export async function fetchBluebookExportBundle(
   const hourLogs = await fetchHourLogsForPeriod(supabase, userId, period);
 
   const { data: allSigned } = await supabase
-    .from("bluebook_work_orders")
+    .from("magiclog_work_orders")
     .select("*")
     .eq("user_id", userId)
     .eq("status", "signed")
@@ -137,7 +137,7 @@ export async function fetchBluebookExportBundle(
     .order("signed_at", { ascending: true });
 
   const allSignedWithSigs: SignedWorkOrderExport[] = await Promise.all(
-    ((allSigned ?? []) as BluebookWorkOrder[]).map(async (row) => ({
+    ((allSigned ?? []) as MagicLogWorkOrder[]).map(async (row) => ({
       ...row,
       mentorSignatureSignedUrl: await signStoragePath(row.mentor_signature_url)
     }))
@@ -159,7 +159,7 @@ export async function fetchBluebookExportBundle(
   };
 }
 
-export function parseAiSteps(raw: unknown): BluebookAiStep[] {
+export function parseAiSteps(raw: unknown): MagicLogAiStep[] {
   if (!Array.isArray(raw)) return [];
-  return raw as BluebookAiStep[];
+  return raw as MagicLogAiStep[];
 }

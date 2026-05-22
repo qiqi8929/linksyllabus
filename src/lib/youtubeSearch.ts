@@ -11,7 +11,7 @@ export type YouTubeSearchResult = {
 };
 
 /**
- * Bluebook / trade-aware YouTube search query.
+ * Magic Log / trade-aware YouTube search query.
  * Example: "install branch circuits" + Electrician → "install branch circuits electrician how to"
  */
 export function buildTradeAwareYouTubeSearchQuery(
