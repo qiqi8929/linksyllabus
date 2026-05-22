@@ -152,7 +152,12 @@ export async function fetchMagicLogExportBundle(
     apprenticeName: displayName(profile),
     estimatedCompletion: estimatePeriodCompletionDate(
       profile.apprenticeship_start_date,
-      period
+      period,
+      {
+        totalHours: progress.total_hours,
+        hoursRequired: requirements.hoursRequired,
+        periodComplete: progress.period_complete
+      }
     )
   };
 }

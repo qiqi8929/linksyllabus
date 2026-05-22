@@ -196,12 +196,20 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
   width: 72px;
   height: 100vh;
   padding: 16px 0;
   background: var(--ml-card);
   border-right: 1px solid var(--ml-border);
+}
+
+.magiclog-root .ml-sidebar-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
 }
 
 .magiclog-root .ml-sidebar-icon {
@@ -372,7 +380,7 @@
   height: 8px;
   border-radius: 999px;
   background: #e5e7eb;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .magiclog-root .ml-progress-fill {
@@ -380,18 +388,6 @@
   border-radius: 999px;
   background: var(--ml-green);
   transition: width 0.35s ease;
-}
-
-.magiclog-root .ml-progress-dot {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: #ef4444;
-  transform: translate(50%, -50%);
-  box-shadow: 0 0 0 2px var(--ml-card);
 }
 
 .magiclog-root .ml-progress-meta {

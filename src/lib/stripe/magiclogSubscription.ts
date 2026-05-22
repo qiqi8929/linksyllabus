@@ -6,14 +6,12 @@ import { STRIPE_PRICES } from "@/lib/stripe/prices";
 const FALLBACK_PLACEHOLDER = "price_REPLACE_ME_MAGICLOG_1999";
 
 /**
- * Magic Log Stripe Price ID from hosting env.
- * Primary: MAGICLOG_STRIPE_PRICE_ID
- * Legacy: BLUEBOOK_STRIPE_PRICE_ID, STRIPE_PRICE_ID_BLUEBOOK_MONTHLY
+ * Magic Log Stripe Price ID from hosting env (Vercel: MAGICLOG_STRIPE_PRICE_ID).
+ * Legacy alias: STRIPE_PRICE_ID_BLUEBOOK_MONTHLY
  */
 export function getMagicLogStripePriceId(): string {
   return (
     process.env.MAGICLOG_STRIPE_PRICE_ID?.trim() ||
-    process.env.BLUEBOOK_STRIPE_PRICE_ID?.trim() ||
     process.env.STRIPE_PRICE_ID_BLUEBOOK_MONTHLY?.trim() ||
     env.stripe.priceIdMagicLogMonthly()?.trim() ||
     STRIPE_PRICES.magiclogMonthlyUsd1999 ||
@@ -30,10 +28,7 @@ export function describeMagicLogStripePriceConfig(): {
 } {
   const resolved = getMagicLogStripePriceId();
   const envMagicLog = process.env.MAGICLOG_STRIPE_PRICE_ID?.trim() || null;
-  const envLegacy =
-    process.env.BLUEBOOK_STRIPE_PRICE_ID?.trim() ||
-    process.env.STRIPE_PRICE_ID_BLUEBOOK_MONTHLY?.trim() ||
-    null;
+  const envLegacy = process.env.STRIPE_PRICE_ID_BLUEBOOK_MONTHLY?.trim() || null;
   return {
     resolvedPriceId: resolved,
     envMagicLogStripePriceId: envMagicLog,

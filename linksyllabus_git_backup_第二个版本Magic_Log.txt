@@ -17,7 +17,7 @@ This is the current production-ready Magic Log build:
 Includes prior Bluebook v2 work (commit 72fa481):
   - Three work-order modes, cover scan, Submit to AIT export
   - Trade-aware YouTube search, email reminders cron
-  - Stripe: BLUEBOOK_STRIPE_PRICE_ID env
+  - Stripe: MAGICLOG_STRIPE_PRICE_ID env
 
 HOW TO RESTORE THIS VERSION:
 ------------------------------
@@ -57,7 +57,7 @@ CRON / HOSTING NOTES
   - Reminders: POST /api/magiclog/reminders
   - Header: x-magiclog-cron-secret (legacy: x-bluebook-cron-secret)
   - Env: MAGICLOG_CRON_SECRET (legacy: BLUEBOOK_CRON_SECRET)
-  - Stripe: MAGICLOG_STRIPE_PRICE_ID (legacy: BLUEBOOK_STRIPE_PRICE_ID)
+  - Stripe: MAGICLOG_STRIPE_PRICE_ID (legacy alias: STRIPE_PRICE_ID_BLUEBOOK_MONTHLY)
   - DB tables: magiclog_work_orders, magiclog_reminder_logs, magiclog-signatures bucket
   - users.magiclog_onboarding_complete (run migration_rename_bluebook_to_magiclog.sql if upgrading)
 

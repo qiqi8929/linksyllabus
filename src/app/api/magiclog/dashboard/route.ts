@@ -57,7 +57,12 @@ export async function GET(req: Request) {
     },
     estimatedCompletion: estimatePeriodCompletionDate(
       profile.apprenticeship_start_date,
-      period
+      period,
+      {
+        totalHours: computed.total_hours,
+        hoursRequired: reqPeriod.hoursRequired,
+        periodComplete: computed.period_complete
+      }
     ),
     recentWorkOrders: recentOrders ?? []
   });

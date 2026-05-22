@@ -240,8 +240,16 @@ export function DashboardClient() {
     return (
       <div className="ml-dashboard">
         <aside className="ml-dashboard-sidebar" aria-label="Main navigation">
-          <div className="ml-sidebar-icon ml-sidebar-icon--active">
-            <IconHome active />
+          <div className="ml-sidebar-top">
+            <div className="ml-sidebar-icon ml-sidebar-icon--active">
+              <IconHome active />
+            </div>
+            <a className="ml-sidebar-icon" href="#ml-period-progress" aria-hidden tabIndex={-1}>
+              <IconChart />
+            </a>
+            <span className="ml-sidebar-icon" aria-hidden>
+              <IconExport />
+            </span>
           </div>
         </aside>
         <div className="ml-dashboard-main">
@@ -268,20 +276,22 @@ export function DashboardClient() {
   return (
     <div className="ml-dashboard">
       <aside className="ml-dashboard-sidebar" aria-label="Main navigation">
-        <Link
-          href="/magiclog/dashboard"
-          className={`ml-sidebar-icon ${pathname === "/magiclog/dashboard" ? "ml-sidebar-icon--active" : ""}`}
-          aria-label="Home"
-          aria-current={pathname === "/magiclog/dashboard" ? "page" : undefined}
-        >
-          <IconHome active={pathname === "/magiclog/dashboard"} />
-        </Link>
-        <a href="#ml-period-progress" className="ml-sidebar-icon" aria-label="Progress">
-          <IconChart />
-        </a>
-        <Link href="/magiclog/export" className="ml-sidebar-icon" aria-label="Export">
-          <IconExport />
-        </Link>
+        <div className="ml-sidebar-top">
+          <Link
+            href="/magiclog/dashboard"
+            className={`ml-sidebar-icon ${pathname === "/magiclog/dashboard" ? "ml-sidebar-icon--active" : ""}`}
+            aria-label="Home"
+            aria-current={pathname === "/magiclog/dashboard" ? "page" : undefined}
+          >
+            <IconHome active={pathname === "/magiclog/dashboard"} />
+          </Link>
+          <a href="#ml-period-progress" className="ml-sidebar-icon" aria-label="Progress">
+            <IconChart />
+          </a>
+          <Link href="/magiclog/export" className="ml-sidebar-icon" aria-label="Export">
+            <IconExport />
+          </Link>
+        </div>
         <Link
           href="/magiclog/onboarding"
           className="ml-sidebar-icon ml-sidebar-icon--bottom"
@@ -328,9 +338,14 @@ export function DashboardClient() {
               {formatHours(data.requirements.hoursRequired)} hrs
             </span>
           </div>
-          <div className="ml-progress-track" role="progressbar" aria-valuenow={hoursPct} aria-valuemin={0} aria-valuemax={100}>
+          <div
+            className="ml-progress-track"
+            role="progressbar"
+            aria-valuenow={hoursPct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
             <div className="ml-progress-fill" style={{ width: `${hoursPct}%` }} />
-            <span className="ml-progress-dot" aria-hidden />
           </div>
           <div className="ml-progress-meta">
             <span>

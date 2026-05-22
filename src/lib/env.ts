@@ -37,10 +37,9 @@ export const env = {
     /** One-time payment per additional tutorial guide after free tier ($9.99). */
     priceIdGuideUnlock: () =>
       process.env.STRIPE_PRICE_ID_GUIDE_UNLOCK as string | undefined,
-    /** Magic Log subscription ($19.99/mo after trial). Prefer MAGICLOG_STRIPE_PRICE_ID. */
+    /** Magic Log subscription ($19.99/mo after trial). Set MAGICLOG_STRIPE_PRICE_ID in Vercel. */
     priceIdMagicLogMonthly: () =>
       (process.env.MAGICLOG_STRIPE_PRICE_ID as string | undefined) ??
-      (process.env.BLUEBOOK_STRIPE_PRICE_ID as string | undefined) ??
       (process.env.STRIPE_PRICE_ID_BLUEBOOK_MONTHLY as string | undefined)
   },
 
