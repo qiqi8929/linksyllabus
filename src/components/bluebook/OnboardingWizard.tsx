@@ -164,10 +164,10 @@ export function OnboardingWizard() {
         <div className="mt-6 space-y-3">
           <section className="bb-scan-box">
             <p className="text-sm font-medium text-[#1e4b8f]">
-              Scan your blue book cover to auto-fill
+              Have your blue book handy?
             </p>
             <p className="mt-1 text-xs text-zinc-600">
-              Upload a photo of your Alberta AIT apprentice record book cover.
+              Snap a photo to fill in your details instantly.
             </p>
             <label className="btn-ghost mt-3 inline-flex cursor-pointer text-sm">
               {scanLoading ? "Scanning…" : "Upload photo or take picture"}
