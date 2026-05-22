@@ -378,18 +378,23 @@
   box-shadow: 0 4px 14px rgba(29, 158, 117, 0.08);
 }
 
-.magiclog-root .ml-input-card--primary {
-  border-color: var(--ml-green);
-  background: var(--ml-green-light);
+.magiclog-root .ml-input-card--featured {
+  border: 2px solid var(--ml-green);
+  background: linear-gradient(180deg, var(--ml-green-light) 0%, var(--ml-card) 100%);
+  box-shadow: 0 4px 16px rgba(29, 158, 117, 0.12);
 }
 
-.magiclog-root .ml-input-card--primary .ml-input-card-icon {
+.magiclog-root .ml-input-card--featured .ml-input-card-icon {
   background: var(--ml-green);
   color: #fff;
 }
 
-.magiclog-root .ml-input-card--primary .ml-input-card-title {
-  color: var(--ml-green);
+.magiclog-root .ml-input-card--featured .ml-input-card-title {
+  color: var(--ml-green-dark);
+}
+
+.magiclog-root .ml-input-card--featured .ml-input-card-sub {
+  color: #3d6b5c;
 }
 
 .magiclog-root .ml-input-card-icon {
@@ -457,13 +462,111 @@
   transition: width 0.35s ease;
 }
 
-.magiclog-root .ml-progress-meta {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  margin-top: 14px;
+.magiclog-root .ml-progress-competences {
+  margin: 12px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--ml-muted);
+}
+
+.magiclog-root .ml-progress-est {
+  margin: 6px 0 0;
   font-size: 0.75rem;
   color: var(--ml-muted);
+}
+
+.magiclog-root .ml-trial-banner {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--ml-green-light);
+  border: 1px solid var(--ml-green-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ml-green-dark);
+  text-align: center;
+}
+
+.magiclog-root .ml-recent-strip {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--ml-card);
+  border: 1px solid var(--ml-border);
+}
+
+.magiclog-root .ml-recent-strip-label {
+  margin: 0 0 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ml-muted);
+}
+
+.magiclog-root .ml-recent-strip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.magiclog-root .ml-recent-strip-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f9fafb;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.magiclog-root .ml-recent-strip-item:hover {
+  background: var(--ml-green-light);
+}
+
+.magiclog-root .ml-recent-strip-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ml-text);
+}
+
+.magiclog-root .ml-recent-strip-meta {
+  font-size: 0.75rem;
+  color: var(--ml-muted);
+}
+
+.magiclog-root .ml-subscribe-cta {
+  margin-top: 8px;
+  margin-bottom: 24px;
+}
+
+.magiclog-root .ml-subscribe-btn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 14px;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.magiclog-root .ml-subscribe-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.magiclog-root .ml-subscribe-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .magiclog-root .ml-orders-section {
@@ -607,4 +710,48 @@
   .magiclog-root .ml-orders-filter {
     width: 100%;
   }
+}
+
+/* —— Onboarding —— */
+.magiclog-root .ml-onboarding .btn-primary {
+  background: #1d9e75;
+  color: #fff;
+}
+
+.magiclog-root .ml-onboarding .btn-primary:hover {
+  background: #178564;
+}
+
+.magiclog-root .ml-onboarding .btn-primary:focus {
+  border-color: #1d9e75;
+  --tw-ring-color: rgba(29, 158, 117, 0.25);
+}
+
+.magiclog-root .ml-province-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  color: #1a1a1a;
+}
+
+.magiclog-root .ml-province-option:has(input:disabled) {
+  cursor: not-allowed;
+  color: #71717a;
+}
+
+.magiclog-root .ml-province-radio {
+  flex-shrink: 0;
+  margin: 0;
+  width: 1rem;
+  height: 1rem;
+  accent-color: #1d9e75;
+}
+
+.magiclog-root .ml-province-label {
+  flex: 1;
+  min-width: 0;
 }

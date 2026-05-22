@@ -69,6 +69,6 @@ export async function handleMagicLogCheckoutCompleted(
   await activateMagicLogSubscription(admin, {
     userId,
     stripeCustomerId: customerId ?? undefined,
-    status: "active"
+    status: "trialing"
   });
 }

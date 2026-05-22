@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { FormError } from "@/components/FormError";
+import { resolveMagicLogSubscriptionUi } from "@/lib/magiclog/subscriptionUi";
 
 type DashboardData = {
   profile: {
@@ -27,6 +28,8 @@ type DashboardData = {
     period_complete: boolean;
   };
   estimatedCompletion: string | null;
+  subscriptionStatus: string;
+  subscriptionCreatedAt: string | null;
   recentWorkOrders: Array<{
     id: string;
     task_name: string | null;
@@ -175,7 +178,6 @@ function IconChevron() {
 const INPUT_METHODS = [
   {
     href: "/magiclog/new?mode=voice",
-    primary: true,
     title: "Record voice",
     subtitle: "Say it in one sentence",
     Icon: IconMic
@@ -194,8 +196,9 @@ const INPUT_METHODS = [
   },
   {
     href: "/magiclog/new?mode=learn",
+    featured: true,
     title: "Learn with steps",
-    subtitle: "Video + QR guide",
+    subtitle: "AI steps + video guide",
     Icon: IconSteps
   }
 ] as const;
@@ -206,6 +209,7 @@ export function DashboardClient() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [periodFilter, setPeriodFilter] = useState<string>("all");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   useEffect(() => {
     fetch("/api/magiclog/dashboard")
@@ -235,6 +239,31 @@ export function DashboardClient() {
     const p = Number(periodFilter);
     return data.recentWorkOrders.filter((w) => w.period === p);
   }, [data, periodFilter]);
+
+  const recentPreview = useMemo(() => {
+    if (!data) return [];
+    return data.recentWorkOrders.slice(0, 3);
+  }, [data]);
+
+  async function startSubscriptionCheckout() {
+    setCheckoutLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/magiclog/checkout", { method: "POST" });
+      const text = await res.text();
+      let j: { error?: string; url?: string } = {};
+      if (text.trim()) {
+        j = JSON.parse(text) as { error?: string; url?: string };
+      }
+      if (!res.ok) throw new Error(j.error ?? "Checkout failed");
+      if (j.url) window.location.href = j.url;
+      else throw new Error("No checkout URL returned");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Checkout failed");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
 
   if (!data) {
     return (
@@ -273,6 +302,12 @@ export function DashboardClient() {
         ? data.profile.province.charAt(0).toUpperCase() + data.profile.province.slice(1)
         : "";
 
+  const subscription = resolveMagicLogSubscriptionUi({
+    status: data.subscriptionStatus,
+    subscriptionCreatedAt: data.subscriptionCreatedAt,
+    onboardingComplete: data.profile.bluebook_onboarding_complete
+  });
+
   return (
     <div className="ml-dashboard">
       <aside className="ml-dashboard-sidebar" aria-label="Main navigation">
@@ -293,9 +328,9 @@ export function DashboardClient() {
           </Link>
         </div>
         <Link
-          href="/magiclog/onboarding"
+          href="/magiclog/export"
           className="ml-sidebar-icon ml-sidebar-icon--bottom"
-          aria-label="Settings"
+          aria-label="Export and print"
         >
           <IconSettings />
         </Link>
@@ -319,7 +354,7 @@ export function DashboardClient() {
             <Link
               key={item.title}
               href={item.href}
-              className={`ml-input-card ${"primary" in item && item.primary ? "ml-input-card--primary" : ""}`}
+              className={`ml-input-card ${"featured" in item && item.featured ? "ml-input-card--featured" : ""}`}
             >
               <span className="ml-input-card-icon" aria-hidden>
                 <item.Icon />
@@ -329,6 +364,33 @@ export function DashboardClient() {
             </Link>
           ))}
         </div>
+
+        {recentPreview.length > 0 ? (
+          <section className="ml-recent-strip" aria-label="Recent work orders">
+            <p className="ml-recent-strip-label">Recent</p>
+            <ul className="ml-recent-strip-list">
+              {recentPreview.map((w) => (
+                <li key={w.id}>
+                  <Link href={`/magiclog/work-order/${w.id}`} className="ml-recent-strip-item">
+                    <span className="ml-recent-strip-name">
+                      {w.task_name || w.competence_name}
+                    </span>
+                    <span className="ml-recent-strip-meta">
+                      {w.status === "signed" ? "Signed" : "Pending"}
+                      {w.hours != null ? ` · ${w.hours} hrs` : ""}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {subscription.bannerText ? (
+          <p className="ml-trial-banner" role="status">
+            {subscription.bannerText}
+          </p>
+        ) : null}
 
         <section id="ml-period-progress" className="ml-progress-card">
           <div className="ml-progress-card-head">
@@ -347,20 +409,19 @@ export function DashboardClient() {
           >
             <div className="ml-progress-fill" style={{ width: `${hoursPct}%` }} />
           </div>
-          <div className="ml-progress-meta">
-            <span>
-              Mandatory {data.progress.mandatory_completed}/{data.requirements.mandatoryRequired}
-            </span>
-            <span>
-              Optional {data.progress.optional_completed}/{data.requirements.optionalRequired}
-            </span>
-            {estCompletion ? <span>Est. completion {estCompletion}</span> : <span />}
-          </div>
+          <p className="ml-progress-competences">
+            Mandatory competences: {data.progress.mandatory_completed}/
+            {data.requirements.mandatoryRequired} · Optional: {data.progress.optional_completed}/
+            {data.requirements.optionalRequired}
+          </p>
+          {estCompletion ? (
+            <p className="ml-progress-est">Est. period completion {estCompletion}</p>
+          ) : null}
         </section>
 
         <section className="ml-orders-section">
           <div className="ml-orders-head">
-            <h2 className="ml-orders-title">My work orders</h2>
+            <h2 className="ml-orders-title">All work orders</h2>
             <select
               className="ml-orders-filter"
               value={periodFilter}
@@ -412,6 +473,19 @@ export function DashboardClient() {
             )}
           </ul>
         </section>
+
+        {subscription.showSubscribeCta ? (
+          <section className="ml-subscribe-cta">
+            <button
+              type="button"
+              className="ml-subscribe-btn"
+              disabled={checkoutLoading}
+              onClick={() => void startSubscriptionCheckout()}
+            >
+              {checkoutLoading ? "Loading…" : subscription.subscribeCtaLabel}
+            </button>
+          </section>
+        ) : null}
 
         <FormError message={error} />
       </div>

@@ -149,30 +149,31 @@ export function OnboardingWizard() {
   }
 
   return (
-    <div className="card mx-auto max-w-lg p-6">
+    <div className="ml-onboarding card mx-auto max-w-lg p-6">
       <h1 className="text-xl font-semibold">Set up Magic Log</h1>
       <p className="mt-1 text-sm text-zinc-600">Step {step} of 4</p>
 
       {step === 1 ? (
-        <div className="mt-6 space-y-3">
-          <p className="text-sm font-medium">Select your province</p>
-          {MAGICLOG_PROVINCES.map((p) => (
-            <label key={p.id} className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="province"
-                value={p.id}
-                checked={province === p.id}
-                disabled={!p.available}
-                onChange={() => setProvince(p.id)}
-              />
-              {p.label}
-              {!p.available ? (
-                <span className="text-xs text-zinc-500">(coming soon)</span>
-              ) : null}
-            </label>
-          ))}
-        </div>
+        <fieldset className="mt-6 space-y-3 border-0 p-0">
+          <legend className="text-sm font-medium">Select your province</legend>
+          {MAGICLOG_PROVINCES.map((p) => {
+            const lineLabel = p.available ? p.label : `${p.label} (coming soon)`;
+            return (
+              <label key={p.id} className="ml-province-option">
+                <input
+                  type="radio"
+                  name="province"
+                  className="ml-province-radio"
+                  value={p.id}
+                  checked={province === p.id}
+                  disabled={!p.available}
+                  onChange={() => setProvince(p.id)}
+                />
+                <span className="ml-province-label">{lineLabel}</span>
+              </label>
+            );
+          })}
+        </fieldset>
       ) : null}
 
       {step === 2 ? (

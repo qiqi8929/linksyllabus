@@ -39,13 +39,14 @@ export async function GET(req: Request) {
 
   const { data: sub } = await supabase
     .from("subscriptions")
-    .select("status")
+    .select("status,created_at")
     .eq("user_id", user.id)
     .maybeSingle();
 
   return NextResponse.json({
     profile,
     subscriptionStatus: sub?.status ?? "inactive",
+    subscriptionCreatedAt: sub?.created_at ?? null,
     period,
     requirements: reqPeriod,
     progress: {
