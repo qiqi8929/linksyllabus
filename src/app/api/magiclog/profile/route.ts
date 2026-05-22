@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
-import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
+import { ensureMagicLogUser, fetchMagicLogProfile } from "@/lib/magiclog/profile";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,7 @@ export async function GET(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  await ensureMagicLogUser(supabase, { id: user.id, email: user.email });
   const profile = await fetchMagicLogProfile(supabase, user.id);
   return NextResponse.json({ profile });
 }
@@ -36,11 +37,22 @@ export async function PATCH(req: Request) {
   if (body.sponsor_name != null) patch.sponsor_name = String(body.sponsor_name).trim();
   if (body.sponsor_phone != null) patch.sponsor_phone = String(body.sponsor_phone).trim();
   if (body.province != null) patch.province = String(body.province).trim() || "alberta";
-  if (body.magiclog_onboarding_complete === true || body.bluebook_onboarding_complete === true) {
+  const markOnboardingComplete =
+    body.magiclog_onboarding_complete === true || body.bluebook_onboarding_complete === true;
+
+  if (markOnboardingComplete) {
     patch.magiclog_onboarding_complete = true;
   }
 
-  const { error } = await supabase.from("users").update(patch).eq("id", user.id);
+  await ensureMagicLogUser(supabase, { id: user.id, email: user.email });
+
+  let { error } = await supabase.from("users").update(patch).eq("id", user.id);
+  if (error && markOnboardingComplete) {
+    const legacyPatch = { ...patch };
+    delete legacyPatch.magiclog_onboarding_complete;
+    legacyPatch.bluebook_onboarding_complete = true;
+    ({ error } = await supabase.from("users").update(legacyPatch).eq("id", user.id));
+  }
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

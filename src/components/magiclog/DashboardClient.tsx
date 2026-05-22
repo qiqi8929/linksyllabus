@@ -215,7 +215,13 @@ export function DashboardClient() {
           router.replace("/magiclog/onboarding");
           return;
         }
-        if (j.error) throw new Error(j.error);
+        if (j.error) {
+          if (j.error === "Profile not found") {
+            router.replace("/magiclog/onboarding");
+            return;
+          }
+          throw new Error(j.error);
+        }
         setData(j as DashboardData);
       })
       .catch((e: unknown) => {
@@ -251,6 +257,13 @@ export function DashboardClient() {
     Math.round((data.progress.total_hours / data.requirements.hoursRequired) * 100)
   );
   const estCompletion = formatEstCompletion(data.estimatedCompletion);
+  const displayName = data.profile.email?.split("@")[0] ?? "there";
+  const provinceLabel =
+    data.profile.province === "alberta"
+      ? "Alberta"
+      : data.profile.province
+        ? data.profile.province.charAt(0).toUpperCase() + data.profile.province.slice(1)
+        : "";
 
   return (
     <div className="ml-dashboard">
@@ -280,6 +293,13 @@ export function DashboardClient() {
 
       <div className="ml-dashboard-main">
         <header className="ml-dashboard-hero">
+          <p className="ml-dashboard-greeting">
+            Hi {displayName} <span aria-hidden>👋</span>
+          </p>
+          <p className="ml-dashboard-context">
+            {data.profile.trade ?? "Trade"} · Period {data.period}
+            {provinceLabel ? ` · ${provinceLabel}` : ""}
+          </p>
           <h1 className="ml-dashboard-title">What did you work on today?</h1>
           <p className="ml-dashboard-subtitle">Log your hours — speak, snap, or type</p>
         </header>

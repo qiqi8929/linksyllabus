@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PERIOD_REQUIREMENTS, type PeriodRequirements } from "@/lib/magiclog/constants";
-import type { MagicLogUserProfile, CompetenceType } from "@/lib/magiclog/types";
+import { queryWorkOrders } from "@/lib/magiclog/dbCompat";
+import type { MagicLogUserProfile } from "@/lib/magiclog/types";
 
 export type ComputedPeriodProgress = {
   period: number;
@@ -33,12 +34,14 @@ export async function computePeriodProgress(
 ): Promise<ComputedPeriodProgress> {
   const requirements = getPeriodRequirements(period, profile);
 
-  const { data: signedOrders } = await supabase
-    .from("magiclog_work_orders")
-    .select("id,competence_type,hours")
-    .eq("user_id", userId)
-    .eq("period", period)
-    .eq("status", "signed");
+  const { data: signedOrders } = await queryWorkOrders(supabase, async (table) =>
+    supabase
+      .from(table)
+      .select("id,competence_type,hours")
+      .eq("user_id", userId)
+      .eq("period", period)
+      .eq("status", "signed")
+  );
 
   const { data: hourRows } = await supabase
     .from("hour_logs")

@@ -251,6 +251,19 @@
   margin-bottom: 20px;
 }
 
+.magiclog-root .ml-dashboard-greeting {
+  margin: 0 0 4px;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--ml-text);
+}
+
+.magiclog-root .ml-dashboard-context {
+  margin: 0 0 14px;
+  font-size: 0.8125rem;
+  color: var(--ml-muted);
+}
+
 .magiclog-root .ml-dashboard-title {
   margin: 0;
   font-size: 1.35rem;

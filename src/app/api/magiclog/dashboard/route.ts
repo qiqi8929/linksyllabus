@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
-import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
+import { queryWorkOrders } from "@/lib/magiclog/dbCompat";
+import { ensureMagicLogUser, fetchMagicLogProfile } from "@/lib/magiclog/profile";
 import { syncPeriodProgress } from "@/lib/magiclog/computeProgress";
 import { estimatePeriodCompletionDate } from "@/lib/magiclog/periodProgress";
 
@@ -13,21 +14,31 @@ export async function GET(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  await ensureMagicLogUser(supabase, { id: user.id, email: user.email });
+
   const profile = await fetchMagicLogProfile(supabase, user.id);
   if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Profile not found", hint: "Check public.users row and onboarding column migration." },
+      { status: 404 }
+    );
   }
 
   const period = profile.current_period ?? 1;
   const computed = await syncPeriodProgress(supabase, user.id, period, profile);
   const reqPeriod = computed.requirements;
 
-  const { data: recentOrders } = await supabase
-    .from("magiclog_work_orders")
-    .select("id,task_name,competence_name,hours,status,created_at,period")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(8);
+  const { data: recentOrders, error: ordersError } = await queryWorkOrders(supabase, async (table) =>
+    supabase
+      .from(table)
+      .select("id,task_name,competence_name,hours,status,created_at,period")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(8)
+  );
+  if (ordersError) {
+    console.error("[magiclog dashboard] work orders", ordersError.message);
+  }
 
   const { data: sub } = await supabase
     .from("subscriptions")
