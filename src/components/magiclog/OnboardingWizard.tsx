@@ -106,9 +106,24 @@ export function OnboardingWizard() {
     setLoading(true);
     try {
       const res = await fetch("/api/magiclog/checkout", { method: "POST" });
-      const j = await res.json();
+      const text = await res.text();
+      let j: { error?: string; url?: string } = {};
+      if (text.trim()) {
+        try {
+          j = JSON.parse(text) as { error?: string; url?: string };
+        } catch {
+          throw new Error(
+            res.ok
+              ? "Invalid response from checkout"
+              : `Checkout failed (${res.status})`
+          );
+        }
+      } else if (!res.ok) {
+        throw new Error(`Checkout failed (${res.status})`);
+      }
       if (!res.ok) throw new Error(j.error ?? "Checkout failed");
       if (j.url) window.location.href = j.url;
+      else throw new Error("No checkout URL returned");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Checkout failed");
     } finally {
