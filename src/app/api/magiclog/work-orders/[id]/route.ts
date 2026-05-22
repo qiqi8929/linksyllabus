@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { persistMagicLogPlaySteps } from "@/lib/magiclog/persistPlaySteps";
+import { createSignatureSignedUrl } from "@/lib/magiclog/signatureStorage";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type {
@@ -21,7 +22,7 @@ export async function GET(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data, error } = await supabase
-    .from("magiclog_work_orders")
+    .from("bluebook_work_orders")
     .select("*")
     .eq("id", params.id)
     .eq("user_id", user.id)
@@ -48,7 +49,7 @@ export async function GET(
       durationSec: video.durationSec
     });
     await supabase
-      .from("magiclog_work_orders")
+      .from("bluebook_work_orders")
       .update({ ai_steps: aiSteps })
       .eq("id", params.id)
       .eq("user_id", user.id);
@@ -67,10 +68,7 @@ export async function GET(
   const sigPath = data.mentor_signature_url as string | null;
   if (sigPath && !sigPath.startsWith("http")) {
     const admin = createSupabaseAdminClient();
-    const { data: signed } = await admin.storage
-      .from("magiclog-signatures")
-      .createSignedUrl(sigPath, 60 * 60);
-    mentorSignatureSignedUrl = signed?.signedUrl ?? null;
+    mentorSignatureSignedUrl = await createSignatureSignedUrl(admin, sigPath, 60 * 60);
   } else if (sigPath) {
     mentorSignatureSignedUrl = sigPath;
   }
@@ -99,7 +97,7 @@ export async function PATCH(
   if (body.status != null) patch.status = body.status;
 
   const { error } = await supabase
-    .from("magiclog_work_orders")
+    .from("bluebook_work_orders")
     .update(patch)
     .eq("id", params.id)
     .eq("user_id", user.id);

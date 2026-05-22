@@ -11,7 +11,7 @@ type DashboardData = {
     trade: string | null;
     current_period: number;
     province: string;
-    magiclog_onboarding_complete: boolean;
+    bluebook_onboarding_complete: boolean;
   };
   period: number;
   requirements: {
@@ -211,7 +211,7 @@ export function DashboardClient() {
     fetch("/api/magiclog/dashboard")
       .then((r) => r.json())
       .then((j) => {
-        if (j.profile && !j.profile.magiclog_onboarding_complete) {
+        if (j.profile && !j.profile.bluebook_onboarding_complete) {
           router.replace("/magiclog/onboarding");
           return;
         }

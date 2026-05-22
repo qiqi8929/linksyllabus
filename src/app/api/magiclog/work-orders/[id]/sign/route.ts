@@ -28,7 +28,7 @@ export async function POST(
   }
 
   const { data: order, error: loadErr } = await supabase
-    .from("magiclog_work_orders")
+    .from("bluebook_work_orders")
     .select("id,period,competence_type,status")
     .eq("id", params.id)
     .eq("user_id", user.id)
@@ -40,7 +40,7 @@ export async function POST(
 
   const signedAt = new Date().toISOString();
   const { error: upErr } = await supabase
-    .from("magiclog_work_orders")
+    .from("bluebook_work_orders")
     .update({
       status: "signed",
       signed_at: signedAt,

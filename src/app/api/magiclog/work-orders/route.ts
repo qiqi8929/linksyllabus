@@ -67,7 +67,7 @@ export async function POST(req: Request) {
   const draftHours = isQuickLog ? Number(body.hours) : null;
 
   const { data, error } = await supabase
-    .from("magiclog_work_orders")
+    .from("bluebook_work_orders")
     .insert({
       user_id: user.id,
       task_name: task_name || competence_name,
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       durationSec: video.durationSec
     });
     await supabase
-      .from("magiclog_work_orders")
+      .from("bluebook_work_orders")
       .update({ ai_steps: aiSteps })
       .eq("id", data.id)
       .eq("user_id", user.id);

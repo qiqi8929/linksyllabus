@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { signatureBucketForUpload } from "@/lib/magiclog/signatureStorage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,8 +27,9 @@ export async function POST(
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const admin = createSupabaseAdminClient();
+  const bucket = signatureBucketForUpload();
   const { error: uploadErr } = await admin.storage
-    .from("magiclog-signatures")
+    .from(bucket)
     .upload(path, buffer, {
       contentType: file.type || "image/png",
       upsert: true
@@ -38,13 +40,13 @@ export async function POST(
   }
 
   const { data: signed } = await admin.storage
-    .from("magiclog-signatures")
+    .from(bucket)
     .createSignedUrl(path, 60 * 60 * 24 * 365);
 
   const publicUrl = signed?.signedUrl ?? null;
 
   await supabase
-    .from("magiclog_work_orders")
+    .from("bluebook_work_orders")
     .update({ mentor_signature_url: path })
     .eq("id", params.id)
     .eq("user_id", user.id);

@@ -119,7 +119,7 @@ export function OnboardingWizard() {
   async function finishWithoutCheckout() {
     setLoading(true);
     try {
-      await saveProfile({ magiclog_onboarding_complete: true });
+      await saveProfile({ bluebook_onboarding_complete: true });
       router.replace("/magiclog/dashboard");
       router.refresh();
     } catch (e: unknown) {

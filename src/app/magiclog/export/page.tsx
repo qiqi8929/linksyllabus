@@ -11,11 +11,11 @@ export default async function BluebookExportPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("magiclog_onboarding_complete")
+    .select("bluebook_onboarding_complete")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile?.magiclog_onboarding_complete) {
+  if (!profile?.bluebook_onboarding_complete) {
     redirect("/magiclog/onboarding");
   }
 

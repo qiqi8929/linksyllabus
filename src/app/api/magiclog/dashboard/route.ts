@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
-import { queryWorkOrders } from "@/lib/magiclog/dbCompat";
 import { ensureMagicLogUser, fetchMagicLogProfile } from "@/lib/magiclog/profile";
 import { syncPeriodProgress } from "@/lib/magiclog/computeProgress";
 import { estimatePeriodCompletionDate } from "@/lib/magiclog/periodProgress";
@@ -28,14 +27,12 @@ export async function GET(req: Request) {
   const computed = await syncPeriodProgress(supabase, user.id, period, profile);
   const reqPeriod = computed.requirements;
 
-  const { data: recentOrders, error: ordersError } = await queryWorkOrders(supabase, async (table) =>
-    supabase
-      .from(table)
-      .select("id,task_name,competence_name,hours,status,created_at,period")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(8)
-  );
+  const { data: recentOrders, error: ordersError } = await supabase
+    .from("bluebook_work_orders")
+    .select("id,task_name,competence_name,hours,status,created_at,period")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(8);
   if (ordersError) {
     console.error("[magiclog dashboard] work orders", ordersError.message);
   }

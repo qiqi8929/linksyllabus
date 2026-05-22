@@ -61,17 +61,10 @@ export async function handleMagicLogCheckoutCompleted(
   const userId = session.metadata?.user_id;
   if (!userId) return;
 
-  let { error: onboardErr } = await admin
+  await admin
     .from("users")
-    .update({ magiclog_onboarding_complete: true })
+    .update({ bluebook_onboarding_complete: true })
     .eq("id", userId);
-
-  if (onboardErr) {
-    await admin
-      .from("users")
-      .update({ bluebook_onboarding_complete: true })
-      .eq("id", userId);
-  }
 
   const customerId =
     typeof session.customer === "string"

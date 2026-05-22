@@ -37,22 +37,13 @@ export async function PATCH(req: Request) {
   if (body.sponsor_name != null) patch.sponsor_name = String(body.sponsor_name).trim();
   if (body.sponsor_phone != null) patch.sponsor_phone = String(body.sponsor_phone).trim();
   if (body.province != null) patch.province = String(body.province).trim() || "alberta";
-  const markOnboardingComplete =
-    body.magiclog_onboarding_complete === true || body.bluebook_onboarding_complete === true;
-
-  if (markOnboardingComplete) {
-    patch.magiclog_onboarding_complete = true;
+  if (body.bluebook_onboarding_complete === true) {
+    patch.bluebook_onboarding_complete = true;
   }
 
   await ensureMagicLogUser(supabase, { id: user.id, email: user.email });
 
-  let { error } = await supabase.from("users").update(patch).eq("id", user.id);
-  if (error && markOnboardingComplete) {
-    const legacyPatch = { ...patch };
-    delete legacyPatch.magiclog_onboarding_complete;
-    legacyPatch.bluebook_onboarding_complete = true;
-    ({ error } = await supabase.from("users").update(legacyPatch).eq("id", user.id));
-  }
+  const { error } = await supabase.from("users").update(patch).eq("id", user.id);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

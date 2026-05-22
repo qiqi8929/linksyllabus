@@ -36,7 +36,7 @@ export type MagicLogUserProfile = {
   sponsor_name: string | null;
   sponsor_phone: string | null;
   province: string;
-  magiclog_onboarding_complete: boolean;
+  bluebook_onboarding_complete: boolean;
 };
 
 export type MagicLogWorkOrder = {
