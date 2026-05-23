@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  let response = NextResponse.redirect(new URL("/magiclog/onboarding", requestUrl.origin));
+  const pendingCookies: CookieToSet[] = [];
 
   const supabase = createServerClient(supabaseUrl, supabaseAnon, {
     cookies: {
@@ -44,9 +44,7 @@ export async function GET(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet: CookieToSet[]) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options);
-        });
+        pendingCookies.push(...cookiesToSet);
       }
     }
   });
@@ -66,18 +64,24 @@ export async function GET(request: NextRequest) {
     data: { user }
   } = await supabase.auth.getUser();
 
+  let destination: string;
   if (user) {
-    await ensureMagicLogUser(supabase, user);
-    const destination = await resolvePostAuthRedirect(supabase, nextParam);
-    response = NextResponse.redirect(new URL(destination, requestUrl.origin));
+    try {
+      await ensureMagicLogUser(supabase, user);
+      destination = await resolvePostAuthRedirect(supabase, nextParam);
+    } catch (err) {
+      console.error("[auth/callback] post-auth setup failed", err);
+      destination = `/login?error=oauth&next=${encodeURIComponent(nextParam)}`;
+      pendingCookies.length = 0;
+    }
   } else {
-    response = NextResponse.redirect(
-      new URL(
-        `/login?error=oauth&next=${encodeURIComponent(nextParam)}`,
-        requestUrl.origin
-      )
-    );
+    destination = `/login?error=oauth&next=${encodeURIComponent(nextParam)}`;
+    pendingCookies.length = 0;
   }
 
+  const response = NextResponse.redirect(new URL(destination, requestUrl.origin));
+  pendingCookies.forEach(({ name, value, options }) => {
+    response.cookies.set(name, value, options);
+  });
   return response;
 }
