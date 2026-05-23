@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { oauthCallbackRedirectUrl } from "@/lib/magiclog/oauthCallback";
 
 type CookieToSet = {
   name: string;
@@ -8,6 +9,11 @@ type CookieToSet = {
 };
 
 export async function middleware(req: NextRequest) {
+  const oauthRedirect = oauthCallbackRedirectUrl(req.nextUrl);
+  if (oauthRedirect) {
+    return NextResponse.redirect(oauthRedirect);
+  }
+
   if (req.nextUrl.pathname === "/api/stripe/webhook") {
     return NextResponse.next();
   }
@@ -81,6 +87,9 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
+    "/",
+    "/login",
+    "/signup",
     "/dashboard/:path*",
     "/guides",
     "/guides/:path*",

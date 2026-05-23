@@ -6,6 +6,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { FormError } from "@/components/FormError";
 import { GoogleIcon } from "@/components/auth/GoogleIcon";
 import { EmailAuthForm } from "@/components/auth/EmailAuthForm";
+import { buildOAuthCallbackUrl } from "@/lib/magiclog/oauthCallback";
 
 type MagicLogAuthScreenProps = {
   mode: "signup" | "login";
@@ -40,7 +41,7 @@ export function MagicLogAuthScreen({
     setError(null);
     setOauthLoading(true);
     try {
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+      const redirectTo = buildOAuthCallbackUrl(window.location.origin, nextPath);
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo }

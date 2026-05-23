@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { MagicLogLandingPage } from "@/components/landing/MagicLogLandingPage";
+import { oauthCallbackRedirectPath } from "@/lib/magiclog/oauthCallback";
 import "./magiclog-landing.css";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +15,14 @@ export const metadata: Metadata = {
   }
 };
 
-export default function HomePage() {
+export default function HomePage({
+  searchParams
+}: {
+  searchParams?: { code?: string; next?: string };
+}) {
+  if (searchParams?.code) {
+    redirect(oauthCallbackRedirectPath(searchParams.code, searchParams.next));
+  }
+
   return <MagicLogLandingPage />;
 }
