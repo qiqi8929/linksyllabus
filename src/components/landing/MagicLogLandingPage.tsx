@@ -3,7 +3,7 @@ import { magiclog_subscription } from "@/lib/magiclog/constants";
 import { MagicLogDashboardPreview } from "@/components/landing/MagicLogDashboardPreview";
 import { MagicLogLandingFaq } from "@/components/landing/MagicLogLandingFaq";
 
-const TRIAL_HREF = "/magiclog";
+const TRIAL_HREF = "/signup?next=/magiclog/onboarding";
 const CONTACT_EMAIL = "info@linksyllabus.com";
 
 const FEATURE_BAR = [
@@ -82,9 +82,9 @@ export function MagicLogLandingPage() {
           <Link href="/" className="ml-logo">
             Magic Log<span className="ml-logo-dot" aria-hidden />
           </Link>
-          <Link href={TRIAL_HREF} className="ml-btn-nav">
+          <a href={TRIAL_HREF} className="ml-btn-nav">
             Try for free
-          </Link>
+          </a>
         </div>
       </header>
 
@@ -96,9 +96,9 @@ export function MagicLogLandingPage() {
             <p className="ml-hero-sub">
               Say it. Snap it. Magic Log does the rest.
             </p>
-            <Link href={TRIAL_HREF} className="ml-btn-cta">
+            <a href={TRIAL_HREF} className="ml-btn-cta">
               Start free trial →
-            </Link>
+            </a>
             <p className="ml-hero-fine">
               {magiclog_subscription.trialDays}-day free trial · No credit card required
             </p>
@@ -167,9 +167,9 @@ export function MagicLogLandingPage() {
             </div>
             <h3>For web</h3>
             <p>Use Magic Log on any browser, right now.</p>
-            <Link href={TRIAL_HREF} className="ml-btn-platform">
+            <a href={TRIAL_HREF} className="ml-btn-platform">
               Start free trial
-            </Link>
+            </a>
           </article>
           <article className="ml-platform-card ml-platform-card--muted">
             <div className="ml-platform-badge" aria-hidden>

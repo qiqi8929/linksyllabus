@@ -84,6 +84,8 @@ export const config = {
     "/dashboard/:path*",
     "/guides",
     "/guides/:path*",
+    "/magiclog",
+    "/magiclog/",
     "/magiclog/:path*",
     "/bluebook/:path*",
     "/api/stripe/webhook"

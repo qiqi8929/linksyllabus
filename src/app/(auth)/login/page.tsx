@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { FormError } from "@/components/FormError";
+import { safeNextPath } from "@/lib/magiclog/safeNextPath";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") || "/dashboard";
+  const nextPath = safeNextPath(searchParams.get("next"), "/dashboard");
 
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [email, setEmail] = useState("");
@@ -27,9 +27,7 @@ function LoginForm() {
         password
       });
       if (signInError) throw signInError;
-      const nextPath = searchParams.get("next") || "/dashboard";
-      router.replace(nextPath);
-      router.refresh();
+      window.location.assign(nextPath);
     } catch (err: any) {
       setError(err?.message ?? "Login failed");
     } finally {
