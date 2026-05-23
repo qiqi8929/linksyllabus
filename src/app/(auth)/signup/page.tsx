@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { resolvePostAuthRedirect } from "@/lib/magiclog/authRedirect";
 import { safeNextPath } from "@/lib/magiclog/safeNextPath";
-import { MagicLogAuthScreen } from "@/components/auth/MagicLogAuthScreen";
+import { SignupForm } from "./SignupForm";
 
 export default async function SignupPage({
   searchParams
@@ -20,5 +20,5 @@ export default async function SignupPage({
     redirect(await resolvePostAuthRedirect(supabase, nextPath));
   }
 
-  return <MagicLogAuthScreen mode="signup" nextPath={nextPath} />;
+  return <SignupForm nextPath={nextPath} />;
 }
