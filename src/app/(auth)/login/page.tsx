@@ -1,86 +1,30 @@
-"use client";
-
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { FormError } from "@/components/FormError";
+import { redirect } from "next/navigation";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { resolvePostAuthRedirect } from "@/lib/magiclog/authRedirect";
 import { safeNextPath } from "@/lib/magiclog/safeNextPath";
+import { MagicLogAuthScreen } from "@/components/auth/MagicLogAuthScreen";
 
-function LoginForm() {
-  const searchParams = useSearchParams();
-  const nextPath = safeNextPath(searchParams.get("next"), "/dashboard");
+export default async function LoginPage({
+  searchParams
+}: {
+  searchParams?: { next?: string; error?: string };
+}) {
+  const nextPath = safeNextPath(searchParams?.next, "/magiclog/onboarding");
 
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      if (signInError) throw signInError;
-      window.location.assign(nextPath);
-    } catch (err: any) {
-      setError(err?.message ?? "Login failed");
-    } finally {
-      setLoading(false);
-    }
+  if (user) {
+    redirect(await resolvePostAuthRedirect(supabase, nextPath));
   }
 
   return (
-    <div className="card p-6">
-      <h1 className="text-lg font-semibold">Log in</h1>
-      <p className="mt-1 text-sm text-zinc-600">Log in with your email and password to open the dashboard.</p>
-
-      <form className="mt-6 space-y-3" onSubmit={onSubmit}>
-        <div className="space-y-1">
-          <div className="text-sm font-medium">Email</div>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
-        </div>
-        <div className="space-y-1">
-          <div className="text-sm font-medium">Password</div>
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-            required
-            minLength={6}
-          />
-        </div>
-
-        <FormError message={error} />
-
-        <button className="btn-primary w-full" disabled={loading} type="submit">
-          {loading ? "Signing in..." : "Log in"}
-        </button>
-      </form>
-
-      <div className="mt-4 text-sm text-zinc-600">
-        Don't have an account?{" "}
-        <Link
-          className="font-medium text-brand hover:underline"
-          href={nextPath !== "/dashboard" ? `/signup?next=${encodeURIComponent(nextPath)}` : "/signup"}
-        >
-          Sign up
-        </Link>
-      </div>
-    </div>
+    <MagicLogAuthScreen
+      mode="login"
+      nextPath={nextPath}
+      initialError={searchParams?.error ?? null}
+    />
   );
 }
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="card p-6 text-sm text-zinc-600">Loading…</div>}>
-      <LoginForm />
-    </Suspense>
-  );
-}
-

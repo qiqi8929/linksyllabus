@@ -1,15 +1,15 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { fetchMagicLogProfile, profileNeedsOnboarding } from "@/lib/magiclog/profile";
+import { resolvePostAuthRedirect } from "@/lib/magiclog/authRedirect";
 import { safeNextPath } from "@/lib/magiclog/safeNextPath";
-import { SignupForm } from "./SignupForm";
+import { MagicLogAuthScreen } from "@/components/auth/MagicLogAuthScreen";
 
 export default async function SignupPage({
   searchParams
 }: {
   searchParams?: { next?: string };
 }) {
-  const nextPath = safeNextPath(searchParams?.next, "/dashboard");
+  const nextPath = safeNextPath(searchParams?.next, "/magiclog/onboarding");
 
   const supabase = createSupabaseServerClient();
   const {
@@ -17,15 +17,8 @@ export default async function SignupPage({
   } = await supabase.auth.getUser();
 
   if (user) {
-    if (nextPath.startsWith("/magiclog")) {
-      const profile = await fetchMagicLogProfile(supabase, user.id);
-      if (profileNeedsOnboarding(profile)) {
-        redirect("/magiclog/onboarding");
-      }
-      redirect("/magiclog/dashboard");
-    }
-    redirect(nextPath);
+    redirect(await resolvePostAuthRedirect(supabase, nextPath));
   }
 
-  return <SignupForm nextPath={nextPath} />;
+  return <MagicLogAuthScreen mode="signup" nextPath={nextPath} />;
 }
