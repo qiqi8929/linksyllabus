@@ -8,7 +8,7 @@ export default async function BluebookOnboardingPage() {
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/magiclog/onboarding");
+  if (!user) redirect("/signup?next=/magiclog/onboarding");
 
   const { data: profile } = await supabase
     .from("users")

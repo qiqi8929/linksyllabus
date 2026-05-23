@@ -3,7 +3,7 @@ import { magiclog_subscription } from "@/lib/magiclog/constants";
 import { MagicLogDashboardPreview } from "@/components/landing/MagicLogDashboardPreview";
 import { MagicLogLandingFaq } from "@/components/landing/MagicLogLandingFaq";
 
-const TRIAL_HREF = "/magiclog/onboarding";
+const TRIAL_HREF = "/magiclog";
 const CONTACT_EMAIL = "info@linksyllabus.com";
 
 const FEATURE_BAR = [

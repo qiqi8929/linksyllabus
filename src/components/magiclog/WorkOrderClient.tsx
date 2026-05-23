@@ -244,14 +244,14 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
           <nav className="flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
             <button
               type="button"
-              className={`rounded-md px-3 py-1.5 ${tab === "ait" ? "bg-orange-500 text-white" : ""}`}
+              className={`rounded-md px-3 py-1.5 ${tab === "ait" ? "bg-[#1D9E75] text-white" : ""}`}
               onClick={() => setTab("ait")}
             >
               My Bluebook
             </button>
             <button
               type="button"
-              className={`rounded-md px-3 py-1.5 ${tab === "learning" ? "bg-orange-500 text-white" : ""}`}
+              className={`rounded-md px-3 py-1.5 ${tab === "learning" ? "bg-[#1D9E75] text-white" : ""}`}
               onClick={() => setTab("learning")}
             >
               My Learning

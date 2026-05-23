@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { NewWorkOrderClient } from "@/components/magiclog/NewWorkOrderClient";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireMagicLogUser } from "@/lib/magiclog/authRedirect";
 
 const INTRO: Record<string, string> = {
   voice: "Hold the microphone and say what you worked on. Release to create your work order with AI steps.",
@@ -23,10 +24,7 @@ export default async function BluebookNewWorkOrderPage({
   searchParams: Promise<{ mode?: string }>;
 }) {
   const supabase = createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/magiclog/new");
+  const user = await requireMagicLogUser(supabase, "/magiclog/new");
 
   const { data: profile } = await supabase
     .from("users")

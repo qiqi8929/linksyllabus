@@ -572,7 +572,7 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
                   type="button"
                   className={`flex w-full gap-3 rounded-lg border p-3 text-left ${
                     selectedVideo?.videoId === v.videoId
-                      ? "border-orange-500 bg-orange-50"
+                      ? "border-[#1D9E75] bg-[#e8f7f1]"
                       : "border-zinc-200"
                   }`}
                   onClick={() => setSelectedVideo(v)}

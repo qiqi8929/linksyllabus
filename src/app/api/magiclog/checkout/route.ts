@@ -6,7 +6,7 @@ import {
   isStaleStripeCustomerError
 } from "@/lib/stripe/customer";
 import { getStripe } from "@/lib/stripe/server";
-import { describeMagicLogStripePriceConfig } from "@/lib/stripe/magiclogSubscription";
+import { describeMagicLogStripePriceConfig } from "@/lib/magiclog/stripePrice";
 import { env } from "@/lib/env";
 import { magiclog_subscription } from "@/lib/magiclog/constants";
 

@@ -1,5 +1,7 @@
-import { redirect } from "next/navigation";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { redirectMagicLogTrialEntry } from "@/lib/magiclog/authRedirect";
 
-export default function BluebookIndexPage() {
-  redirect("/magiclog/dashboard");
+export default async function MagicLogIndexPage() {
+  const supabase = createSupabaseServerClient();
+  await redirectMagicLogTrialEntry(supabase);
 }

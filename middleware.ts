@@ -18,10 +18,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(dest);
   }
 
+  const pathname = req.nextUrl.pathname;
+  const isMagicLogTrialEntry = pathname === "/magiclog" || pathname === "/magiclog/";
   const isProtected =
-    req.nextUrl.pathname.startsWith("/dashboard") ||
-    req.nextUrl.pathname.startsWith("/guides") ||
-    req.nextUrl.pathname.startsWith("/magiclog");
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/guides") ||
+    (pathname.startsWith("/magiclog") && !isMagicLogTrialEntry);
 
   if (!isProtected) {
     return NextResponse.next();
@@ -68,7 +70,8 @@ export async function middleware(req: NextRequest) {
 
   if (!user) {
     const redirectUrl = req.nextUrl.clone();
-    redirectUrl.pathname = "/login";
+    const isMagicLog = req.nextUrl.pathname.startsWith("/magiclog");
+    redirectUrl.pathname = isMagicLog ? "/signup" : "/login";
     redirectUrl.searchParams.set("next", req.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
   }

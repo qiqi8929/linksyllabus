@@ -3,6 +3,7 @@ import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { ensureMagicLogUser, fetchMagicLogProfile } from "@/lib/magiclog/profile";
 import { syncPeriodProgress } from "@/lib/magiclog/computeProgress";
 import { estimatePeriodCompletionDate } from "@/lib/magiclog/periodProgress";
+import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
   const reqPeriod = computed.requirements;
 
   const { data: recentOrders, error: ordersError } = await supabase
-    .from("bluebook_work_orders")
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
     .select("id,task_name,competence_name,hours,status,created_at,period")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })

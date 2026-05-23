@@ -5,6 +5,7 @@ import { PersonalRecordPrint } from "@/components/magiclog/export/PersonalRecord
 import { ProgressSummaryPrint } from "@/components/magiclog/export/ProgressSummaryPrint";
 import { fetchMagicLogExportBundle } from "@/lib/magiclog/exportData";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireMagicLogUser } from "@/lib/magiclog/authRedirect";
 import "../export-print.css";
 
 const VALID_TYPES = new Set(["ait-submission", "personal-record", "progress-summary"]);
@@ -20,10 +21,10 @@ export default async function BluebookExportPrintPage({
   const period = Math.max(1, Math.min(4, Math.floor(Number(searchParams.period ?? 1))));
 
   const supabase = createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=/magiclog/export/print?type=${type}&period=${period}`);
+  const user = await requireMagicLogUser(
+    supabase,
+    `/magiclog/export/print?type=${type}&period=${period}`
+  );
 
   const bundle = await fetchMagicLogExportBundle(supabase, user.id, period);
   if (!bundle) notFound();

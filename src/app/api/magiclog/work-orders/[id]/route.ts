@@ -3,6 +3,7 @@ import { persistMagicLogPlaySteps } from "@/lib/magiclog/persistPlaySteps";
 import { createSignatureSignedUrl } from "@/lib/magiclog/signatureStorage";
 import { buildQuickLogVideoMeta, isQuickLogWorkOrder } from "@/lib/magiclog/workOrderMode";
 import { isWorkOrderLocked } from "@/lib/magiclog/workOrderStatus";
+import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type {
@@ -25,7 +26,7 @@ export async function GET(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data, error } = await supabase
-    .from("bluebook_work_orders")
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
     .select("*")
     .eq("id", params.id)
     .eq("user_id", user.id)
@@ -52,7 +53,7 @@ export async function GET(
       durationSec: video.durationSec
     });
     await supabase
-      .from("bluebook_work_orders")
+      .from(MAGICLOG_WORK_ORDERS_TABLE)
       .update({ ai_steps: aiSteps })
       .eq("id", params.id)
       .eq("user_id", user.id);
@@ -94,7 +95,7 @@ export async function PATCH(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data: existing, error: loadErr } = await supabase
-    .from("bluebook_work_orders")
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
     .select("id,status,video_urls")
     .eq("id", params.id)
     .eq("user_id", user.id)
@@ -162,7 +163,7 @@ export async function PATCH(
   }
 
   const { error } = await supabase
-    .from("bluebook_work_orders")
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
     .update(patch)
     .eq("id", params.id)
     .eq("user_id", user.id);

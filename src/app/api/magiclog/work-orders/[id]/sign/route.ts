@@ -3,6 +3,7 @@ import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
 import { applySignedWorkOrderToProgress } from "@/lib/magiclog/periodProgress";
 import { isWorkOrderLocked } from "@/lib/magiclog/workOrderStatus";
+import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
 import type { CompetenceType, WorkOrderStatus } from "@/lib/magiclog/types";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export async function POST(
   }
 
   const { data: order, error: loadErr } = await supabase
-    .from("bluebook_work_orders")
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
     .select("id,period,competence_type,status")
     .eq("id", params.id)
     .eq("user_id", user.id)
@@ -48,7 +49,7 @@ export async function POST(
 
   const signedAt = new Date().toISOString();
   const { error: upErr } = await supabase
-    .from("bluebook_work_orders")
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
     .update({
       status: "signed",
       signed_at: signedAt,

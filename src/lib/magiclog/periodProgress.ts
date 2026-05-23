@@ -8,6 +8,22 @@ export type PeriodCompletionEstimateInput = {
   periodComplete?: boolean;
 };
 
+const MIN_HOURS_PCT_FOR_ESTIMATE = 0.1;
+
+export function hoursProgressRatio(totalHours: number, hoursRequired: number): number {
+  if (hoursRequired <= 0) return 0;
+  return totalHours / hoursRequired;
+}
+
+export function shouldShowPeriodCompletionEstimate(
+  totalHours: number,
+  hoursRequired: number,
+  periodComplete?: boolean
+): boolean {
+  if (periodComplete) return true;
+  return hoursProgressRatio(totalHours, hoursRequired) >= MIN_HOURS_PCT_FOR_ESTIMATE;
+}
+
 function addMonths(date: Date, months: number): Date {
   const next = new Date(date);
   next.setMonth(next.getMonth() + months);
@@ -60,6 +76,14 @@ export function estimatePeriodCompletionDate(
   const now = new Date();
   const hoursRequired = input?.hoursRequired ?? 0;
   const totalHours = input?.totalHours ?? 0;
+
+  if (
+    input &&
+    !input.periodComplete &&
+    !shouldShowPeriodCompletionEstimate(totalHours, hoursRequired, input.periodComplete)
+  ) {
+    return null;
+  }
 
   if (input?.periodComplete) {
     return formatMonthYear(now);

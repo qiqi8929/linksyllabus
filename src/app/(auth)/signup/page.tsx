@@ -1,13 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { FormError } from "@/components/FormError";
 
-export default function SignupPage() {
+function safeNextPath(next: string | null): string | null {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
+
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = safeNextPath(searchParams.get("next")) ?? "/dashboard";
+  const isMagicLogSignup = nextPath.startsWith("/magiclog");
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const [email, setEmail] = useState("");
@@ -51,7 +59,7 @@ export default function SignupPage() {
         }).catch(() => {});
       }
 
-      router.replace("/dashboard");
+      router.replace(nextPath);
       router.refresh();
     } catch (err: any) {
       setError(err?.message ?? "Sign up failed");
@@ -63,7 +71,11 @@ export default function SignupPage() {
   return (
     <div className="card p-6">
       <h1 className="text-lg font-semibold">Sign up</h1>
-      <p className="mt-1 text-sm text-zinc-600">After signing up, you will be redirected to the dashboard.</p>
+      <p className="mt-1 text-sm text-zinc-600">
+        {isMagicLogSignup
+          ? "After signing up, you will set up your Magic Log profile."
+          : "After signing up, you will be redirected to the dashboard."}
+      </p>
 
       <form className="mt-6 space-y-3" onSubmit={onSubmit}>
         <div className="space-y-1">
@@ -90,11 +102,22 @@ export default function SignupPage() {
 
       <div className="mt-4 text-sm text-zinc-600">
         Already have an account?{" "}
-        <Link className="font-medium text-brand hover:underline" href="/login">
+        <Link
+          className="font-medium text-brand hover:underline"
+          href={nextPath !== "/dashboard" ? `/login?next=${encodeURIComponent(nextPath)}` : "/login"}
+        >
           Log in
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="card p-6 text-sm text-zinc-600">Loading…</div>}>
+      <SignupForm />
+    </Suspense>
   );
 }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { persistMagicLogPlaySteps } from "@/lib/magiclog/persistPlaySteps";
 import { buildQuickLogVideoMeta } from "@/lib/magiclog/workOrderMode";
+import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import type {
   MagicLogAiStep,
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
   const draftHours = isQuickLog ? Number(body.hours) : null;
 
   const { data, error } = await supabase
-    .from("bluebook_work_orders")
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
     .insert({
       user_id: user.id,
       task_name: task_name || competence_name,
@@ -97,7 +98,7 @@ export async function POST(req: Request) {
       durationSec: video.durationSec
     });
     await supabase
-      .from("bluebook_work_orders")
+      .from(MAGICLOG_WORK_ORDERS_TABLE)
       .update({ ai_steps: aiSteps })
       .eq("id", data.id)
       .eq("user_id", user.id);

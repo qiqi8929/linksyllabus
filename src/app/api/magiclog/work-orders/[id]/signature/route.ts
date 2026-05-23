@@ -3,6 +3,7 @@ import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { signatureBucketForUpload } from "@/lib/magiclog/signatureStorage";
 import { isWorkOrderLocked } from "@/lib/magiclog/workOrderStatus";
+import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
 import type { WorkOrderStatus } from "@/lib/magiclog/types";
 
 export const runtime = "nodejs";
@@ -19,7 +20,7 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data: order } = await supabase
-    .from("bluebook_work_orders")
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
     .select("status")
     .eq("id", params.id)
     .eq("user_id", user.id)
@@ -65,7 +66,7 @@ export async function POST(
   const publicUrl = signed?.signedUrl ?? null;
 
   await supabase
-    .from("bluebook_work_orders")
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
     .update({ mentor_signature_url: path })
     .eq("id", params.id)
     .eq("user_id", user.id);

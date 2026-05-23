@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { FormError } from "@/components/FormError";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next") || "/dashboard";
 
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [email, setEmail] = useState("");
@@ -25,10 +27,7 @@ export default function LoginPage() {
         password
       });
       if (signInError) throw signInError;
-      const nextPath =
-        typeof window !== "undefined"
-          ? new URLSearchParams(window.location.search).get("next") || "/dashboard"
-          : "/dashboard";
+      const nextPath = searchParams.get("next") || "/dashboard";
       router.replace(nextPath);
       router.refresh();
     } catch (err: any) {
@@ -68,11 +67,22 @@ export default function LoginPage() {
 
       <div className="mt-4 text-sm text-zinc-600">
         Don't have an account?{" "}
-        <Link className="font-medium text-brand hover:underline" href="/signup">
+        <Link
+          className="font-medium text-brand hover:underline"
+          href={nextPath !== "/dashboard" ? `/signup?next=${encodeURIComponent(nextPath)}` : "/signup"}
+        >
           Sign up
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="card p-6 text-sm text-zinc-600">Loading…</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
 

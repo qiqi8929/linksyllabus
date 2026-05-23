@@ -6,6 +6,7 @@ import {
 } from "@/lib/magiclog/computeProgress";
 import { estimatePeriodCompletionDate } from "@/lib/magiclog/periodProgress";
 import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
+import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
 import { createSignatureSignedUrl } from "@/lib/magiclog/signatureStorage";
 import type { MagicLogAiStep, MagicLogUserProfile, MagicLogWorkOrder } from "@/lib/magiclog/types";
 
@@ -38,7 +39,7 @@ export async function fetchSignedWorkOrdersForPeriod(
   period: number
 ): Promise<SignedWorkOrderExport[]> {
   const { data } = await supabase
-    .from("bluebook_work_orders")
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
     .select("*")
     .eq("user_id", userId)
     .eq("period", period)
@@ -81,7 +82,7 @@ export async function fetchHourLogsForPeriod(
 
   if (workOrderIds.length > 0) {
     const { data: orders } = await supabase
-      .from("bluebook_work_orders")
+      .from(MAGICLOG_WORK_ORDERS_TABLE)
       .select("id,competence_name,task_name,competence_type")
       .in("id", workOrderIds);
 
@@ -127,7 +128,7 @@ export async function fetchMagicLogExportBundle(
   const hourLogs = await fetchHourLogsForPeriod(supabase, userId, period);
 
   const { data: allSigned } = await supabase
-    .from("bluebook_work_orders")
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
     .select("*")
     .eq("user_id", userId)
     .eq("status", "signed")

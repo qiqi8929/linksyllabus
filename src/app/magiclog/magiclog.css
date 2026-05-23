@@ -712,17 +712,17 @@
   }
 }
 
-/* —— Onboarding —— */
-.magiclog-root .ml-onboarding .btn-primary {
+/* —— Primary actions (Magic Log green) —— */
+.magiclog-root .btn-primary {
   background: #1d9e75;
   color: #fff;
 }
 
-.magiclog-root .ml-onboarding .btn-primary:hover {
+.magiclog-root .btn-primary:hover {
   background: #178564;
 }
 
-.magiclog-root .ml-onboarding .btn-primary:focus {
+.magiclog-root .btn-primary:focus {
   border-color: #1d9e75;
   --tw-ring-color: rgba(29, 158, 117, 0.25);
 }

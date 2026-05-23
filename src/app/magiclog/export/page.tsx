@@ -1,13 +1,11 @@
 import { redirect } from "next/navigation";
 import { ExportClient } from "@/components/magiclog/ExportClient";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireMagicLogUser } from "@/lib/magiclog/authRedirect";
 
 export default async function BluebookExportPage() {
   const supabase = createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/magiclog/export");
+  const user = await requireMagicLogUser(supabase, "/magiclog/export");
 
   const { data: profile } = await supabase
     .from("users")

@@ -414,7 +414,9 @@ export function DashboardClient() {
             {data.requirements.mandatoryRequired} · Optional: {data.progress.optional_completed}/
             {data.requirements.optionalRequired}
           </p>
-          {estCompletion ? (
+          {!estCompletion && hoursPct < 10 && !data.progress.period_complete ? (
+            <p className="ml-progress-est">Keep logging to see estimate</p>
+          ) : estCompletion ? (
             <p className="ml-progress-est">Est. period completion {estCompletion}</p>
           ) : null}
         </section>
