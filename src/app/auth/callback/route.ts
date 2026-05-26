@@ -4,6 +4,7 @@ import { resolvePostAuthRedirect } from "@/lib/magiclog/authRedirect";
 import { ensureMagicLogUser } from "@/lib/magiclog/profile";
 import { safeNextPath } from "@/lib/magiclog/safeNextPath";
 import { env } from "@/lib/env";
+import { publicSiteOriginFromRequest } from "@/lib/publicOrigin";
 
 type CookieToSet = {
   name: string;
@@ -79,7 +80,8 @@ export async function GET(request: NextRequest) {
     pendingCookies.length = 0;
   }
 
-  const response = NextResponse.redirect(new URL(destination, requestUrl.origin));
+  const siteOrigin = publicSiteOriginFromRequest(request);
+  const response = NextResponse.redirect(new URL(destination, siteOrigin));
   pendingCookies.forEach(({ name, value, options }) => {
     response.cookies.set(name, value, options);
   });

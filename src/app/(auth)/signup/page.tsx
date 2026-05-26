@@ -1,14 +1,21 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { resolvePostAuthRedirect } from "@/lib/magiclog/authRedirect";
+import { oauthCallbackRedirectPath } from "@/lib/magiclog/oauthCallback";
 import { safeNextPath } from "@/lib/magiclog/safeNextPath";
 import { SignupForm } from "./SignupForm";
 
 export default async function SignupPage({
   searchParams
 }: {
-  searchParams?: { next?: string };
+  searchParams?: { next?: string; code?: string };
 }) {
+  if (searchParams?.code) {
+    redirect(
+      oauthCallbackRedirectPath(searchParams.code, searchParams.next)
+    );
+  }
+
   const nextPath = safeNextPath(searchParams?.next, "/magiclog/onboarding");
 
   const supabase = createSupabaseServerClient();
