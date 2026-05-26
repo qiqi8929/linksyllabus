@@ -28,10 +28,13 @@ export function resolveOAuthRedirectOrigin(browserOrigin: string): string {
   return browser;
 }
 
-export function buildOAuthCallbackUrl(origin: string, nextPath: string): string {
-  const safe = safeNextPath(nextPath, MAGICLOG_OAUTH_DEFAULT_NEXT);
+/**
+ * Supabase allowlist must include this exact path (no query string).
+ * Post-login destination is stored in sessionStorage before OAuth starts.
+ */
+export function buildOAuthCallbackUrl(origin: string): string {
   const base = resolveOAuthRedirectOrigin(origin);
-  return `${base}/auth/callback?next=${encodeURIComponent(safe)}`;
+  return `${base}/auth/callback`;
 }
 
 /** Build relative redirect path for server components. */

@@ -7,6 +7,7 @@ import { FormError } from "@/components/FormError";
 import { GoogleIcon } from "@/components/auth/GoogleIcon";
 import { EmailAuthForm } from "@/components/auth/EmailAuthForm";
 import { buildOAuthCallbackUrl } from "@/lib/magiclog/oauthCallback";
+import { stashOAuthNext } from "@/lib/magiclog/oauthNextStorage";
 
 type MagicLogAuthScreenProps = {
   mode: "signup" | "login";
@@ -40,8 +41,9 @@ export function MagicLogAuthScreen({
     setError(null);
     setOauthLoading(true);
     try {
+      stashOAuthNext(nextPath);
       const supabase = createSupabaseBrowserClient();
-      const redirectTo = buildOAuthCallbackUrl(window.location.origin, nextPath);
+      const redirectTo = buildOAuthCallbackUrl(window.location.origin);
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo }

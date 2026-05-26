@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { DM_Sans, Fraunces } from "next/font/google";
 import Script from "next/script";
+import { OAuthCodeCapture } from "@/components/auth/OAuthCodeCapture";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             gtag('config', 'G-8THXFQ4PWF');
           `}
         </Script>
+        <OAuthCodeCapture />
         <div className="min-h-screen">{children}</div>
       </body>
     </html>
