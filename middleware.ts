@@ -26,10 +26,12 @@ export async function middleware(req: NextRequest) {
 
   const pathname = req.nextUrl.pathname;
   const isMagicLogTrialEntry = pathname === "/magiclog" || pathname === "/magiclog/";
+  /** Public mentor sign-off from SMS link — no login required. */
+  const isPublicMentorSign = pathname.startsWith("/magiclog/sign/");
   const isProtected =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/guides") ||
-    (pathname.startsWith("/magiclog") && !isMagicLogTrialEntry);
+    (pathname.startsWith("/magiclog") && !isMagicLogTrialEntry && !isPublicMentorSign);
 
   if (!isProtected) {
     return NextResponse.next();

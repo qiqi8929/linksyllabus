@@ -20,9 +20,10 @@ type Phase =
   | "video"
   | "steps"
   | "options"
-  | "quick_log";
+  | "quick_log"
+  | "type_it";
 
-type DashboardEntryMode = "voice" | "photo" | "quick" | "learn";
+type DashboardEntryMode = "voice" | "photo" | "quick" | "type" | "learn";
 
 type BrowserSpeechRecognition = {
   lang: string;
@@ -64,7 +65,7 @@ const MODES: Array<{
 ];
 
 function parseEntryMode(raw: string | null): DashboardEntryMode | null {
-  if (raw === "voice" || raw === "photo" || raw === "quick" || raw === "learn") {
+  if (raw === "voice" || raw === "photo" || raw === "quick" || raw === "type" || raw === "learn") {
     return raw;
   }
   return null;
@@ -74,12 +75,14 @@ function initialPhase(entry: DashboardEntryMode | null): Phase {
   if (entry === "voice") return "voice";
   if (entry === "photo") return "photo";
   if (entry === "quick") return "quick_log";
+  if (entry === "type") return "type_it";
   if (entry === "learn") return "mode";
   return "mode";
 }
 
 function initialCreationMode(entry: DashboardEntryMode | null): MagicLogCreationMode | null {
   if (entry === "quick") return "quick_log";
+  if (entry === "type") return "type_it";
   return null;
 }
 
@@ -99,6 +102,8 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
   const [competenceType, setCompetenceType] = useState<CompetenceType>("mandatory");
   const [period, setPeriod] = useState(defaultPeriod);
   const [quickHours, setQuickHours] = useState("");
+  const [typeNotes, setTypeNotes] = useState("");
+  const [generateStepsOnType, setGenerateStepsOnType] = useState(false);
   const [workedDate, setWorkedDate] = useState(
     () => new Date().toISOString().slice(0, 10)
   );
@@ -124,6 +129,8 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
     setError(null);
     if (next === "quick_log") {
       setPhase("quick_log");
+    } else if (next === "type_it") {
+      setPhase("type_it");
     } else {
       setPhase("task");
     }
@@ -359,6 +366,39 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
     });
   }
 
+  async function saveTypeIt() {
+    if (!taskName.trim()) {
+      setError("Enter a task name");
+      return;
+    }
+    if (!workedDate.trim()) {
+      setError("Select the date you worked");
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      let aiSteps: MagicLogAiStep[] = [];
+      if (generateStepsOnType) {
+        aiSteps = await generateStepsForTask(taskName.trim());
+      }
+      await saveWorkOrder({
+        taskName: taskName.trim(),
+        competenceName: taskName.trim(),
+        competenceType,
+        period,
+        workedDate,
+        notes: typeNotes.trim() || undefined,
+        creationMode: "type_it",
+        includeVideo: false,
+        aiSteps
+      });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Save failed");
+      setLoading(false);
+    }
+  }
+
   function saveQuickLog() {
     const h = Number(quickHours);
     if (!Number.isFinite(h) || h <= 0) {
@@ -383,7 +423,10 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
   }
 
   const backHref =
-    entryMode === "voice" || entryMode === "photo" || entryMode === "quick"
+    entryMode === "voice" ||
+    entryMode === "photo" ||
+    entryMode === "quick" ||
+    entryMode === "type"
       ? "/magiclog/dashboard"
       : null;
 
@@ -392,8 +435,10 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
       ? "Record voice"
       : entryMode === "photo"
         ? "Take photo"
-        : entryMode === "quick"
+        : entryMode === "type"
           ? "Type it"
+        : entryMode === "quick"
+          ? "Quick log"
           : entryMode === "learn"
             ? "Learn with steps"
             : "New work order";
@@ -746,6 +791,83 @@ export function NewWorkOrderClient({ defaultPeriod }: { defaultPeriod: number })
             className="btn-primary"
             disabled={loading || !taskName.trim()}
             onClick={saveQuickLog}
+          >
+            {loading ? "Saving…" : "Create work order"}
+          </button>
+        </section>
+      ) : null}
+
+      {phase === "type_it" && mode === "type_it" ? (
+        <section className="card space-y-4 p-5">
+          <p className="text-sm text-zinc-600">
+            Enter your task manually. Add optional notes, then get mentor sign-off. You can
+            optionally generate AI learning steps.
+          </p>
+          <label className="block text-sm font-medium">
+            Task / competence name
+            <input
+              className="mt-1 w-full"
+              value={taskName}
+              onChange={(e) => setTaskName(e.target.value)}
+              placeholder="Install commercial branch circuits"
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Notes (optional)
+            <textarea
+              className="mt-1 min-h-[80px] w-full text-sm"
+              value={typeNotes}
+              onChange={(e) => setTypeNotes(e.target.value)}
+              placeholder="What you did, materials, location…"
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Date worked
+            <input
+              type="date"
+              className="mt-1 w-full"
+              value={workedDate}
+              onChange={(e) => setWorkedDate(e.target.value)}
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Competence type
+            <select
+              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              value={competenceType}
+              onChange={(e) => setCompetenceType(e.target.value as CompetenceType)}
+            >
+              <option value="mandatory">Mandatory (compulsory)</option>
+              <option value="optional">Optional</option>
+            </select>
+          </label>
+          <label className="block text-sm font-medium">
+            Period
+            <select
+              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              value={period}
+              onChange={(e) => setPeriod(Number(e.target.value))}
+            >
+              {[1, 2, 3, 4].map((n) => (
+                <option key={n} value={n}>
+                  Period {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={generateStepsOnType}
+              onChange={(e) => setGenerateStepsOnType(e.target.checked)}
+            />
+            Generate AI learning steps for this task
+          </label>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={loading || !taskName.trim()}
+            onClick={() => void saveTypeIt()}
           >
             {loading ? "Saving…" : "Create work order"}
           </button>

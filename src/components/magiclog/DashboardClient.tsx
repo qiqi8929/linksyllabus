@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { FormError } from "@/components/FormError";
 import { resolveMagicLogSubscriptionUi } from "@/lib/magiclog/subscriptionUi";
+import { PeriodChecklistCard } from "@/components/magiclog/PeriodChecklistCard";
+import { isCompulsoryCertificationTrade } from "@/lib/magiclog/constants";
 
 type DashboardData = {
   profile: {
@@ -189,7 +191,7 @@ const INPUT_METHODS = [
     Icon: IconCamera
   },
   {
-    href: "/magiclog/new?mode=quick",
+    href: "/magiclog/new?mode=type",
     title: "Type it",
     subtitle: "Enter task manually",
     Icon: IconType
@@ -328,9 +330,9 @@ export function DashboardClient() {
           </Link>
         </div>
         <Link
-          href="/magiclog/export"
+          href="/magiclog/settings"
           className="ml-sidebar-icon ml-sidebar-icon--bottom"
-          aria-label="Export and print"
+          aria-label="Settings"
         >
           <IconSettings />
         </Link>
@@ -413,13 +415,25 @@ export function DashboardClient() {
             Mandatory competences: {data.progress.mandatory_completed}/
             {data.requirements.mandatoryRequired} · Optional: {data.progress.optional_completed}/
             {data.requirements.optionalRequired}
+            {isCompulsoryCertificationTrade(data.profile.trade)
+              ? " · Trade-certified hour targets"
+              : " · Self-reported hour targets"}
           </p>
           {!estCompletion && hoursPct < 10 && !data.progress.period_complete ? (
             <p className="ml-progress-est">Keep logging to see estimate</p>
           ) : estCompletion ? (
             <p className="ml-progress-est">Est. period completion {estCompletion}</p>
           ) : null}
+          {data.profile.province === "alberta" ? (
+            <p className="ml-progress-est">
+              <Link href="/magiclog/grants" className="font-medium text-[#1D9E75] hover:underline">
+                View Alberta grants &amp; awards →
+              </Link>
+            </p>
+          ) : null}
         </section>
+
+        <PeriodChecklistCard period={data.period} />
 
         <section className="ml-orders-section">
           <div className="ml-orders-head">

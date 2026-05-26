@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  MAGICLOG_COMPULSORY_TRADES,
+  MAGICLOG_OPTIONAL_TRADES,
   MAGICLOG_PROVINCES,
-  magiclog_subscription,
-  MAGICLOG_TRADES
+  magiclog_subscription
 } from "@/lib/magiclog/constants";
 import { FormError } from "@/components/FormError";
 
@@ -20,7 +21,9 @@ export function OnboardingWizard() {
 
   const [province, setProvince] = useState("alberta");
   const [aitId, setAitId] = useState("");
-  const [trade, setTrade] = useState<string>(MAGICLOG_TRADES[0]);
+  const [trade, setTrade] = useState<string>(MAGICLOG_COMPULSORY_TRADES[0]);
+  const [isJourneyman, setIsJourneyman] = useState(false);
+  const [journeymanCert, setJourneymanCert] = useState("");
   const [currentPeriod, setCurrentPeriod] = useState(1);
   const [startDate, setStartDate] = useState("");
   const [sponsorName, setSponsorName] = useState("");
@@ -90,7 +93,11 @@ export function OnboardingWizard() {
       } else if (step === 3) {
         await saveProfile({
           sponsor_name: sponsorName,
-          sponsor_phone: sponsorPhone
+          sponsor_phone: sponsorPhone,
+          is_journeyman: isJourneyman,
+          journeyman_certificate_number: journeymanCert.trim() || null,
+          default_mentor_name: sponsorName.trim() || null,
+          default_mentor_phone: sponsorPhone.trim() || null
         });
         setStep(4);
       }
@@ -210,20 +217,37 @@ export function OnboardingWizard() {
             <label className="text-sm font-medium">AIT ID number</label>
             <input value={aitId} onChange={(e) => setAitId(e.target.value)} required />
           </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Trade</label>
-            <select
-              value={trade}
-              onChange={(e) => setTrade(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-            >
-              {MAGICLOG_TRADES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
+          <fieldset className="space-y-2 border-0 p-0">
+            <legend className="text-sm font-medium">Trade</legend>
+            <p className="text-xs text-zinc-500">Compulsory certification trades use AIT hour targets.</p>
+            {MAGICLOG_COMPULSORY_TRADES.map((t) => (
+                <label key={t} className="ml-province-option">
+                  <input
+                    type="radio"
+                    name="onboarding_trade"
+                    value={t}
+                    checked={trade === t}
+                    onChange={() => setTrade(t)}
+                  />
+                  <span className="ml-province-label">
+                    {t} <span className="text-zinc-400">🔒</span>
+                  </span>
+                </label>
               ))}
-            </select>
-          </div>
+            <p className="pt-1 text-xs font-medium text-zinc-600">Optional certification</p>
+            {MAGICLOG_OPTIONAL_TRADES.map((t) => (
+              <label key={t} className="ml-province-option">
+                <input
+                  type="radio"
+                  name="onboarding_trade"
+                  value={t}
+                  checked={trade === t}
+                  onChange={() => setTrade(t)}
+                />
+                <span className="ml-province-label">{t}</span>
+              </label>
+            ))}
+          </fieldset>
           <div className="space-y-1">
             <label className="text-sm font-medium">Current period</label>
             <select
@@ -251,6 +275,24 @@ export function OnboardingWizard() {
 
       {step === 3 ? (
         <div className="mt-6 space-y-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isJourneyman}
+              onChange={(e) => setIsJourneyman(e.target.checked)}
+            />
+            I am a journeyman (certificate holder)
+          </label>
+          {isJourneyman ? (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Journeyman certificate number</label>
+              <input
+                value={journeymanCert}
+                onChange={(e) => setJourneymanCert(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          ) : null}
           <div className="space-y-1">
             <label className="text-sm font-medium">Sponsor / employer name</label>
             <input

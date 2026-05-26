@@ -11,7 +11,7 @@ export type MagicLogAiStep = {
   end_time?: number;
 };
 
-export type MagicLogCreationMode = "learn" | "steps_only" | "quick_log";
+export type MagicLogCreationMode = "learn" | "steps_only" | "quick_log" | "type_it";
 
 export type MagicLogVideoRef = {
   videoId: string;
@@ -20,10 +20,15 @@ export type MagicLogVideoRef = {
   channel?: string;
   thumbnailUrl?: string;
   durationSec?: number;
-  /** Set on quick-log work orders (metadata, not a real video). */
+  /** Set on quick-log / type-it work orders (metadata, not a real video). */
   quickLog?: boolean;
+  typeIt?: boolean;
   workedDate?: string;
   creationMode?: MagicLogCreationMode;
+  notes?: string;
+  signingToken?: string;
+  signingTokenExpires?: string;
+  mentorPhone?: string;
 };
 
 export type MagicLogUserProfile = {
@@ -37,6 +42,10 @@ export type MagicLogUserProfile = {
   sponsor_phone: string | null;
   province: string;
   bluebook_onboarding_complete: boolean;
+  is_journeyman?: boolean;
+  journeyman_certificate_number?: string | null;
+  default_mentor_name?: string | null;
+  default_mentor_phone?: string | null;
 };
 
 export type MagicLogWorkOrder = {

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { PERIOD_REQUIREMENTS, type PeriodRequirements } from "@/lib/magiclog/constants";
+import { getPeriodRequirementsForTrade, type PeriodRequirements } from "@/lib/magiclog/constants";
 import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
 import type { MagicLogUserProfile } from "@/lib/magiclog/types";
 
@@ -13,12 +13,11 @@ export type ComputedPeriodProgress = {
   requirements: PeriodRequirements;
 };
 
-/** MVP placeholder — trade-specific hour targets will replace this later. */
 export function getPeriodRequirements(
   period: number,
-  _profile?: Pick<MagicLogUserProfile, "trade" | "province"> | null
+  profile?: Pick<MagicLogUserProfile, "trade" | "province"> | null
 ): PeriodRequirements {
-  return PERIOD_REQUIREMENTS[period] ?? PERIOD_REQUIREMENTS[1];
+  return getPeriodRequirementsForTrade(profile?.trade, period);
 }
 
 /**

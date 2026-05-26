@@ -40,6 +40,17 @@ export async function PATCH(req: Request) {
   if (body.bluebook_onboarding_complete === true) {
     patch.bluebook_onboarding_complete = true;
   }
+  if (body.is_journeyman != null) patch.is_journeyman = Boolean(body.is_journeyman);
+  if (body.journeyman_certificate_number != null) {
+    patch.journeyman_certificate_number =
+      String(body.journeyman_certificate_number).trim() || null;
+  }
+  if (body.default_mentor_name != null) {
+    patch.default_mentor_name = String(body.default_mentor_name).trim() || null;
+  }
+  if (body.default_mentor_phone != null) {
+    patch.default_mentor_phone = String(body.default_mentor_phone).trim() || null;
+  }
 
   await ensureMagicLogUser(supabase, { id: user.id, email: user.email });
 

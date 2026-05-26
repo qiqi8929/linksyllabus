@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { persistMagicLogPlaySteps } from "@/lib/magiclog/persistPlaySteps";
-import { buildQuickLogVideoMeta } from "@/lib/magiclog/workOrderMode";
+import { buildQuickLogVideoMeta, buildTypeItVideoMeta } from "@/lib/magiclog/workOrderMode";
 import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import type {
@@ -44,13 +44,14 @@ export async function POST(req: Request) {
 
   const creationMode = body.creationMode ?? "learn";
   const isQuickLog = creationMode === "quick_log";
+  const isTypeIt = creationMode === "type_it";
 
   let videoUrls = (body.videoUrls ?? []) as MagicLogVideoRef[];
   const video = videoUrls.find((v) => v.url?.trim()) ?? null;
   let aiSteps = (body.aiSteps ?? []) as MagicLogAiStep[];
 
   const includeVideo =
-    !isQuickLog && creationMode !== "steps_only" && body.includeVideo !== false;
+    !isQuickLog && !isTypeIt && creationMode !== "steps_only" && body.includeVideo !== false;
 
   if (isQuickLog) {
     const workedDate = String(body.workedDate ?? "").trim();
@@ -65,7 +66,21 @@ export async function POST(req: Request) {
     aiSteps = [];
   }
 
-  const draftHours = isQuickLog ? Number(body.hours) : null;
+  if (isTypeIt) {
+    const workedDate = String(body.workedDate ?? "").trim();
+    if (!workedDate) {
+      return NextResponse.json({ error: "workedDate is required" }, { status: 400 });
+    }
+    const notes = String((body as { notes?: string }).notes ?? "").trim();
+    videoUrls = buildTypeItVideoMeta(workedDate, notes);
+    aiSteps = (body.aiSteps ?? []) as MagicLogAiStep[];
+  }
+
+  const draftHours = isQuickLog
+    ? Number(body.hours)
+    : isTypeIt && body.hours != null && Number(body.hours) > 0
+      ? Number(body.hours)
+      : null;
 
   const { data, error } = await supabase
     .from(MAGICLOG_WORK_ORDERS_TABLE)

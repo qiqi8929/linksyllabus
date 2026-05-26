@@ -7,6 +7,7 @@ import { SignaturePad } from "@/components/magiclog/SignaturePad";
 import { FormError } from "@/components/FormError";
 import {
   formatWorkOrderStartDate,
+  isManualLogWorkOrder,
   isQuickLogWorkOrder,
   quickLogWorkedDate,
   workOrderStartDateIso
@@ -52,6 +53,9 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
   const [editSteps, setEditSteps] = useState<MagicLogAiStep[]>([]);
   const [showPad, setShowPad] = useState(false);
   const [showHoursPrompt, setShowHoursPrompt] = useState(false);
+  const [mentorPhone, setMentorPhone] = useState("");
+  const [smsLink, setSmsLink] = useState<string | null>(null);
+  const [smsNotice, setSmsNotice] = useState<string | null>(null);
   const [hours, setHours] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -69,6 +73,11 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
       setSignaturePath(wo.mentor_signature_url);
     }
     if (wo.mentor_name) setMentorName(wo.mentor_name);
+    const defaultPhone =
+      (profile as { default_mentor_phone?: string | null })?.default_mentor_phone ??
+      profile?.sponsor_phone ??
+      "";
+    setMentorPhone(defaultPhone);
     const synced = syncEditFields(wo);
     setEditTaskName(synced.taskName);
     setEditCompetenceType(synced.competenceType);
@@ -107,14 +116,19 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
         mentor_name: mentorName.trim() || null,
         ai_steps: editSteps
       };
-      const quickLog = isQuickLogWorkOrder(workOrder);
-      if (quickLog) {
+      const manualLog = isManualLogWorkOrder(workOrder);
+      if (manualLog) {
         payload.workedDate = editWorkedDate;
-        const h = Number(editHours);
-        if (!Number.isFinite(h) || h <= 0) {
-          throw new Error("Enter valid hours");
+        if (quickLog) {
+          const h = Number(editHours);
+          if (!Number.isFinite(h) || h <= 0) {
+            throw new Error("Enter valid hours");
+          }
+          payload.hours = h;
+        } else if (editHours.trim()) {
+          const h = Number(editHours);
+          if (Number.isFinite(h) && h > 0) payload.hours = h;
         }
-        payload.hours = h;
       } else if (editHours.trim()) {
         const h = Number(editHours);
         if (Number.isFinite(h) && h > 0) payload.hours = h;
@@ -212,15 +226,44 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
     : workOrder.competence_name || workOrder.task_name || "Task";
   const competenceType = editable ? editCompetenceType : workOrder.competence_type;
   const quickLog = isQuickLogWorkOrder(workOrder);
-  const workedDate = editable && quickLog ? editWorkedDate : quickLogWorkedDate(workOrder);
+  const manualLog = isManualLogWorkOrder(workOrder);
+  const workedDate = editable && manualLog ? editWorkedDate : quickLogWorkedDate(workOrder);
   const startDateDisplay = formatWorkOrderStartDate(workOrder);
   const displayHours = locked
     ? workOrder.hours
-    : quickLog
+    : manualLog
       ? editHours
       : workOrder.hours ?? editHours;
   const steps = editable ? editSteps : ((workOrder.ai_steps ?? []) as MagicLogAiStep[]);
-  const hasLearning = !quickLog && steps.length > 0;
+  const hasLearning = !manualLog && steps.length > 0;
+
+  async function sendSmsSignLink() {
+    if (!mentorPhone.trim()) {
+      setError("Enter your mentor's phone number");
+      return;
+    }
+    setError(null);
+    setSmsNotice(null);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/magiclog/work-orders/${workOrderId}/request-sign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mentorPhone: mentorPhone.trim(),
+          mentorName: mentorName.trim() || undefined
+        })
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error ?? "Failed to send link");
+      setSmsLink(j.signUrl ?? null);
+      setSmsNotice(j.message ?? (j.smsSent ? "Link sent." : "Copy the link below."));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to send signing link");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <section className="space-y-6">
@@ -304,7 +347,7 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
           </label>
           <label className="block text-sm font-medium">
             Start date
-            {editable && quickLog ? (
+            {editable && manualLog ? (
               <input
                 type="date"
                 className="mt-1 w-full"
@@ -539,6 +582,30 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
               }}
             />
           </label>
+          <label className="block text-sm">
+            Mentor phone (for SMS sign link)
+            <input
+              type="tel"
+              className="mt-1 w-full"
+              value={mentorPhone}
+              onChange={(e) => setMentorPhone(e.target.value)}
+              placeholder="e.g. 4035551234"
+            />
+          </label>
+          <button
+            type="button"
+            className="btn-primary w-full"
+            disabled={loading}
+            onClick={() => void sendSmsSignLink()}
+          >
+            {loading ? "Sending…" : "Text signing link to mentor"}
+          </button>
+          {smsNotice ? <p className="text-sm text-zinc-600">{smsNotice}</p> : null}
+          {smsLink ? (
+            <p className="break-all rounded-md bg-zinc-100 p-2 text-xs text-zinc-700">
+              {smsLink}
+            </p>
+          ) : null}
           <button type="button" className="btn-ghost" onClick={() => setShowPad((v) => !v)}>
             Mentor signs on screen
           </button>
@@ -567,7 +634,7 @@ export function WorkOrderClient({ workOrderId }: { workOrderId: string }) {
         </section>
       )}
 
-      {showHoursPrompt && editable && !quickLog ? (
+      {showHoursPrompt && editable && !manualLog ? (
         <section className="card space-y-3 p-5">
           <p className="text-sm font-medium">How many hours did this task take?</p>
           <input
