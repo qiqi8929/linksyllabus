@@ -19,7 +19,6 @@ export function MagicLogAuthScreen({
   nextPath,
   initialError = null
 }: MagicLogAuthScreenProps) {
-  const supabase = createSupabaseBrowserClient();
   const [showEmail, setShowEmail] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [error, setError] = useState<string | null>(
@@ -41,6 +40,7 @@ export function MagicLogAuthScreen({
     setError(null);
     setOauthLoading(true);
     try {
+      const supabase = createSupabaseBrowserClient();
       const redirectTo = buildOAuthCallbackUrl(window.location.origin, nextPath);
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
