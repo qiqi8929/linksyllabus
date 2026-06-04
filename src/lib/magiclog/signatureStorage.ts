@@ -19,3 +19,8 @@ export async function createSignatureSignedUrl(
 export function signatureBucketForUpload(): string {
   return SIGNATURE_BUCKET;
 }
+
+/** Canonical storage object path for mentor web / in-app signatures. */
+export function mentorSignatureStoragePath(userId: string, workOrderId: string): string {
+  return `${userId}/${workOrderId}/mentor.png`;
+}

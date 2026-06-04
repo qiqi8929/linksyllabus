@@ -1,5 +1,10 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { signatureBucketForUpload } from "@/lib/magiclog/signatureStorage";
+import {
+  mentorSignatureStoragePath,
+  signatureBucketForUpload
+} from "@/lib/magiclog/signatureStorage";
+import { applySignedWorkOrderToProgress } from "@/lib/magiclog/periodProgress";
+import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
 import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
 import type { CompetenceType, WorkOrderStatus } from "@/lib/magiclog/types";
 
@@ -78,17 +83,83 @@ function apprenticeDisplayName(profile: {
   return "Apprentice";
 }
 
-/** Storage path: {userId}/{workOrderId}/mentor.png — must match MagicLog mentorSignaturePath + RPC. */
+/** @deprecated Use mentorSignatureStoragePath — kept for imports. */
 export function publicMentorSignaturePath(userId: string, workOrderId: string): string {
-  return `${userId}/${workOrderId}/mentor.png`;
+  return mentorSignatureStoragePath(userId, workOrderId);
 }
 
-function isExpectedMentorSignaturePath(
-  path: string,
-  userId: string,
-  workOrderId: string
-): boolean {
-  return path === publicMentorSignaturePath(userId, workOrderId);
+type AdminClient = ReturnType<typeof createSupabaseAdminClient>;
+
+async function persistSignedWorkOrder(
+  admin: AdminClient,
+  order: PublicSignWorkOrder,
+  workOrderId: string,
+  storagePath: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const signedAt = new Date().toISOString();
+  const { error: updateErr } = await admin
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
+    .update({
+      status: "signed",
+      signed_at: signedAt,
+      mentor_signature_url: storagePath,
+      signing_token: null,
+      signing_token_expires: null
+    })
+    .eq("id", workOrderId);
+
+  if (updateErr) {
+    console.error("[completePublicMentorSign] direct update failed", updateErr);
+    return { ok: false, message: updateErr.message || "Failed to save signature." };
+  }
+
+  const hours = order.hours;
+  if (hours != null && Number.isFinite(hours) && hours > 0) {
+    const { data: existing } = await admin
+      .from("hour_logs")
+      .select("id")
+      .eq("work_order_id", workOrderId)
+      .maybeSingle();
+
+    if (!existing) {
+      await admin.from("hour_logs").insert({
+        user_id: order.user_id,
+        work_order_id: workOrderId,
+        hours,
+        period: order.period
+      });
+    }
+
+    const profile = await fetchMagicLogProfile(admin, order.user_id);
+    await applySignedWorkOrderToProgress(admin, {
+      userId: order.user_id,
+      period: order.period,
+      hours,
+      competenceType: order.competence_type,
+      profile
+    });
+  }
+
+  return { ok: true };
+}
+
+async function readBackSignedPath(
+  admin: AdminClient,
+  workOrderId: string,
+  storagePath: string
+): Promise<boolean> {
+  const { data: saved, error: readErr } = await admin
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
+    .select("status, mentor_signature_url")
+    .eq("id", workOrderId)
+    .maybeSingle();
+
+  if (readErr) {
+    console.error("[completePublicMentorSign] read-back", readErr);
+    return false;
+  }
+
+  return saved?.status === "signed" && saved?.mentor_signature_url === storagePath;
 }
 
 const WORK_ORDER_ID_RE =
@@ -300,12 +371,8 @@ export async function completePublicMentorSign(
 
   const admin = createSupabaseAdminClient();
   const order = loaded.order;
-  const storagePath = publicMentorSignaturePath(order.user_id, workOrderId);
+  const storagePath = mentorSignatureStoragePath(order.user_id, workOrderId);
   const bucket = signatureBucketForUpload();
-
-  if (!isExpectedMentorSignaturePath(storagePath, order.user_id, workOrderId)) {
-    return { ok: false, message: "Internal error: invalid mentor signature path." };
-  }
 
   const { error: uploadErr } = await admin.storage.from(bucket).upload(storagePath, pngBytes, {
     contentType: "image/png",
@@ -323,31 +390,66 @@ export async function completePublicMentorSign(
     return { ok: false, message: "Signature upload could not be verified." };
   }
 
-  const { error: rpcErr } = await admin.rpc("complete_work_order_signing_with_token", {
+  const rpcParams = {
     p_work_order_id: workOrderId,
-    p_token: token,
+    p_token: token.trim(),
     p_signature_path: storagePath
-  });
+  };
+
+  const { error: rpcErr } = await admin.rpc(
+    "complete_work_order_signing_with_token",
+    rpcParams
+  );
 
   if (rpcErr) {
-    console.error("[completePublicMentorSign] RPC failed", rpcErr);
+    console.error(
+      "[completePublicMentorSign] RPC failed",
+      rpcErr.message,
+      "params:",
+      rpcParams
+    );
+  }
+
+  let confirmed = !rpcErr && (await readBackSignedPath(admin, workOrderId, storagePath));
+
+  if (!confirmed) {
+    if (rpcErr) {
+      const missingRpc =
+        rpcErr.message?.includes("Could not find the function") ||
+        rpcErr.message?.toLowerCase().includes("does not exist");
+      if (!missingRpc) {
+        console.warn(
+          "[completePublicMentorSign] RPC error but attempting direct update fallback"
+        );
+      }
+    } else {
+      console.warn(
+        "[completePublicMentorSign] RPC succeeded but mentor_signature_url not set; using direct update"
+      );
+    }
+
+    const fallback = await persistSignedWorkOrder(admin, order, workOrderId, storagePath);
+    if (!fallback.ok) return fallback;
+    confirmed = await readBackSignedPath(admin, workOrderId, storagePath);
+  }
+
+  if (!confirmed) {
     return {
       ok: false,
-      message:
-        rpcErr.message ||
-        "Failed to complete signing. Ensure Supabase migration_token_signing_rpc.sql is applied."
+      message: "Signature was uploaded but could not be linked to the work order."
     };
   }
 
-  const { data: saved, error: readErr } = await admin
-    .from(MAGICLOG_WORK_ORDERS_TABLE)
-    .select("status, mentor_signature_url")
-    .eq("id", workOrderId)
-    .maybeSingle();
-
-  if (readErr || saved?.status !== "signed" || saved?.mentor_signature_url !== storagePath) {
-    console.error("[completePublicMentorSign] read-back", readErr, saved);
-    return { ok: false, message: "Signature was saved but work order could not be confirmed." };
+  const hours = order.hours;
+  if (hours != null && Number.isFinite(hours) && hours > 0) {
+    const profile = await fetchMagicLogProfile(admin, order.user_id);
+    await applySignedWorkOrderToProgress(admin, {
+      userId: order.user_id,
+      period: order.period,
+      hours,
+      competenceType: order.competence_type,
+      profile
+    });
   }
 
   return { ok: true };
