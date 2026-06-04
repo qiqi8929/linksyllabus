@@ -1,7 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { signatureBucketForUpload } from "@/lib/magiclog/signatureStorage";
-import { applySignedWorkOrderToProgress } from "@/lib/magiclog/periodProgress";
-import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
 import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
 import type { CompetenceType, WorkOrderStatus } from "@/lib/magiclog/types";
 
@@ -80,48 +78,77 @@ function apprenticeDisplayName(profile: {
   return "Apprentice";
 }
 
-/** Storage object path inside `bluebook-signatures`. */
-export function publicMentorSignaturePath(workOrderId: string): string {
-  return `${workOrderId}/mentor.png`;
+/** Storage path: {userId}/{workOrderId}/mentor.png — must match MagicLog mentorSignaturePath + RPC. */
+export function publicMentorSignaturePath(userId: string, workOrderId: string): string {
+  return `${userId}/${workOrderId}/mentor.png`;
 }
 
-export async function loadPublicSignWorkOrder(
-  workOrderId: string,
-  token: string | null | undefined
-): Promise<PublicSignLoadResult> {
-  if (!workOrderId?.trim()) {
-    return { kind: "invalid", message: "Invalid signing link." };
-  }
+function isExpectedMentorSignaturePath(
+  path: string,
+  userId: string,
+  workOrderId: string
+): boolean {
+  return path === publicMentorSignaturePath(userId, workOrderId);
+}
 
-  const admin = createSupabaseAdminClient();
+const WORK_ORDER_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-  const { data: order, error } = await admin
+const ORDER_SELECT_BASE =
+  "id,task_name,competence_name,hours,status,user_id,period,competence_type,signed_at,video_urls";
+
+type OrderRow = {
+  id: string;
+  task_name: string | null;
+  competence_name: string;
+  hours: number | null;
+  status: string;
+  user_id: string;
+  period: number;
+  competence_type: string;
+  signed_at: string | null;
+  video_urls: unknown;
+  signing_token?: string | null;
+};
+
+async function fetchOrderRow(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  workOrderId: string
+): Promise<{ order: OrderRow | null; error: { message: string } | null }> {
+  const withToken = await admin
     .from(MAGICLOG_WORK_ORDERS_TABLE)
-    .select(
-      "id,task_name,competence_name,hours,status,user_id,period,competence_type,signed_at,video_urls,signing_token"
-    )
+    .select(`${ORDER_SELECT_BASE},signing_token`)
     .eq("id", workOrderId)
     .maybeSingle();
 
-  if (error || !order) {
-    return { kind: "invalid", message: "Work order not found." };
+  if (!withToken.error && withToken.data) {
+    return { order: withToken.data as OrderRow, error: null };
   }
 
-  const { data: userRow } = await admin
-    .from("users")
-    .select("email,ait_id,sponsor_name")
-    .eq("id", order.user_id)
+  const missingColumn =
+    withToken.error?.message?.toLowerCase().includes("signing_token") ?? false;
+
+  if (withToken.error && !missingColumn) {
+    console.error("[loadPublicSignWorkOrder] select error", withToken.error);
+    return { order: null, error: { message: withToken.error.message } };
+  }
+
+  const fallback = await admin
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
+    .select(ORDER_SELECT_BASE)
+    .eq("id", workOrderId)
     .maybeSingle();
 
-  const apprentice: PublicSignApprentice = {
-    displayName: apprenticeDisplayName({
-      email: userRow?.email ?? null,
-      ait_id: userRow?.ait_id ?? null,
-      sponsor_name: userRow?.sponsor_name ?? null
-    })
-  };
+  if (fallback.error) {
+    console.error("[loadPublicSignWorkOrder] select fallback error", fallback.error);
+    return { order: null, error: { message: fallback.error.message } };
+  }
 
-  const workOrder: PublicSignWorkOrder = {
+  return { order: (fallback.data as OrderRow | null) ?? null, error: null };
+}
+
+function mapOrderRow(order: OrderRow): PublicSignWorkOrder {
+  return {
     id: order.id,
     task_name: order.task_name,
     competence_name: order.competence_name,
@@ -132,21 +159,130 @@ export async function loadPublicSignWorkOrder(
     competence_type: order.competence_type as CompetenceType,
     signed_at: order.signed_at
   };
+}
 
-  if (order.status === "signed") {
-    return { kind: "already_signed", order: workOrder, apprentice };
+async function loadApprentice(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  userId: string
+): Promise<PublicSignApprentice> {
+  const { data: userRow } = await admin
+    .from("users")
+    .select("email,ait_id,sponsor_name")
+    .eq("id", userId)
+    .maybeSingle();
+
+  return {
+    displayName: apprenticeDisplayName({
+      email: userRow?.email ?? null,
+      ait_id: userRow?.ait_id ?? null,
+      sponsor_name: userRow?.sponsor_name ?? null
+    })
+  };
+}
+
+type RpcSigningRow = {
+  work_order_id: string;
+  task_name: string | null;
+  competence_name: string;
+  hours: number | null;
+  user_id: string;
+  status: string;
+};
+
+/** Load work order for public mentor sign page (same token rules as MagicLog app RPC). */
+export async function loadPublicSignWorkOrder(
+  workOrderId: string,
+  token: string | null | undefined
+): Promise<PublicSignLoadResult> {
+  const id = workOrderId?.trim();
+  const tokenTrimmed = token?.trim();
+
+  if (!id || !WORK_ORDER_ID_RE.test(id)) {
+    return { kind: "invalid", message: "Invalid signing link." };
   }
 
-  const columnToken =
-    typeof order.signing_token === "string" ? order.signing_token.trim() : null;
-  if (columnToken && token?.trim() === columnToken) {
-    return { kind: "ok", order: workOrder, apprentice };
+  if (!tokenTrimmed) {
+    return { kind: "invalid", message: "This signing link is missing a token." };
   }
 
-  const meta = extractSigningMeta(order.video_urls);
-  if (!isTokenValid(meta, token)) {
+  let admin: ReturnType<typeof createSupabaseAdminClient>;
+  try {
+    admin = createSupabaseAdminClient();
+  } catch (err: unknown) {
+    console.error("[loadPublicSignWorkOrder] admin client", err);
+    return {
+      kind: "invalid",
+      message: "Signing service is not configured. Contact support."
+    };
+  }
+
+  const { data: rpcData, error: rpcErr } = await admin.rpc("get_work_order_for_signing", {
+    p_work_order_id: id,
+    p_token: tokenTrimmed
+  });
+
+  const { order: row, error: selectErr } = await fetchOrderRow(admin, id);
+
+  if (rpcErr) {
+    const rpcMsg = rpcErr.message ?? "";
+    console.error("[loadPublicSignWorkOrder] RPC error", rpcErr);
+
+    if (row?.status === "signed") {
+      const apprentice = await loadApprentice(admin, row.user_id);
+      return { kind: "already_signed", order: mapOrderRow(row), apprentice };
+    }
+
+    if (!row) {
+      if (selectErr?.message?.includes("JWT") || rpcMsg.toLowerCase().includes("jwt")) {
+        return {
+          kind: "invalid",
+          message: "Signing service configuration error. Check Supabase keys on Vercel."
+        };
+      }
+      return { kind: "invalid", message: "Work order not found." };
+    }
+
+    if (rpcMsg.toLowerCase().includes("already signed")) {
+      const apprentice = await loadApprentice(admin, row.user_id);
+      return { kind: "already_signed", order: mapOrderRow(row), apprentice };
+    }
+
+    if (rpcMsg.toLowerCase().includes("expired")) {
+      return { kind: "invalid", message: "This signing link has expired." };
+    }
+
+    const columnToken =
+      typeof row.signing_token === "string" ? row.signing_token.trim() : null;
+    if (columnToken === tokenTrimmed || isTokenValid(extractSigningMeta(row.video_urls), tokenTrimmed)) {
+      const apprentice = await loadApprentice(admin, row.user_id);
+      return { kind: "ok", order: mapOrderRow(row), apprentice };
+    }
+
     return { kind: "invalid", message: "This signing link is invalid or has expired." };
   }
+
+  const rpcRow = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as RpcSigningRow | null;
+  if (!rpcRow?.work_order_id) {
+    return { kind: "invalid", message: "This signing link is invalid or has expired." };
+  }
+
+  if (row) {
+    const apprentice = await loadApprentice(admin, row.user_id);
+    return { kind: "ok", order: mapOrderRow(row), apprentice };
+  }
+
+  const apprentice = await loadApprentice(admin, rpcRow.user_id);
+  const workOrder: PublicSignWorkOrder = {
+    id: rpcRow.work_order_id,
+    task_name: rpcRow.task_name,
+    competence_name: rpcRow.competence_name,
+    hours: rpcRow.hours != null ? Number(rpcRow.hours) : null,
+    status: rpcRow.status as WorkOrderStatus,
+    user_id: rpcRow.user_id,
+    period: 1,
+    competence_type: "mandatory",
+    signed_at: null
+  };
 
   return { kind: "ok", order: workOrder, apprentice };
 }
@@ -163,10 +299,15 @@ export async function completePublicMentorSign(
   }
 
   const admin = createSupabaseAdminClient();
-  const path = publicMentorSignaturePath(workOrderId);
+  const order = loaded.order;
+  const storagePath = publicMentorSignaturePath(order.user_id, workOrderId);
   const bucket = signatureBucketForUpload();
 
-  const { error: uploadErr } = await admin.storage.from(bucket).upload(path, pngBytes, {
+  if (!isExpectedMentorSignaturePath(storagePath, order.user_id, workOrderId)) {
+    return { ok: false, message: "Internal error: invalid mentor signature path." };
+  }
+
+  const { error: uploadErr } = await admin.storage.from(bucket).upload(storagePath, pngBytes, {
     contentType: "image/png",
     upsert: true
   });
@@ -175,39 +316,38 @@ export async function completePublicMentorSign(
     return { ok: false, message: uploadErr.message || "Failed to upload signature." };
   }
 
-  const signedAt = new Date().toISOString();
-  const order = loaded.order;
+  const { data: uploaded, error: verifyErr } = await admin.storage.from(bucket).download(storagePath);
 
-  const { error: updateErr } = await admin
-    .from(MAGICLOG_WORK_ORDERS_TABLE)
-    .update({
-      status: "signed",
-      signed_at: signedAt,
-      mentor_signature_url: path
-    })
-    .eq("id", workOrderId);
-
-  if (updateErr) {
-    return { ok: false, message: updateErr.message || "Failed to save signature." };
+  if (verifyErr || !uploaded || uploaded.size === 0) {
+    console.error("[completePublicMentorSign] verify upload:", verifyErr?.message ?? "empty file");
+    return { ok: false, message: "Signature upload could not be verified." };
   }
 
-  const hours = order.hours;
-  if (hours != null && Number.isFinite(hours) && hours > 0) {
-    await admin.from("hour_logs").insert({
-      user_id: order.user_id,
-      work_order_id: workOrderId,
-      hours,
-      period: order.period
-    });
+  const { error: rpcErr } = await admin.rpc("complete_work_order_signing_with_token", {
+    p_work_order_id: workOrderId,
+    p_token: token,
+    p_signature_path: storagePath
+  });
 
-    const profile = await fetchMagicLogProfile(admin, order.user_id);
-    await applySignedWorkOrderToProgress(admin, {
-      userId: order.user_id,
-      period: order.period,
-      hours,
-      competenceType: order.competence_type,
-      profile
-    });
+  if (rpcErr) {
+    console.error("[completePublicMentorSign] RPC failed", rpcErr);
+    return {
+      ok: false,
+      message:
+        rpcErr.message ||
+        "Failed to complete signing. Ensure Supabase migration_token_signing_rpc.sql is applied."
+    };
+  }
+
+  const { data: saved, error: readErr } = await admin
+    .from(MAGICLOG_WORK_ORDERS_TABLE)
+    .select("status, mentor_signature_url")
+    .eq("id", workOrderId)
+    .maybeSingle();
+
+  if (readErr || saved?.status !== "signed" || saved?.mentor_signature_url !== storagePath) {
+    console.error("[completePublicMentorSign] read-back", readErr, saved);
+    return { ok: false, message: "Signature was saved but work order could not be confirmed." };
   }
 
   return { ok: true };

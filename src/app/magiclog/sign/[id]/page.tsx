@@ -44,20 +44,11 @@ export default async function MentorPublicSignPage({
     );
   }
 
-  if (!token?.trim()) {
-    return (
-      <div className="mx-auto max-w-lg px-4 py-16 text-center">
-        <h1 className="text-xl font-bold text-zinc-900">Invalid link</h1>
-        <p className="mt-3 text-zinc-600">This signing link is missing a token.</p>
-      </div>
-    );
-  }
-
   return (
     <MentorPublicSignClient
       order={result.order}
       apprentice={result.apprentice}
-      token={token.trim()}
+      token={token!.trim()}
     />
   );
 }
