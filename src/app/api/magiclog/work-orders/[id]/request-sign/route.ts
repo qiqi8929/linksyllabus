@@ -8,6 +8,7 @@ import {
 } from "@/lib/magiclog/mentorSignLink";
 import { isWorkOrderLocked } from "@/lib/magiclog/workOrderStatus";
 import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
+import { updateWorkOrderSigningLink } from "@/lib/magiclog/workOrderSigningPatch";
 import type { MagicLogVideoRef } from "@/lib/magiclog/types";
 
 export const dynamic = "force-dynamic";
@@ -55,30 +56,16 @@ export async function POST(
   const mentor_name =
     String(body.mentorName ?? order.mentor_name ?? "").trim() || null;
 
-  const patch: Record<string, unknown> = {
+  const { error: updateError } = await updateWorkOrderSigningLink(supabase, params.id, user.id, {
     video_urls,
-    mentor_phone: phone
-  };
-  if (mentor_name) patch.mentor_name = mentor_name;
-  patch.signing_token = token;
-  patch.signing_token_expires = expiresAt;
-
-  const { error: updateError } = await supabase
-    .from(MAGICLOG_WORK_ORDERS_TABLE)
-    .update(patch)
-    .eq("id", params.id)
-    .eq("user_id", user.id);
+    mentor_phone: phone,
+    mentor_name,
+    signing_token: token,
+    signing_token_expires: expiresAt
+  });
 
   if (updateError) {
-    const withoutCols = { video_urls, mentor_name };
-    const { error: fallbackError } = await supabase
-      .from(MAGICLOG_WORK_ORDERS_TABLE)
-      .update(withoutCols)
-      .eq("id", params.id)
-      .eq("user_id", user.id);
-    if (fallbackError) {
-      return NextResponse.json({ error: fallbackError.message }, { status: 500 });
-    }
+    return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
   const signUrl = buildMentorSignUrl(params.id, token);

@@ -1,6 +1,25 @@
--- Public mentor SMS signing RPCs (legacy file — prefer migration_web_signing_e2e.sql).
--- migration_web_signing_e2e.sql adds columns + RPCs + NOTIFY pgrst reload in one step.
+-- Magic Log web mentor signing (end-to-end)
+-- Run once in Supabase SQL Editor. Safe to re-run (idempotent).
+-- Fixes: signing_token_expires column, RPC mentor_signature_url, PostgREST schema cache.
 
+-- ---------------------------------------------------------------------------
+-- 1) Columns required by SMS / public sign links
+-- ---------------------------------------------------------------------------
+alter table public.bluebook_work_orders
+  add column if not exists signing_token text,
+  add column if not exists signing_token_expires timestamptz,
+  add column if not exists mentor_phone text;
+
+comment on column public.bluebook_work_orders.signing_token is
+  'One-time token for public mentor sign link (cleared after sign-off).';
+comment on column public.bluebook_work_orders.signing_token_expires is
+  'Expiry for signing_token; null means no expiry.';
+comment on column public.bluebook_work_orders.mentor_signature_url is
+  'Storage path in bluebook-signatures bucket, e.g. {user_id}/{work_order_id}/mentor.png';
+
+-- ---------------------------------------------------------------------------
+-- 2) Token validation helper (column + video_urls JSON fallback)
+-- ---------------------------------------------------------------------------
 create or replace function public.work_order_signing_token_matches(
   p_signing_token text,
   p_signing_token_expires timestamptz,
@@ -10,6 +29,7 @@ create or replace function public.work_order_signing_token_matches(
 returns boolean
 language plpgsql
 stable
+set search_path = public
 as $$
 declare
   t text := nullif(trim(p_token), '');
@@ -49,6 +69,9 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------------------
+-- 3) Load work order for public sign page
+-- ---------------------------------------------------------------------------
 create or replace function public.get_work_order_for_signing(
   p_work_order_id uuid,
   p_token text
@@ -96,6 +119,9 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------------------
+-- 4) Complete sign-off: sets mentor_signature_url + clears token
+-- ---------------------------------------------------------------------------
 create or replace function public.complete_work_order_signing_with_token(
   p_work_order_id uuid,
   p_token text,
@@ -167,3 +193,8 @@ revoke all on function public.complete_work_order_signing_with_token(uuid, text,
 
 grant execute on function public.get_work_order_for_signing(uuid, text) to service_role;
 grant execute on function public.complete_work_order_signing_with_token(uuid, text, text) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- 5) Refresh PostgREST schema cache (fixes "column not in schema cache")
+-- ---------------------------------------------------------------------------
+notify pgrst, 'reload schema';

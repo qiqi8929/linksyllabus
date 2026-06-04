@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { persistMagicLogPlaySteps } from "@/lib/magiclog/persistPlaySteps";
-import { createSignatureSignedUrl } from "@/lib/magiclog/signatureStorage";
+import { resolveMentorSignatureSignedUrl } from "@/lib/magiclog/signatureStorage";
 import { buildQuickLogVideoMeta, isQuickLogWorkOrder } from "@/lib/magiclog/workOrderMode";
 import { isWorkOrderLocked } from "@/lib/magiclog/workOrderStatus";
 import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
@@ -72,7 +72,13 @@ export async function GET(
   const sigPath = data.mentor_signature_url as string | null;
   if (sigPath && !sigPath.startsWith("http")) {
     const admin = createSupabaseAdminClient();
-    mentorSignatureSignedUrl = await createSignatureSignedUrl(admin, sigPath, 60 * 60);
+    mentorSignatureSignedUrl = await resolveMentorSignatureSignedUrl(
+      admin,
+      sigPath,
+      user.id,
+      params.id,
+      60 * 60
+    );
   } else if (sigPath) {
     mentorSignatureSignedUrl = sigPath;
   }

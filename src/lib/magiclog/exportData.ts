@@ -7,7 +7,7 @@ import {
 import { estimatePeriodCompletionDate } from "@/lib/magiclog/periodProgress";
 import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
 import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
-import { createSignatureSignedUrl } from "@/lib/magiclog/signatureStorage";
+import { resolveMentorSignatureSignedUrl } from "@/lib/magiclog/signatureStorage";
 import type { MagicLogAiStep, MagicLogUserProfile, MagicLogWorkOrder } from "@/lib/magiclog/types";
 
 export type HourLogRow = {
@@ -26,11 +26,13 @@ export type SignedWorkOrderExport = MagicLogWorkOrder & {
   mentorSignatureSignedUrl: string | null;
 };
 
-async function signStoragePath(path: string | null): Promise<string | null> {
-  if (!path) return null;
-  if (path.startsWith("http")) return path;
+async function signStoragePath(
+  path: string | null,
+  userId: string,
+  workOrderId: string
+): Promise<string | null> {
   const admin = createSupabaseAdminClient();
-  return createSignatureSignedUrl(admin, path, 60 * 60);
+  return resolveMentorSignatureSignedUrl(admin, path, userId, workOrderId, 60 * 60);
 }
 
 export async function fetchSignedWorkOrdersForPeriod(
@@ -50,7 +52,11 @@ export async function fetchSignedWorkOrdersForPeriod(
   return Promise.all(
     rows.map(async (row) => ({
       ...row,
-      mentorSignatureSignedUrl: await signStoragePath(row.mentor_signature_url)
+      mentorSignatureSignedUrl: await signStoragePath(
+        row.mentor_signature_url,
+        row.user_id,
+        row.id
+      )
     }))
   );
 }
@@ -138,7 +144,11 @@ export async function fetchMagicLogExportBundle(
   const allSignedWithSigs: SignedWorkOrderExport[] = await Promise.all(
     ((allSigned ?? []) as MagicLogWorkOrder[]).map(async (row) => ({
       ...row,
-      mentorSignatureSignedUrl: await signStoragePath(row.mentor_signature_url)
+      mentorSignatureSignedUrl: await signStoragePath(
+        row.mentor_signature_url,
+        row.user_id,
+        row.id
+      )
     }))
   );
 

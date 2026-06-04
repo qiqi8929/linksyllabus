@@ -6,6 +6,7 @@ import {
 import { applySignedWorkOrderToProgress } from "@/lib/magiclog/periodProgress";
 import { fetchMagicLogProfile } from "@/lib/magiclog/profile";
 import { MAGICLOG_WORK_ORDERS_TABLE } from "@/lib/magiclog/tables";
+import { updateWorkOrderAfterMentorSign } from "@/lib/magiclog/workOrderSigningPatch";
 import type { CompetenceType, WorkOrderStatus } from "@/lib/magiclog/types";
 
 export type PublicSignWorkOrder = {
@@ -97,16 +98,12 @@ async function persistSignedWorkOrder(
   storagePath: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const signedAt = new Date().toISOString();
-  const { error: updateErr } = await admin
-    .from(MAGICLOG_WORK_ORDERS_TABLE)
-    .update({
-      status: "signed",
-      signed_at: signedAt,
-      mentor_signature_url: storagePath,
-      signing_token: null,
-      signing_token_expires: null
-    })
-    .eq("id", workOrderId);
+  const { error: updateErr } = await updateWorkOrderAfterMentorSign(
+    admin,
+    workOrderId,
+    storagePath,
+    signedAt
+  );
 
   if (updateErr) {
     console.error("[completePublicMentorSign] direct update failed", updateErr);
