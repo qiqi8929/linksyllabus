@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { ensureMagicLogUser, fetchMagicLogProfile } from "@/lib/magiclog/profile";
+import { updateUserProfilePatch } from "@/lib/magiclog/userProfilePatch";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,7 @@ export async function PATCH(req: Request) {
 
   await ensureMagicLogUser(supabase, { id: user.id, email: user.email });
 
-  const { error } = await supabase.from("users").update(patch).eq("id", user.id);
+  const { error } = await updateUserProfilePatch(supabase, user.id, patch);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

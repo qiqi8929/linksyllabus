@@ -738,6 +738,16 @@
   color: #1a1a1a;
 }
 
+/* globals.css sets w-full on all inputs — reset radios/checkboxes in Magic Log */
+.magiclog-root input[type="radio"],
+.magiclog-root input[type="checkbox"] {
+  width: auto;
+  max-width: none;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+}
+
 .magiclog-root .ml-province-option:has(input:disabled) {
   cursor: not-allowed;
   color: #71717a;

@@ -224,13 +224,14 @@ export function OnboardingWizard() {
                 <label key={t} className="ml-province-option">
                   <input
                     type="radio"
+                    className="ml-province-radio"
                     name="onboarding_trade"
                     value={t}
                     checked={trade === t}
                     onChange={() => setTrade(t)}
                   />
                   <span className="ml-province-label">
-                    {t} <span className="text-zinc-400">🔒</span>
+                    {t} <span className="text-zinc-400" aria-hidden>🔒</span>
                   </span>
                 </label>
               ))}
@@ -239,6 +240,7 @@ export function OnboardingWizard() {
               <label key={t} className="ml-province-option">
                 <input
                   type="radio"
+                  className="ml-province-radio"
                   name="onboarding_trade"
                   value={t}
                   checked={trade === t}

@@ -1,5 +1,6 @@
 -- Magic Log feature expansion (run in Supabase SQL editor)
--- For web mentor signing + RPCs, also run migration_web_signing_e2e.sql (includes these columns).
+-- For web mentor signing + RPCs, also run migration_web_signing_e2e.sql.
+-- For user profile columns (step 3 onboarding), run migration_users_profile_e2e.sql.
 
 alter table public.bluebook_work_orders
   add column if not exists signing_token text,

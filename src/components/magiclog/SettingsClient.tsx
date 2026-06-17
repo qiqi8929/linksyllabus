@@ -146,6 +146,7 @@ export function SettingsClient({ initialProfile }: { initialProfile: MagicLogUse
             <label key={t} className="ml-province-option">
               <input
                 type="radio"
+                className="ml-province-radio"
                 name="trade_radio"
                 checked={trade === t}
                 onChange={() => onTradeChange(t)}
@@ -158,6 +159,7 @@ export function SettingsClient({ initialProfile }: { initialProfile: MagicLogUse
             <label key={t} className="ml-province-option">
               <input
                 type="radio"
+                className="ml-province-radio"
                 name="trade_radio"
                 checked={trade === t}
                 onChange={() => onTradeChange(t)}

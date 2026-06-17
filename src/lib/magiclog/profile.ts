@@ -33,6 +33,17 @@ export async function fetchMagicLogProfile(
       .select(PROFILE_COLUMNS_BASE)
       .eq("id", userId)
       .maybeSingle());
+  } else if (
+    error &&
+    (error.message.includes("default_mentor") ||
+      error.message.includes("journeyman_certificate") ||
+      error.message.includes("schema cache"))
+  ) {
+    ({ data, error } = await supabase
+      .from("users")
+      .select(PROFILE_COLUMNS_BASE)
+      .eq("id", userId)
+      .maybeSingle());
   }
 
   if (error) {
